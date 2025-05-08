@@ -1,0 +1,8 @@
+__pycache__/
+*.DS_Store
+.VSCodeCounter
+logs
+gen_configs/
+gen_worlds/
+gen_runtimes/
+*.log
