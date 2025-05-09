@@ -21,22 +21,22 @@ def _create_startup_config(name: str) -> StartupConfiguration:
             fast_api_version="0.0.1",
             fast_api_description="description1",
         ),
-        ServiceConfiguration(
-            port=8501,
-            temperature=0.7,
-            api="/v1/llm_serve/chat/",
-            fast_api_title="title2",
-            fast_api_version="0.0.1",
-            fast_api_description="description2",
-        ),
-        ServiceConfiguration(
-            port=8502,
-            temperature=0.7,
-            api="/v1/llm_serve/chat/",
-            fast_api_title="title3",
-            fast_api_version="0.0.1",
-            fast_api_description="description3",
-        ),
+        # ServiceConfiguration(
+        #     port=8501,
+        #     temperature=0.7,
+        #     api="/v1/llm_serve/chat/",
+        #     fast_api_title="title2",
+        #     fast_api_version="0.0.1",
+        #     fast_api_description="description2",
+        # ),
+        # ServiceConfiguration(
+        #     port=8502,
+        #     temperature=0.7,
+        #     api="/v1/llm_serve/chat/",
+        #     fast_api_title="title3",
+        #     fast_api_version="0.0.1",
+        #     fast_api_description="description3",
+        # ),
     ]
     return agent_startup_config
 
