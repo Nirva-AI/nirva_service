@@ -12,15 +12,9 @@ def main(game_server: UserSessionServerInstance) -> None:
 
     from services.api_endpoints_services import api_endpoints_router
     from services.login_services import login_router
-
-    # from services.start_services import start_router
     from services.chat_action_services import chat_action_router
 
-    # from services.dungeon_gameplay_services import dungeon_gameplay_router
-    # from services.view_dungeon_services import view_dungeon_router
-    # from services.view_home_services import view_home_router
-    # from services.view_actor_services import view_actor_router
-
+    #
     game_server.fast_api.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -32,12 +26,7 @@ def main(game_server: UserSessionServerInstance) -> None:
     # API Endpoints
     game_server.fast_api.include_router(router=api_endpoints_router)
     game_server.fast_api.include_router(router=login_router)
-    # game_server.fast_api.include_router(router=start_router)
     game_server.fast_api.include_router(router=chat_action_router)
-    # game_server.fast_api.include_router(router=dungeon_gameplay_router)
-    # game_server.fast_api.include_router(router=view_dungeon_router)
-    # game_server.fast_api.include_router(router=view_home_router)
-    # game_server.fast_api.include_router(router=view_actor_router)
     # 加一些其他的。。。。。
 
     parser = argparse.ArgumentParser(description="启动 FastAPI 应用")
@@ -72,6 +61,6 @@ if __name__ == "__main__":
         initialize_user_session_server_instance(
             server_ip_address="0.0.0.0",
             server_port=8000,
-            local_network_ip="192.168.192.123",
+            local_network_ip="192.168.2.64",  # 192.168.2.64
         )
     )

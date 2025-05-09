@@ -8,7 +8,7 @@ from models_v_0_0_1 import (
 )
 from loguru import logger
 from llm_serves.chat_system import ChatSystem
-from game.options import ChatSystemOptions, UserSessionOptions
+from services.options import ChatSystemOptions, UserSessionOptions
 
 ###################################################################################################################################################################
 login_router = APIRouter()

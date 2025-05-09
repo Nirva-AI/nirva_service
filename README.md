@@ -15,7 +15,7 @@ pip install langchain langchain_core langserve langgraph fastapi langchain_opena
 ## 严格模式检查
 
 ```shell
-mypy --strict run_terminal_tcg_game.py run_user_session_server.py run_llm_serves.py simulator_client.py llm_serves/batch_start_langserve.py
+mypy --strict run_user_session_server.py run_llm_serves.py simulator_client.py llm_serves/batch_start_langserve.py
 ```
 
 ## 升级langchain

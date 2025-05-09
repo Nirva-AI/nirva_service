@@ -42,9 +42,9 @@ class SimulatorContext:
         user_name: str,
     ) -> None:
 
-        self._server_ip_address: Final[str] = server_ip_address  # "192.168.192.123"
-        self._server_port: Final[int] = server_port  # 8000
-        self._user_name: Final[str] = user_name  # "wei"
+        self._server_ip_address: Final[str] = server_ip_address
+        self._server_port: Final[int] = server_port
+        self._user_name: Final[str] = user_name
         self._api_endpoints_config: APIEndpointConfiguration = (
             APIEndpointConfiguration()
         )
@@ -134,7 +134,7 @@ async def _handle_chat_action(context: SimulatorContext, user_input: str) -> Non
 async def _simulator() -> None:
 
     simulator_context = SimulatorContext(
-        server_ip_address="192.168.192.123",
+        server_ip_address="192.168.2.64",
         server_port=8000,
         user_name="wei",
     )

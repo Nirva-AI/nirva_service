@@ -3,6 +3,4 @@ __pycache__/
 .VSCodeCounter
 logs
 gen_configs/
-gen_worlds/
-gen_runtimes/
 *.log
