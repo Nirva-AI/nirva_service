@@ -1,21 +1,21 @@
-from services.game_server import GameServer
+from services.user_session_server import UserSessionServer
 from fastapi import FastAPI, Depends
 from typing import Annotated
-from services.room_manager import RoomManager
-from services.game_server import ServerConfig
+from services.user_session_manager import UserSessionManager
+from services.user_session_server import ServerConfig
 
 
 ###############################################################################################################################################
-def initialize_game_server_instance(
+def initialize_user_session_server_instance(
     server_ip_address: str, server_port: int, local_network_ip: str
-) -> GameServer:
+) -> UserSessionServer:
 
-    assert GameServer._singleton is None
+    assert UserSessionServer._singleton is None
 
-    if GameServer._singleton is None:
-        GameServer._singleton = GameServer(
+    if UserSessionServer._singleton is None:
+        UserSessionServer._singleton = UserSessionServer(
             fast_api=FastAPI(),
-            room_manager=RoomManager(),
+            user_session_manager=UserSessionManager(),
             server_config=ServerConfig(
                 server_ip_address=server_ip_address,
                 server_port=server_port,
@@ -23,15 +23,17 @@ def initialize_game_server_instance(
             ),
         )
 
-    return GameServer._singleton
+    return UserSessionServer._singleton
 
 
 ###############################################################################################################################################
-def get_game_server_instance() -> GameServer:
-    assert GameServer._singleton is not None
-    return GameServer._singleton
+def get_user_session_server_instance() -> UserSessionServer:
+    assert UserSessionServer._singleton is not None
+    return UserSessionServer._singleton
 
 
 ###############################################################################################################################################
-GameServerInstance = Annotated[GameServer, Depends(get_game_server_instance)]
+UserSessionServerInstance = Annotated[
+    UserSessionServer, Depends(get_user_session_server_instance)
+]
 ###############################################################################################################################################

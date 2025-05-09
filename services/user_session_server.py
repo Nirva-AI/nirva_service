@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import Optional, Final
-from services.room_manager import RoomManager
+from services.user_session_manager import UserSessionManager
 from fastapi import FastAPI
 import os
 
@@ -14,21 +14,24 @@ class ServerConfig:
 
 
 ###############################################################################################################################################
-class GameServer:
+class UserSessionServer:
 
-    _singleton: Optional["GameServer"] = None
+    _singleton: Optional["UserSessionServer"] = None
 
     def __init__(
-        self, fast_api: FastAPI, room_manager: RoomManager, server_config: ServerConfig
+        self,
+        fast_api: FastAPI,
+        user_session_manager: UserSessionManager,
+        server_config: ServerConfig,
     ) -> None:
         self._fast_api: Final[FastAPI] = fast_api
-        self._room_manager: Final[RoomManager] = room_manager
+        self._user_session_manager: Final[UserSessionManager] = user_session_manager
         self._server_config: Final[ServerConfig] = server_config
 
     ###############################################################################################################################################
     @property
-    def room_manager(self) -> RoomManager:
-        return self._room_manager
+    def user_session_manager(self) -> UserSessionManager:
+        return self._user_session_manager
 
     ###############################################################################################################################################
     @property

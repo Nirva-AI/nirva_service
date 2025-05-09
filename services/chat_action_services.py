@@ -1,6 +1,6 @@
 from typing import List, Union
 from fastapi import APIRouter
-from services.game_server_instance import GameServerInstance
+from services.user_session_server_instance import UserSessionServerInstance
 from models_v_0_0_1 import (
     ChatActionRequest,
     ChatActionResponse,
@@ -10,14 +10,14 @@ from models_v_0_0_1 import (
     # HomeTransDungeonResponse,
 )
 from loguru import logger
-from llm_serves.chat_system import ChatSystem
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+
+# from llm_serves.chat_system import ChatSystem
+from langchain_core.messages import HumanMessage, AIMessage
 
 # from game.web_tcg_game import WebTCGGame
 from llm_serves.chat_request_handler import ChatRequestHandler
 
 # from game.tcg_game import TCGGameState
-
 
 
 ###########################################################################################################################
@@ -69,34 +69,84 @@ chat_action_router = APIRouter()
 @chat_action_router.post(path="/chat-action/v1/", response_model=ChatActionResponse)
 async def handle_chat_action(
     request_data: ChatActionRequest,
-    game_server: GameServerInstance,
+    user_session_server: UserSessionServerInstance,
 ) -> ChatActionResponse:
 
     logger.info(f"/chat-action/v1/: {request_data.model_dump_json()}")
 
-    server_url = "http://localhost:8500/v1/llm_serve/chat/"
-    chat_system = ChatSystem(
-        name="nirva_agent",
-        user_name=request_data.user_name,
-        localhost_urls=[server_url],
-    )
+    # 是否有房间？！！
+    # room_manager = game_server.room_manager
+    # if not room_manager.has_room(request_data.user_name):
+    #     logger.error(
+    #         f"home/gameplay/v1: {request_data.user_name} has no room, please login first."
+    #     )
+    #     return HomeGamePlayResponse(
+    #         error=1001,
+    #         message="没有登录，请先登录",
+    #     )
+    user_session_manager = user_session_server.user_session_manager
+    if not user_session_manager.has_user_session(request_data.user_name):
+        logger.error(
+            f"hchat-action/v1: {request_data.user_name} has no session, please login first."
+        )
+        return ChatActionResponse(
+            error=1001,
+            message="没有登录，请先登录",
+        )
 
-    chat_history: List[Union[SystemMessage, HumanMessage, AIMessage]] = []
-    chat_history.append(
-        SystemMessage(content="你需要扮演一个海盗与我对话，要用海盗的语气哦！")
-    )
+    # # 是否有游戏？！！
+    # current_room = room_manager.get_room(request_data.user_name)
+    # assert current_room is not None
+    # if current_room.game is None:
+    #     logger.error(
+    #         f"home/gameplay/v1: {request_data.user_name} has no game, please login first."
+    #     )
+    #     return HomeGamePlayResponse(
+    #         error=1002,
+    #         message="没有游戏，请先登录",
+    #     )
+
+    current_user_session = user_session_manager.get_user_session(request_data.user_name)
+    assert current_user_session is not None
+    if current_user_session.chat_system is None:
+        logger.error(
+            f"chat-action/v1: {request_data.user_name} has no chat_system, please login first."
+        )
+        return ChatActionResponse(
+            error=1002,
+            message="没有游戏，请先登录",
+        )
+    # assert current_user_session.chat_system is not None
+
+    # server_url = "http://localhost:8500/v1/llm_serve/chat/"
+    # chat_system = ChatSystem(
+    #     name="nirva_agent",
+    #     user_name=request_data.user_name,
+    #     localhost_urls=[server_url],
+    # )
+
+    # chat_system = current_user_session.chat_system
+
+    # chat_history: List[Union[SystemMessage, HumanMessage, AIMessage]] = []
+    # chat_history.append(
+    #     SystemMessage(content="你需要扮演一个海盗与我对话，要用海盗的语气哦！")
+    # )
 
     try:
         chat_request_handler = ChatRequestHandler(
             name=request_data.user_name,
             prompt=request_data.content,
-            chat_history=chat_history,
+            chat_history=current_user_session.chat_history,
         )
-        chat_system.handle(request_handlers=[chat_request_handler])
-        chat_history.append(HumanMessage(content=request_data.content))
-        chat_history.append(AIMessage(content=chat_request_handler.response_content))
+        current_user_session.chat_system.handle(request_handlers=[chat_request_handler])
+        current_user_session.chat_history.append(
+            HumanMessage(content=request_data.content)
+        )
+        current_user_session.chat_history.append(
+            AIMessage(content=chat_request_handler.response_content)
+        )
 
-        for msg in chat_history:
+        for msg in current_user_session.chat_history:
             logger.warning(msg.content)
 
         return ChatActionResponse(

@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from loguru import logger
-from services.game_server_instance import GameServerInstance
+from services.user_session_server_instance import UserSessionServerInstance
 from models_v_0_0_1 import (
     APIEndpointConfiguration,
     APIEndpointConfigurationResponse,
@@ -14,7 +14,7 @@ api_endpoints_router = APIRouter()
     path="/api_endpoints/v1/", response_model=APIEndpointConfigurationResponse
 )
 async def api_endpoints(
-    game_server: GameServerInstance,
+    game_server: UserSessionServerInstance,
 ) -> APIEndpointConfigurationResponse:
 
     logger.info("获取API路由")

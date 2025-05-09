@@ -1,12 +1,12 @@
 from fastapi.middleware.cors import CORSMiddleware
-from services.game_server_instance import (
-    GameServerInstance,
-    initialize_game_server_instance,
+from services.user_session_server_instance import (
+    UserSessionServerInstance,
+    initialize_user_session_server_instance,
 )
 
 
 ###############################################################################################################################################
-def main(game_server: GameServerInstance) -> None:
+def main(game_server: UserSessionServerInstance) -> None:
     import argparse
     import uvicorn
 
@@ -69,7 +69,7 @@ def main(game_server: GameServerInstance) -> None:
 if __name__ == "__main__":
     # 开局域网, 问题还是很多的，Unity可能涉及安全访问的问题。
     main(
-        initialize_game_server_instance(
+        initialize_user_session_server_instance(
             server_ip_address="0.0.0.0",
             server_port=8000,
             local_network_ip="192.168.192.123",

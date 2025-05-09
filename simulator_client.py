@@ -146,7 +146,7 @@ async def _simulator() -> None:
     while True:
         try:
             user_input = input(f"[{simulator_context._user_name}]: ")
-            if user_input.lower() in ["quit", "exit", "q"]:
+            if user_input.lower() in ["/quit", "/q"]:
                 print("退出！")
                 break
 
