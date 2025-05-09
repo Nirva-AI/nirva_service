@@ -15,17 +15,17 @@ from .world import AgentShortTermMemory
 @final
 @register_base_model_class
 class APIEndpointConfiguration(BaseModel):
-    TEST_URL: str = ""
+    # TEST_URL: str = ""
     LOGIN_URL: str = ""
     LOGOUT_URL: str = ""
-    START_URL: str = ""
-    HOME_GAMEPLAY_URL: str = ""
-    HOME_TRANS_DUNGEON_URL: str = ""
-    DUNGEON_GAMEPLAY_URL: str = ""
-    DUNGEON_TRANS_HOME_URL: str = ""
-    VIEW_HOME_URL: str = ""
-    VIEW_DUNGEON_URL: str = ""
-    VIEW_ACTOR_URL: str = ""
+    # START_URL: str = ""
+    # HOME_GAMEPLAY_URL: str = ""
+    # HOME_TRANS_DUNGEON_URL: str = ""
+    # DUNGEON_GAMEPLAY_URL: str = ""
+    # DUNGEON_TRANS_HOME_URL: str = ""
+    # VIEW_HOME_URL: str = ""
+    # VIEW_DUNGEON_URL: str = ""
+    # VIEW_ACTOR_URL: str = ""
 
 
 @final
@@ -45,7 +45,7 @@ class APIEndpointConfigurationResponse(BaseModel):
 @register_base_model_class
 class LoginRequest(BaseModel):
     user_name: str = ""
-    game_name: str = ""
+    # game_name: str = ""
 
 
 @final
@@ -64,7 +64,7 @@ class LoginResponse(BaseModel):
 @register_base_model_class
 class LogoutRequest(BaseModel):
     user_name: str = ""
-    game_name: str = ""
+    # game_name: str = ""
 
 
 @final

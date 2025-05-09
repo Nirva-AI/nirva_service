@@ -14,7 +14,7 @@ def _create_startup_config(name: str) -> StartupConfiguration:
     agent_startup_config.name = name
     agent_startup_config.service_configurations = [
         ServiceConfiguration(
-            port=8100,
+            port=8500,
             temperature=0.7,
             api="/v1/llm_serve/chat/",
             fast_api_title="title1",
@@ -22,7 +22,7 @@ def _create_startup_config(name: str) -> StartupConfiguration:
             fast_api_description="description1",
         ),
         ServiceConfiguration(
-            port=8101,
+            port=8501,
             temperature=0.7,
             api="/v1/llm_serve/chat/",
             fast_api_title="title2",
@@ -30,7 +30,7 @@ def _create_startup_config(name: str) -> StartupConfiguration:
             fast_api_description="description2",
         ),
         ServiceConfiguration(
-            port=8102,
+            port=8502,
             temperature=0.7,
             api="/v1/llm_serve/chat/",
             fast_api_title="title3",
