@@ -8,10 +8,30 @@ from models_v_0_0_1 import (
     LoginResponse,
     LogoutRequest,
     LogoutResponse,
+    ChatActionRequest,
+    ChatActionResponse,
 )
 import copy
 
 
+###########################################################################################################################
+def _extract_user_input(user_input: str, symbol: str) -> str:
+    assert symbol in user_input, f"symbol: {symbol} not in user_input: {user_input}"
+    assert symbol != "", f"symbol: {symbol} is empty string."
+    # 先去掉前面的空格。
+    user_input = user_input.strip()
+    # 如果没有/chat，就直接返回。
+    if not user_input.startswith(symbol):
+        return user_input
+
+    # 去掉/chat
+    user_input = user_input[len(symbol) :].strip()
+    return user_input
+
+
+###########################################################################################################################
+###########################################################################################################################
+###########################################################################################################################
 @final
 class SimulatorContext:
 
@@ -66,8 +86,8 @@ async def _handle_api_endpoints(context: SimulatorContext) -> None:
     )
     if response is not None:
         response_model = APIEndpointConfigurationResponse.model_validate(response)
-        #logger.debug(f"Response Model: {response_model.model_dump_json()}")
         context._api_endpoints_config = copy.copy(response_model.api_endpoints)
+        logger.info(f"api_endpoints: {response_model.model_dump_json()}")
 
 
 ###########################################################################################################################
@@ -79,7 +99,7 @@ async def _handle_login(context: SimulatorContext) -> None:
     )
     if response is not None:
         response_model = LoginResponse.model_validate(response)
-        logger.debug(f"_handle_login: {response_model.model_dump_json()}")
+        logger.info(f"login: {response_model.model_dump_json()}")
 
 
 ###########################################################################################################################
@@ -91,7 +111,23 @@ async def _handle_logout(context: SimulatorContext) -> None:
     )
     if response is not None:
         response_model = LogoutResponse.model_validate(response)
-        logger.debug(f"_handle_logout: {response_model.model_dump_json()}")
+        logger.info(f"logout: {response_model.model_dump_json()}")
+
+
+###########################################################################################################################
+async def _handle_chat_action(context: SimulatorContext, user_input: str) -> None:
+
+    content = _extract_user_input(user_input, "/chat")
+    assert content != "", f"content: {content} is empty string."
+
+    request_data = ChatActionRequest(user_name=context._user_name, content=content)
+    response = _post_request(
+        context._api_endpoints_config.CHAT_ACTION_URL,
+        data=request_data.model_dump(),
+    )
+    if response is not None:
+        response_model = ChatActionResponse.model_validate(response)
+        logger.info(f"chat_action: {response_model.model_dump_json()}")
 
 
 ###########################################################################################################################
@@ -103,19 +139,25 @@ async def _simulator() -> None:
         user_name="wei",
     )
 
+    # 直接开始。
+    await _handle_api_endpoints(simulator_context)
+    await _handle_login(simulator_context)
+
     while True:
         try:
-            user_input = input("User: ")
+            user_input = input(f"[{simulator_context._user_name}]: ")
             if user_input.lower() in ["quit", "exit", "q"]:
                 print("退出！")
                 break
 
-            if user_input == "/api_endpoints" or user_input == "/api":
+            if "/api" in user_input:
                 await _handle_api_endpoints(simulator_context)
-            elif user_input == "/login" or user_input == "/lin":
+            elif "/login" in user_input:
                 await _handle_login(simulator_context)
-            elif user_input == "/logout" or user_input == "/lot":
+            elif "/logout" in user_input:
                 await _handle_logout(simulator_context)
+            elif "/chat" in user_input:
+                await _handle_chat_action(simulator_context, user_input)
             else:
                 logger.info(f"Unknown command: {user_input}")
 
@@ -129,7 +171,6 @@ async def _simulator() -> None:
 
 ###########################################################################################################################
 async def main() -> None:
-    #
     await _simulator()
 
 

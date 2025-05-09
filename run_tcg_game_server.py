@@ -12,12 +12,14 @@ def main(game_server: GameServerInstance) -> None:
 
     from services.api_endpoints_services import api_endpoints_router
     from services.login_services import login_router
-    from services.start_services import start_router
-    from services.home_gameplay_services import home_gameplay_router
-    from services.dungeon_gameplay_services import dungeon_gameplay_router
-    from services.view_dungeon_services import view_dungeon_router
-    from services.view_home_services import view_home_router
-    from services.view_actor_services import view_actor_router
+
+    # from services.start_services import start_router
+    from services.chat_action_services import chat_action_router
+
+    # from services.dungeon_gameplay_services import dungeon_gameplay_router
+    # from services.view_dungeon_services import view_dungeon_router
+    # from services.view_home_services import view_home_router
+    # from services.view_actor_services import view_actor_router
 
     game_server.fast_api.add_middleware(
         CORSMiddleware,
@@ -30,12 +32,12 @@ def main(game_server: GameServerInstance) -> None:
     # API Endpoints
     game_server.fast_api.include_router(router=api_endpoints_router)
     game_server.fast_api.include_router(router=login_router)
-    game_server.fast_api.include_router(router=start_router)
-    game_server.fast_api.include_router(router=home_gameplay_router)
-    game_server.fast_api.include_router(router=dungeon_gameplay_router)
-    game_server.fast_api.include_router(router=view_dungeon_router)
-    game_server.fast_api.include_router(router=view_home_router)
-    game_server.fast_api.include_router(router=view_actor_router)
+    # game_server.fast_api.include_router(router=start_router)
+    game_server.fast_api.include_router(router=chat_action_router)
+    # game_server.fast_api.include_router(router=dungeon_gameplay_router)
+    # game_server.fast_api.include_router(router=view_dungeon_router)
+    # game_server.fast_api.include_router(router=view_home_router)
+    # game_server.fast_api.include_router(router=view_actor_router)
     # 加一些其他的。。。。。
 
     parser = argparse.ArgumentParser(description="启动 FastAPI 应用")

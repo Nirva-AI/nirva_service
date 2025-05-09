@@ -18,6 +18,7 @@ class APIEndpointConfiguration(BaseModel):
     # TEST_URL: str = ""
     LOGIN_URL: str = ""
     LOGOUT_URL: str = ""
+    CHAT_ACTION_URL: str = ""
     # START_URL: str = ""
     # HOME_GAMEPLAY_URL: str = ""
     # HOME_TRANS_DUNGEON_URL: str = ""
@@ -70,6 +71,25 @@ class LogoutRequest(BaseModel):
 @final
 @register_base_model_class
 class LogoutResponse(BaseModel):
+    error: int = 0
+    message: str = ""
+
+
+################################################################################################################
+################################################################################################################
+################################################################################################################
+
+
+@final
+@register_base_model_class
+class ChatActionRequest(BaseModel):
+    user_name: str = ""
+    content: str = ""
+
+
+@final
+@register_base_model_class
+class ChatActionResponse(BaseModel):
     error: int = 0
     message: str = ""
 

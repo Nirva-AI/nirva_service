@@ -33,6 +33,7 @@ async def api_endpoints(
         # 核心流程
         LOGIN_URL=f"http://{server_ip_address}:{server_port}/login/v1/",
         LOGOUT_URL=f"http://{server_ip_address}:{server_port}/logout/v1/",
+        CHAT_ACTION_URL=f"http://{server_ip_address}:{server_port}/chat-action/v1/",
         # START_URL=f"http://{server_ip_address}:{server_port}/start/v1/",
         # # Home 流程
         # HOME_GAMEPLAY_URL=f"http://{server_ip_address}:{server_port}/home/gameplay/v1/",
