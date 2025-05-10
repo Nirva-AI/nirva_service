@@ -1,16 +1,9 @@
 import sys
 from pathlib import Path
-from typing import Final, cast, List
-
-from loguru import logger
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
-import threading
+from typing import Final, cast
 from fastapi import FastAPI
-from llm_serves.service_config import (
-    GEN_CONFIGS_DIR,
-    StartupConfiguration,
-)
 from langchain.schema import HumanMessage
 from langgraph.graph.state import CompiledStateGraph
 from llm_serves.chat_request_protocol import (
@@ -22,6 +15,8 @@ from llm_serves.azure_chat_openai_gpt_4o_graph import (
     stream_graph_updates,
     State,
 )
+from config.configuration import LLMServerConfig, LLM_SERVER_CONFIG_PATH
+from loguru import logger
 
 
 ############################################################################################################
@@ -85,66 +80,39 @@ def launch_localhost_chat_server(
 
 
 ############################################################################################################
-def main(agent_startup_config_file_path: Path) -> None:
-
-    if not agent_startup_config_file_path.exists():
-        # 如果文件不存在，打印错误信息并返回
-        logger.error(f"配置文件不存在: {agent_startup_config_file_path}")
-        return
+def main() -> None:
 
     try:
 
-        config_file_content = agent_startup_config_file_path.read_text(encoding="utf-8")
-        agent_startup_config = StartupConfiguration.model_validate_json(
-            config_file_content
+        assert (
+            LLM_SERVER_CONFIG_PATH.exists()
+        ), f"找不到配置文件: {LLM_SERVER_CONFIG_PATH}"
+        config_file_content = LLM_SERVER_CONFIG_PATH.read_text(encoding="utf-8")
+        llm_server_config = LLMServerConfig.model_validate_json(config_file_content)
+
+        app = FastAPI(
+            title=llm_server_config.fast_api_title,
+            version=llm_server_config.fast_api_version,
+            description=llm_server_config.fast_api_description,
         )
 
-        if len(agent_startup_config.service_configurations) == 0:
-            print("没有找到配置")
-            return
+        chat_executor = ChatExecutor(
+            api=str(llm_server_config.api),
+            compiled_state_graph=create_compiled_stage_graph(
+                "azure_chat_openai_chatbot_node", llm_server_config.temperature
+            ),
+        )
 
-        threads: List[threading.Thread] = []
-        for config in agent_startup_config.service_configurations:
-            app = FastAPI(
-                title=config.fast_api_title,
-                version=config.fast_api_version,
-                description=config.fast_api_description,
-            )
-
-            chat_executor = ChatExecutor(
-                api=str(config.api),
-                compiled_state_graph=create_compiled_stage_graph(
-                    "azure_chat_openai_chatbot_node", config.temperature
-                ),
-            )
-
-            # 创建线程并传递当前配置的app和port
-            thread = threading.Thread(
-                target=launch_localhost_chat_server,
-                args=(app, config.port, chat_executor),
-            )
-            thread.daemon = True
-            thread.start()
-            threads.append(thread)
-
-        # 主线程等待所有子线程完成（实际uvicorn.run会阻塞）
-        for thread in threads:
-            thread.join()
+        launch_localhost_chat_server(
+            app=app,
+            port=llm_server_config.port,
+            chat_executor=chat_executor,
+        )
 
     except Exception as e:
-        print(f"Exception: {e}")
+        logger.error(f"Exception: {e}")
 
 
 ############################################################################################################
 if __name__ == "__main__":
-
-    if len(sys.argv) >= 2:
-        arguments = sys.argv[1:]  # 获取除脚本名称外的所有参数
-        print("接收到的参数:", arguments)
-        main(Path(str(arguments[0])))
-    else:
-        startup_config_file_path: Path = GEN_CONFIGS_DIR / "start_llm_serves.json"
-        assert (
-            startup_config_file_path.exists()
-        ), f"找不到配置文件: {startup_config_file_path}"
-        main(startup_config_file_path)
+    main()

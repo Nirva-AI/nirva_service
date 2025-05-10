@@ -8,10 +8,14 @@ from models_v_0_0_1 import (
     LoginResponse,
     LogoutRequest,
     LogoutResponse,
-    ChatActionRequest,
-    ChatActionResponse,
+    ConversationActionRequest,
+    ConversationActionResponse,
 )
 import copy
+from config.configuration import (
+    USER_SESSION_SERVER_CONFIG_PATH,
+    UserSessionServerConfig,
+)
 
 
 ###########################################################################################################################
@@ -20,11 +24,9 @@ def _extract_user_input(user_input: str, symbol: str) -> str:
     assert symbol != "", f"symbol: {symbol} is empty string."
     # 先去掉前面的空格。
     user_input = user_input.strip()
-    # 如果没有/chat，就直接返回。
     if not user_input.startswith(symbol):
         return user_input
 
-    # 去掉/chat
     user_input = user_input[len(symbol) :].strip()
     return user_input
 
@@ -115,27 +117,37 @@ async def _handle_logout(context: SimulatorContext) -> None:
 
 
 ###########################################################################################################################
-async def _handle_chat_action(context: SimulatorContext, user_input: str) -> None:
+async def _handle_conversation(context: SimulatorContext, user_input: str) -> None:
 
-    content = _extract_user_input(user_input, "/chat")
+    content = _extract_user_input(user_input, "/conversation")
     assert content != "", f"content: {content} is empty string."
 
-    request_data = ChatActionRequest(user_name=context._user_name, content=content)
+    request_data = ConversationActionRequest(
+        user_name=context._user_name, content=content
+    )
     response = _post_request(
-        context._api_endpoints_config.CHAT_ACTION_URL,
+        context._api_endpoints_config.CONVERSATION_ACTION_URL,
         data=request_data.model_dump(),
     )
     if response is not None:
-        response_model = ChatActionResponse.model_validate(response)
-        logger.info(f"chat_action: {response_model.model_dump_json()}")
+        response_model = ConversationActionResponse.model_validate(response)
+        logger.info(f"_handle_conversation: {response_model.model_dump_json()}")
 
 
 ###########################################################################################################################
 async def _simulator() -> None:
 
+    assert (
+        USER_SESSION_SERVER_CONFIG_PATH.exists()
+    ), f"找不到配置文件: {USER_SESSION_SERVER_CONFIG_PATH}"
+    config_file_content = USER_SESSION_SERVER_CONFIG_PATH.read_text(encoding="utf-8")
+    user_session_server_config = UserSessionServerConfig.model_validate_json(
+        config_file_content
+    )
+
     simulator_context = SimulatorContext(
-        server_ip_address="192.168.2.64",
-        server_port=8000,
+        server_ip_address=user_session_server_config.local_network_ip,
+        server_port=user_session_server_config.server_port,
         user_name="wei",
     )
 
@@ -156,8 +168,8 @@ async def _simulator() -> None:
                 await _handle_login(simulator_context)
             elif "/logout" in user_input:
                 await _handle_logout(simulator_context)
-            elif "/chat" in user_input:
-                await _handle_chat_action(simulator_context, user_input)
+            elif "/conversation" in user_input:
+                await _handle_conversation(simulator_context, user_input)
             else:
                 logger.info(f"Unknown command: {user_input}")
 

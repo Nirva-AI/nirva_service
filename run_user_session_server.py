@@ -3,16 +3,20 @@ from services.user_session_server_instance import (
     UserSessionServerInstance,
     initialize_user_session_server_instance,
 )
+from config.configuration import (
+    UserSessionServerConfig,
+    USER_SESSION_SERVER_CONFIG_PATH,
+)
 
 
 ###############################################################################################################################################
-def main(game_server: UserSessionServerInstance) -> None:
+def launch_user_session_server(game_server: UserSessionServerInstance) -> None:
     import argparse
     import uvicorn
 
     from services.api_endpoints_services import api_endpoints_router
     from services.login_services import login_router
-    from services.chat_action_services import chat_action_router
+    from services.conversation_action_services import conversation_action_router
 
     #
     game_server.fast_api.add_middleware(
@@ -26,7 +30,7 @@ def main(game_server: UserSessionServerInstance) -> None:
     # API Endpoints
     game_server.fast_api.include_router(router=api_endpoints_router)
     game_server.fast_api.include_router(router=login_router)
-    game_server.fast_api.include_router(router=chat_action_router)
+    game_server.fast_api.include_router(router=conversation_action_router)
     # 加一些其他的。。。。。
 
     parser = argparse.ArgumentParser(description="启动 FastAPI 应用")
@@ -55,12 +59,32 @@ def main(game_server: UserSessionServerInstance) -> None:
     )
 
 
-if __name__ == "__main__":
-    # 开局域网, 问题还是很多的，Unity可能涉及安全访问的问题。
-    main(
-        initialize_user_session_server_instance(
-            server_ip_address="0.0.0.0",
-            server_port=8000,
-            local_network_ip="192.168.2.64",  # 192.168.2.64
+###############################################################################################################################################
+def main() -> None:
+
+    try:
+        assert (
+            USER_SESSION_SERVER_CONFIG_PATH.exists()
+        ), f"找不到配置文件: {USER_SESSION_SERVER_CONFIG_PATH}"
+        config_file_content = USER_SESSION_SERVER_CONFIG_PATH.read_text(
+            encoding="utf-8"
         )
-    )
+        user_session_server_config = UserSessionServerConfig.model_validate_json(
+            config_file_content
+        )
+
+        launch_user_session_server(
+            initialize_user_session_server_instance(
+                server_ip_address=user_session_server_config.local_network_ip,
+                server_port=user_session_server_config.server_port,
+                local_network_ip=user_session_server_config.local_network_ip,
+            )
+        )
+
+    except Exception as e:
+        print(f"Exception: {e}")
+
+
+###############################################################################################################################################
+if __name__ == "__main__":
+    main()

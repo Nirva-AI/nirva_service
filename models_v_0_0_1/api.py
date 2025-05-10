@@ -13,7 +13,7 @@ from .registry import register_base_model_class
 class APIEndpointConfiguration(BaseModel):
     LOGIN_URL: str = ""
     LOGOUT_URL: str = ""
-    CHAT_ACTION_URL: str = ""
+    CONVERSATION_ACTION_URL: str = ""
 
 
 @final
@@ -67,14 +67,14 @@ class LogoutResponse(BaseModel):
 
 @final
 @register_base_model_class
-class ChatActionRequest(BaseModel):
+class ConversationActionRequest(BaseModel):
     user_name: str = ""
     content: str = ""
 
 
 @final
 @register_base_model_class
-class ChatActionResponse(BaseModel):
+class ConversationActionResponse(BaseModel):
     error: int = 0
     message: str = ""
 

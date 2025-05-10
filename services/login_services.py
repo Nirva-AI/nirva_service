@@ -1,4 +1,7 @@
+from pathlib import Path
+from typing import List
 from fastapi import APIRouter
+from config.configuration import LLMServerConfig
 from services.user_session_server_instance import UserSessionServerInstance
 from models_v_0_0_1 import (
     LoginRequest,
@@ -8,7 +11,8 @@ from models_v_0_0_1 import (
 )
 from loguru import logger
 from llm_serves.chat_system import ChatSystem
-from services.options import ChatSystemOptions, UserSessionOptions
+from services.options import UserSessionOptions
+from config.configuration import LLM_SERVER_CONFIG_PATH
 
 ###################################################################################################################################################################
 login_router = APIRouter()
@@ -42,18 +46,20 @@ async def login(
             f"login/v1: {request_data.user_name} create session = {new_user_session._user_name}"
         )
 
-        # 创建ChatSystemOptions
-        chat_system_setup_options = ChatSystemOptions(
-            user=request_data.user_name,
-            # game="",
-            server_setup_config="gen_configs/start_llm_serves.json",
-        )
+        config_file_content = LLM_SERVER_CONFIG_PATH.read_text(encoding="utf-8")
+        assert (
+            LLM_SERVER_CONFIG_PATH.exists()
+        ), f"找不到配置文件: {LLM_SERVER_CONFIG_PATH}"
+        llm_server_config = LLMServerConfig.model_validate_json(config_file_content)
+        localhost_urls: List[str] = [
+            f"http://localhost:{llm_server_config.port}{llm_server_config.api}"
+        ]
 
         # 创建ChatSystem
         new_user_session._chat_system = ChatSystem(
-            name=f"{chat_system_setup_options.user}-chatsystem",
-            user_name=chat_system_setup_options.user,
-            localhost_urls=chat_system_setup_options.localhost_urls,
+            name=f"{request_data.user_name}-chatsystem",
+            user_name=request_data.user_name,
+            localhost_urls=localhost_urls,
         )
 
     # 获取
