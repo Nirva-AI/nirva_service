@@ -1,5 +1,5 @@
 from typing import List, Optional, Union
-from llm_serves.chat_system import ChatSystem
+from llm_serves.chat_request_manager import ChatRequestManager
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 
 
@@ -7,7 +7,7 @@ class UserSession:
 
     def __init__(self, user_name: str) -> None:
         self._user_name = user_name
-        self._chat_system: Optional[ChatSystem] = None
+        self._chat_system: Optional[ChatRequestManager] = None
         self._chat_history: List[Union[SystemMessage, HumanMessage, AIMessage]] = []
         self._chat_history.append(
             SystemMessage(content="你需要扮演一个海盗与我对话，要用海盗的语气哦！")
@@ -15,7 +15,7 @@ class UserSession:
 
     ###############################################################################################################################################
     @property
-    def chat_system(self) -> Optional[ChatSystem]:
+    def chat_system(self) -> Optional[ChatRequestManager]:
         return self._chat_system
 
     ###############################################################################################################################################

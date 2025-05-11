@@ -4,8 +4,7 @@ from pydantic import BaseModel
 
 
 ############################################################################################################
-class ChatRequestModel(BaseModel):
-    agent_name: str = ""
+class ChatServiceRequestModel(BaseModel):
     user_name: str = ""
     input: str = ""
     chat_history: List[Union[SystemMessage, HumanMessage, AIMessage]] = []
@@ -15,8 +14,7 @@ class ChatRequestModel(BaseModel):
 
 
 ############################################################################################################
-class ChatResponseModel(BaseModel):
-    agent_name: str = ""
+class ChatServiceResponseModel(BaseModel):
     user_name: str = ""
     output: str = ""
 

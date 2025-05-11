@@ -31,7 +31,7 @@ async def api_endpoints(
     generated_api_endpoints: APIEndpointConfiguration = APIEndpointConfiguration(
         LOGIN_URL=f"http://{server_ip_address}:{server_port}/login/v1/",
         LOGOUT_URL=f"http://{server_ip_address}:{server_port}/logout/v1/",
-        CONVERSATION_ACTION_URL=f"http://{server_ip_address}:{server_port}/action/conversation/v1/",
+        CHAT_ACTION_URL=f"http://{server_ip_address}:{server_port}/action/chat/v1/",
     )
 
     return APIEndpointConfigurationResponse(

@@ -10,7 +10,7 @@ from models_v_0_0_1 import (
     LogoutResponse,
 )
 from loguru import logger
-from llm_serves.chat_system import ChatSystem
+from llm_serves.chat_request_manager import ChatRequestManager
 from services.options import UserSessionOptions
 from config.configuration import LLM_SERVER_CONFIG_PATH
 
@@ -56,9 +56,9 @@ async def login(
         ]
 
         # 创建ChatSystem
-        new_user_session._chat_system = ChatSystem(
-            name=f"{request_data.user_name}-chatsystem",
-            user_name=request_data.user_name,
+        new_user_session._chat_system = ChatRequestManager(
+            # name=f"{request_data.user_name}-chatsystem",
+            # user_name=request_data.user_name,
             localhost_urls=localhost_urls,
         )
 

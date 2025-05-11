@@ -4,19 +4,14 @@ import httpx
 import asyncio
 import asyncio
 import time
-from llm_serves.chat_request_handler import ChatRequestHandler
+from llm_serves.chat_service_request import ChatServiceRequest
 
 
 @final
-class ChatSystem:
+class ChatRequestManager:
 
     ################################################################################################################################################################################
-    def __init__(self, name: str, user_name: str, localhost_urls: List[str]) -> None:
-
-        # 名字
-        self._name: Final[str] = name
-
-        self._user_name: Final[str] = user_name
+    def __init__(self, localhost_urls: List[str]) -> None:
 
         # 运行的服务器
         assert len(localhost_urls) > 0
@@ -26,7 +21,7 @@ class ChatSystem:
         self._async_client: Final[httpx.AsyncClient] = httpx.AsyncClient()
 
     ################################################################################################################################################################################
-    async def gather(self, request_handlers: List[ChatRequestHandler]) -> List[Any]:
+    async def gather(self, request_handlers: List[ChatServiceRequest]) -> List[Any]:
 
         if len(request_handlers) == 0:
             return []
@@ -38,7 +33,7 @@ class ChatSystem:
         for idx, handler in enumerate(request_handlers):
             # 循环复用
             endpoint_url = self._localhost_urls[idx % len(self._localhost_urls)]
-            handler._user_name = self._user_name
+            # handler._user_name = self._user_name
             coros.append(handler.a_request(self._async_client, endpoint_url))
 
         # 允许异常捕获，不中断其他请求
@@ -55,7 +50,7 @@ class ChatSystem:
         return batch_results
 
     ################################################################################################################################################################################
-    def handle(self, request_handlers: List[ChatRequestHandler]) -> None:
+    def handle(self, request_handlers: List[ChatServiceRequest]) -> None:
 
         if len(request_handlers) == 0:
             return
@@ -65,7 +60,7 @@ class ChatSystem:
 
         for request_handler in request_handlers:
             start_time = time.time()
-            request_handler._user_name = self._user_name
+            # request_handler._user_name = self._user_name
             request_handler.request(self._localhost_urls[0])
             end_time = time.time()
             logger.debug(f"ChatSystem.handle:{end_time - start_time:.2f} seconds")

@@ -8,8 +8,8 @@ from models_v_0_0_1 import (
     LoginResponse,
     LogoutRequest,
     LogoutResponse,
-    ConversationActionRequest,
-    ConversationActionResponse,
+    ChatActionRequest,
+    ChatActionResponse,
 )
 import copy
 from config.configuration import (
@@ -117,21 +117,19 @@ async def _handle_logout(context: SimulatorContext) -> None:
 
 
 ###########################################################################################################################
-async def _handle_conversation(context: SimulatorContext, user_input: str) -> None:
+async def _handle_chat_action(context: SimulatorContext, user_input: str) -> None:
 
-    content = _extract_user_input(user_input, "/conversation")
+    content = _extract_user_input(user_input, "/chat")
     assert content != "", f"content: {content} is empty string."
 
-    request_data = ConversationActionRequest(
-        user_name=context._user_name, content=content
-    )
+    request_data = ChatActionRequest(user_name=context._user_name, content=content)
     response = _post_request(
-        context._api_endpoints_config.CONVERSATION_ACTION_URL,
+        context._api_endpoints_config.CHAT_ACTION_URL,
         data=request_data.model_dump(),
     )
     if response is not None:
-        response_model = ConversationActionResponse.model_validate(response)
-        logger.info(f"_handle_conversation: {response_model.model_dump_json()}")
+        response_model = ChatActionResponse.model_validate(response)
+        logger.info(f"_handle_chat_action: {response_model.model_dump_json()}")
 
 
 ###########################################################################################################################
@@ -168,8 +166,8 @@ async def _simulator() -> None:
                 await _handle_login(simulator_context)
             elif "/logout" in user_input:
                 await _handle_logout(simulator_context)
-            elif "/conversation" in user_input:
-                await _handle_conversation(simulator_context, user_input)
+            elif "/chat" in user_input:
+                await _handle_chat_action(simulator_context, user_input)
             else:
                 logger.info(f"Unknown command: {user_input}")
 

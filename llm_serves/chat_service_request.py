@@ -2,31 +2,29 @@ from loguru import logger
 from typing import List, Union, Optional, Final, final
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 import httpx
-from llm_serves.chat_request_protocol import (
-    ChatRequestModel,
-    ChatResponseModel,
+from llm_serves.chat_service_api import (
+    ChatServiceRequestModel,
+    ChatServiceResponseModel,
 )
 import requests
 
 
 @final
-class ChatRequestHandler:
+class ChatServiceRequest:
 
     ################################################################################################################################################################################
     def __init__(
         self,
-        name: str,
+        user_name: str,
         prompt: str,
         chat_history: List[Union[SystemMessage, HumanMessage, AIMessage]],
-        user_name: str = "",
     ) -> None:
 
-        self._name = name
         self._prompt: Final[str] = prompt
         self._chat_history: List[Union[SystemMessage, HumanMessage, AIMessage]] = (
             chat_history
         )
-        self._response: Optional[ChatResponseModel] = None
+        self._response: Optional[ChatServiceResponseModel] = None
         self._user_name: str = user_name
         self._timeout: Final[int] = 30
 
@@ -38,23 +36,22 @@ class ChatRequestHandler:
         return self._response.output
 
     ################################################################################################################################################################################
-    def request(self, url: str) -> Optional[ChatResponseModel]:
+    def request(self, url: str) -> Optional[ChatServiceResponseModel]:
 
         assert self._response is None
         assert url != ""
 
         if self._prompt == "" or url == "":
-            logger.error(f"{self._name}: request error: prompt or url is empty")
+            logger.error(f"{self._user_name}: request error: prompt or url is empty")
             return None
 
         try:
 
-            logger.debug(f"{self._name} request prompt:\n{self._prompt}")
+            logger.debug(f"{self._user_name} request prompt:\n{self._prompt}")
 
             response = requests.post(
                 url=url,
-                json=ChatRequestModel(
-                    agent_name=self._name,
+                json=ChatServiceRequestModel(
                     user_name=self._user_name,
                     input=self._prompt,
                     chat_history=self._chat_history,
@@ -63,9 +60,11 @@ class ChatRequestHandler:
             )
 
             if response.status_code == 200:
-                self._response = ChatResponseModel.model_validate(response.json())
+                self._response = ChatServiceResponseModel.model_validate(
+                    response.json()
+                )
                 logger.info(
-                    f"{self._name} request-response:\n{self._response.model_dump_json()}"
+                    f"{self._user_name} request-response:\n{self._response.model_dump_json()}"
                 )
             else:
                 logger.error(
@@ -73,30 +72,29 @@ class ChatRequestHandler:
                 )
 
         except Exception as e:
-            logger.error(f"{self._name}: request error: {e}")
+            logger.error(f"{self._user_name}: request error: {e}")
 
         return self._response
 
     ################################################################################################################################################################################
     async def a_request(
         self, client: httpx.AsyncClient, url: str
-    ) -> Optional[ChatResponseModel]:
+    ) -> Optional[ChatServiceResponseModel]:
 
         assert self._response is None
         assert url != ""
 
         if self._prompt == "" or url == "":
-            logger.error(f"{self._name}: a_request error: prompt or url is empty")
+            logger.error(f"{self._user_name}: a_request error: prompt or url is empty")
             return None
 
         try:
 
-            logger.debug(f"{self._name} a_request prompt:\n{self._prompt}")
+            logger.debug(f"{self._user_name} a_request prompt:\n{self._prompt}")
 
             response = await client.post(
                 url=url,
-                json=ChatRequestModel(
-                    agent_name=self._name,
+                json=ChatServiceRequestModel(
                     user_name=self._user_name,
                     input=self._prompt,
                     chat_history=self._chat_history,
@@ -105,9 +103,11 @@ class ChatRequestHandler:
             )
 
             if response.status_code == 200:
-                self._response = ChatResponseModel.model_validate(response.json())
+                self._response = ChatServiceResponseModel.model_validate(
+                    response.json()
+                )
                 logger.info(
-                    f"{self._name} a_request-response:\n{self._response.model_dump_json()}"
+                    f"{self._user_name} a_request-response:\n{self._response.model_dump_json()}"
                 )
             else:
                 logger.error(
@@ -115,7 +115,7 @@ class ChatRequestHandler:
                 )
 
         except Exception as e:
-            logger.error(f"{self._name}: a_request error: {e}")
+            logger.error(f"{self._user_name}: a_request error: {e}")
 
         return self._response
 
