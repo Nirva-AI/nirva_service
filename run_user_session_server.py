@@ -1,4 +1,6 @@
+import datetime
 from fastapi.middleware.cors import CORSMiddleware
+from loguru import logger
 from services.user_session_server_instance import (
     UserSessionServerInstance,
     initialize_user_session_server_instance,
@@ -6,11 +8,18 @@ from services.user_session_server_instance import (
 from config.configuration import (
     UserSessionServerConfig,
     USER_SESSION_SERVER_CONFIG_PATH,
+    LOGS_DIR,
 )
 
 
 ###############################################################################################################################################
-def launch_user_session_server(game_server: UserSessionServerInstance) -> None:
+def _setup_logger() -> None:
+    log_start_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    logger.add(LOGS_DIR / f"{log_start_time}.log", level="DEBUG")
+
+
+###############################################################################################################################################
+def _launch_user_session_server(game_server: UserSessionServerInstance) -> None:
     import uvicorn
 
     from services.api_endpoints_services import api_endpoints_router
@@ -51,7 +60,9 @@ def main() -> None:
             config_file_content
         )
 
-        launch_user_session_server(
+        _setup_logger()
+
+        _launch_user_session_server(
             initialize_user_session_server_instance(
                 server_ip_address=user_session_server_config.local_network_ip,
                 server_port=user_session_server_config.server_port,

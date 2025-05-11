@@ -7,16 +7,10 @@ class UserSession:
 
     def __init__(self, user_name: str) -> None:
         self._user_name = user_name
-        self._chat_system: Optional[ChatRequestManager] = None
         self._chat_history: List[Union[SystemMessage, HumanMessage, AIMessage]] = []
         self._chat_history.append(
             SystemMessage(content="你需要扮演一个海盗与我对话，要用海盗的语气哦！")
         )
-
-    ###############################################################################################################################################
-    @property
-    def chat_system(self) -> Optional[ChatRequestManager]:
-        return self._chat_system
 
     ###############################################################################################################################################
     @property

@@ -35,22 +35,22 @@ async def handle_chat_action(
 
     current_user_session = user_session_manager.get_user_session(request_data.user_name)
     assert current_user_session is not None
-    if current_user_session.chat_system is None:
-        logger.error(
-            f"action/chat/v1: {request_data.user_name} has no chat_system, please login first."
-        )
-        return ChatActionResponse(
-            error=1002,
-            message="没有游戏，请先登录",
-        )
 
     try:
+
+        # 组织请求
         chat_request_handler = ChatServiceRequest(
             user_name=request_data.user_name,
             prompt=request_data.content,
             chat_history=current_user_session.chat_history,
         )
-        current_user_session.chat_system.handle(request_handlers=[chat_request_handler])
+
+        # 处理请求
+        user_session_manager.chat_request_manager.handle(
+            request_handlers=[chat_request_handler]
+        )
+
+        # 处理返回添加上下文。
         current_user_session.chat_history.append(
             HumanMessage(content=request_data.content)
         )
@@ -58,6 +58,7 @@ async def handle_chat_action(
             AIMessage(content=chat_request_handler.response_content)
         )
 
+        # 打印聊天记录
         for msg in current_user_session.chat_history:
             logger.warning(msg.content)
 
@@ -67,12 +68,10 @@ async def handle_chat_action(
         )
 
     except Exception as e:
-        logger.error(f"Exception: {e}")
-
-    return ChatActionResponse(
-        error=1000,
-        message="未知的请求类型, 不能处理！",
-    )
+        return ChatActionResponse(
+            error=1002,
+            message=f"处理请求失败: {e}",
+        )
 
 
 ###################################################################################################################################################################

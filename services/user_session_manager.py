@@ -1,4 +1,6 @@
-from typing import Optional, Dict
+from typing import Final, Optional, Dict
+from config.configuration import LLM_SERVER_CONFIG_PATH, LLMServerConfig
+from llm_serves.chat_request_manager import ChatRequestManager
 from services.user_session import UserSession
 
 
@@ -6,6 +8,27 @@ class UserSessionManager:
 
     def __init__(self) -> None:
         self._user_sessions: Dict[str, UserSession] = {}
+        self._chat_request_manager: Final[ChatRequestManager] = (
+            self._create_chat_request_manager()
+        )
+
+    ###############################################################################################################################################
+    @property
+    def chat_request_manager(self) -> ChatRequestManager:
+        return self._chat_request_manager
+
+    ###############################################################################################################################################
+    def _create_chat_request_manager(self) -> ChatRequestManager:
+        config_file_content = LLM_SERVER_CONFIG_PATH.read_text(encoding="utf-8")
+        assert (
+            LLM_SERVER_CONFIG_PATH.exists()
+        ), f"找不到配置文件: {LLM_SERVER_CONFIG_PATH}"
+        llm_server_config = LLMServerConfig.model_validate_json(config_file_content)
+        return ChatRequestManager(
+            localhost_urls=[
+                f"http://localhost:{llm_server_config.port}{llm_server_config.api}"
+            ],
+        )
 
     ###############################################################################################################################################
     def has_user_session(self, user_name: str) -> bool:
