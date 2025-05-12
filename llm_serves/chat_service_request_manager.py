@@ -3,11 +3,11 @@ from typing import Final, List, Any, final
 import httpx
 import asyncio
 import time
-from llm_serves.chat_service_request import ChatServiceRequest
+from llm_serves.chat_service_request_handler import ChatServiceRequestHandler
 
 
 @final
-class ChatRequestManager:
+class ChatServiceRequestManager:
 
     ################################################################################################################################################################################
     def __init__(self, localhost_urls: List[str]) -> None:
@@ -19,8 +19,13 @@ class ChatRequestManager:
         # 异步请求客户端
         self._async_client: Final[httpx.AsyncClient] = httpx.AsyncClient()
 
+        # 不同的请求分配到不同的 URL
+        self._request_distribution_index: int = 0
+
     ################################################################################################################################################################################
-    async def gather(self, request_handlers: List[ChatServiceRequest]) -> List[Any]:
+    async def gather(
+        self, request_handlers: List[ChatServiceRequestHandler]
+    ) -> List[Any]:
 
         if len(request_handlers) == 0:
             return []
@@ -38,7 +43,9 @@ class ChatRequestManager:
         start_time = time.time()
         batch_results = await asyncio.gather(*coros, return_exceptions=True)
         end_time = time.time()
-        logger.debug(f"ChatSystem.gather:{end_time - start_time:.2f} seconds")
+        logger.debug(
+            f"ChatServiceRequestManager.gather:{end_time - start_time:.2f} seconds"
+        )
 
         # 记录失败请求
         for result in batch_results:
@@ -48,7 +55,7 @@ class ChatRequestManager:
         return batch_results
 
     ################################################################################################################################################################################
-    def handle(self, request_handlers: List[ChatServiceRequest]) -> None:
+    def handle(self, request_handlers: List[ChatServiceRequestHandler]) -> None:
 
         if len(request_handlers) == 0:
             return
@@ -56,10 +63,19 @@ class ChatRequestManager:
         if len(self._localhost_urls) == 0:
             return
 
-        for request_handler in request_handlers:
+        for idx, request_handler in enumerate(request_handlers):
+            # 根据 self._handle_count 循环分配 URL
+            endpoint_url = self._localhost_urls[
+                (self._request_distribution_index + idx) % len(self._localhost_urls)
+            ]
             start_time = time.time()
-            request_handler.request(self._localhost_urls[0])
+            request_handler.request(endpoint_url)
             end_time = time.time()
-            logger.debug(f"ChatSystem.handle:{end_time - start_time:.2f} seconds")
+            logger.debug(
+                f"ChatServiceRequestManager.handle:{end_time - start_time:.2f} seconds"
+            )
+
+        # 更新 self._handle_count
+        self._request_distribution_index += len(request_handlers)
 
     ################################################################################################################################################################################

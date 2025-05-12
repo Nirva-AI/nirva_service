@@ -1,5 +1,5 @@
 from typing import List, Optional, Union
-from llm_serves.chat_request_manager import ChatRequestManager
+from llm_serves.chat_service_request_manager import ChatServiceRequestManager
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 
 

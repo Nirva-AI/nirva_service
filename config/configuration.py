@@ -20,7 +20,7 @@ class LLMServerConfig(BaseModel):
 class UserSessionServerConfig(BaseModel):
     server_ip_address: str = "0.0.0.0"
     server_port: int = 8000
-    local_network_ip: str = "192.168.2.64"
+    local_network_ip: str = "192.168.192.135"
 
 
 ##################################################################################################################
@@ -39,18 +39,18 @@ assert GEN_CONFIGS_DIR.exists(), f"找不到目录: {GEN_CONFIGS_DIR}"
 
 # 生成配置文件, 写死先
 LLM_SERVER_CONFIG_PATH = GEN_CONFIGS_DIR / "llm_server_config.json"
-if not LLM_SERVER_CONFIG_PATH.exists():
-    llm_server_config = LLMServerConfig()
-    LLM_SERVER_CONFIG_PATH.write_text(
-        llm_server_config.model_dump_json(),
-        encoding="utf-8",
-    )
+# if not LLM_SERVER_CONFIG_PATH.exists():
+llm_server_config = LLMServerConfig()
+LLM_SERVER_CONFIG_PATH.write_text(
+    llm_server_config.model_dump_json(),
+    encoding="utf-8",
+)
 
 # 生成配置文件, 写死先
 USER_SESSION_SERVER_CONFIG_PATH = GEN_CONFIGS_DIR / "user_session_server_config.json"
-if not USER_SESSION_SERVER_CONFIG_PATH.exists():
-    user_session_server_config = UserSessionServerConfig()
-    USER_SESSION_SERVER_CONFIG_PATH.write_text(
-        user_session_server_config.model_dump_json(),
-        encoding="utf-8",
-    )
+# if not USER_SESSION_SERVER_CONFIG_PATH.exists():
+user_session_server_config = UserSessionServerConfig()
+USER_SESSION_SERVER_CONFIG_PATH.write_text(
+    user_session_server_config.model_dump_json(),
+    encoding="utf-8",
+)

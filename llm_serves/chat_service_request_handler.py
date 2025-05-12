@@ -3,14 +3,14 @@ from typing import List, Union, Optional, Final, final
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 import httpx
 from llm_serves.chat_service_api import (
-    ChatServiceRequestModel,
-    ChatServiceResponseModel,
+    ChatServiceRequest,
+    ChatServiceResponse,
 )
 import requests
 
 
 @final
-class ChatServiceRequest:
+class ChatServiceRequestHandler:
 
     ################################################################################################################################################################################
     def __init__(
@@ -24,7 +24,7 @@ class ChatServiceRequest:
         self._chat_history: List[Union[SystemMessage, HumanMessage, AIMessage]] = (
             chat_history
         )
-        self._response: Optional[ChatServiceResponseModel] = None
+        self._response: Optional[ChatServiceResponse] = None
         self._user_name: str = user_name
         self._timeout: Final[int] = 30
 
@@ -36,7 +36,7 @@ class ChatServiceRequest:
         return self._response.output
 
     ################################################################################################################################################################################
-    def request(self, url: str) -> Optional[ChatServiceResponseModel]:
+    def request(self, url: str) -> Optional[ChatServiceResponse]:
 
         assert self._response is None
         assert url != ""
@@ -51,7 +51,7 @@ class ChatServiceRequest:
 
             response = requests.post(
                 url=url,
-                json=ChatServiceRequestModel(
+                json=ChatServiceRequest(
                     user_name=self._user_name,
                     input=self._prompt,
                     chat_history=self._chat_history,
@@ -60,9 +60,7 @@ class ChatServiceRequest:
             )
 
             if response.status_code == 200:
-                self._response = ChatServiceResponseModel.model_validate(
-                    response.json()
-                )
+                self._response = ChatServiceResponse.model_validate(response.json())
                 logger.info(
                     f"{self._user_name} request-response:\n{self._response.model_dump_json()}"
                 )
@@ -79,7 +77,7 @@ class ChatServiceRequest:
     ################################################################################################################################################################################
     async def a_request(
         self, client: httpx.AsyncClient, url: str
-    ) -> Optional[ChatServiceResponseModel]:
+    ) -> Optional[ChatServiceResponse]:
 
         assert self._response is None
         assert url != ""
@@ -94,7 +92,7 @@ class ChatServiceRequest:
 
             response = await client.post(
                 url=url,
-                json=ChatServiceRequestModel(
+                json=ChatServiceRequest(
                     user_name=self._user_name,
                     input=self._prompt,
                     chat_history=self._chat_history,
@@ -103,9 +101,7 @@ class ChatServiceRequest:
             )
 
             if response.status_code == 200:
-                self._response = ChatServiceResponseModel.model_validate(
-                    response.json()
-                )
+                self._response = ChatServiceResponse.model_validate(response.json())
                 logger.info(
                     f"{self._user_name} a_request-response:\n{self._response.model_dump_json()}"
                 )

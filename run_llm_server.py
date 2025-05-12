@@ -7,8 +7,8 @@ from fastapi import FastAPI
 from langchain.schema import HumanMessage
 from langgraph.graph.state import CompiledStateGraph
 from llm_serves.chat_service_api import (
-    ChatServiceRequestModel,
-    ChatServiceResponseModel,
+    ChatServiceRequest,
+    ChatServiceResponse,
 )
 from llm_serves.azure_chat_openai_gpt_4o_graph import (
     create_compiled_stage_graph,
@@ -33,9 +33,7 @@ class ChatProcessor:
         return self._api
 
     ############################################################################################################
-    def process_chat_request(
-        self, request: ChatServiceRequestModel
-    ) -> ChatServiceResponseModel:
+    def process_chat_request(self, request: ChatServiceRequest) -> ChatServiceResponse:
 
         # 聊天历史
         chat_history_state: State = {
@@ -54,12 +52,12 @@ class ChatProcessor:
 
         # 返回
         if len(update_messages) > 0:
-            return ChatServiceResponseModel(
+            return ChatServiceResponse(
                 # agent_name=request.agent_name,
                 user_name=request.user_name,
                 output=cast(str, update_messages[-1].content),
             )
-        return ChatServiceResponseModel(user_name=request.user_name, output="")
+        return ChatServiceResponse(user_name=request.user_name, output="")
 
 
 ############################################################################################################
@@ -67,10 +65,10 @@ def launch_localhost_chat_server(
     app: FastAPI, port: int, chat_executor: ChatProcessor
 ) -> None:
 
-    @app.post(path=chat_executor.post_url, response_model=ChatServiceResponseModel)
+    @app.post(path=chat_executor.post_url, response_model=ChatServiceResponse)
     async def process_chat_request(
-        request_data: ChatServiceRequestModel,
-    ) -> ChatServiceResponseModel:
+        request_data: ChatServiceRequest,
+    ) -> ChatServiceResponse:
         return chat_executor.process_chat_request(request_data)
 
     # 启动 FastAPI 应用
