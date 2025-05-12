@@ -64,7 +64,7 @@ def main() -> None:
 
         _launch_user_session_server(
             initialize_user_session_server_instance(
-                server_ip_address=user_session_server_config.local_network_ip,
+                server_ip_address=user_session_server_config.server_ip_address,
                 server_port=user_session_server_config.server_port,
                 local_network_ip=user_session_server_config.local_network_ip,
             )
