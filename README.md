@@ -12,7 +12,12 @@ conda activate Name
 pip install langchain langchain_core langserve langgraph fastapi langchain_openai sse_starlette faiss-cpu loguru mypy pandas openpyxl overrides Jinja2 jsonschema black pandas-stubs uvicorn "python-jose[cryptography]" passlib requests python-multipart bcrypt types-python-jose pip install types-passlib
 ```
 
-pip install fastapi uvicorn "python-jose[cryptography]" passlib requests
+## 需要特别注意
+
+```shell
+pip uninstall bcrypt -y
+pip install bcrypt==3.2.2  # 已知兼容 passlib 1.7.4 的版本
+```
 
 ## 严格模式检查
 

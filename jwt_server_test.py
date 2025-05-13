@@ -4,12 +4,14 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
-from typing import Optional, Dict, Any
+from typing import Final, Optional, Dict, Any
 
 # 配置参数
-SECRET_KEY = "your-secret-key-here-please-change-it"  # 生产环境要用更复杂的密钥
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+SECRET_KEY: Final[str] = (
+    "your-secret-key-here-please-change-it"  # 生产环境要用更复杂的密钥
+)
+ALGORITHM: Final[str] = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES: Final[int] = 30
 
 # 模拟数据库中的用户数据
 fake_users_db: Dict[str, Dict[str, str]] = {
