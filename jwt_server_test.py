@@ -116,11 +116,14 @@ async def get_protected_data(
 def main() -> None:
     import uvicorn
 
-    # 启动 FastAPI 应用
-    uvicorn.run(app, host="localhost", port=8000)
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=8000,
+        ssl_keyfile="./localhost+3-key.pem",
+        ssl_certfile="./localhost+3.pem",
+    )
 
 
 if __name__ == "__main__":
     main()
-
-

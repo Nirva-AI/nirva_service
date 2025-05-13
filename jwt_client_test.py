@@ -2,7 +2,7 @@ import requests
 from typing import Final, Optional, Dict, cast
 
 # 服务器地址
-BASE_URL: Final[str] = "http://localhost:8000"
+BASE_URL: Final[str] = "https://localhost:8000"
 
 
 def login() -> Optional[str]:
