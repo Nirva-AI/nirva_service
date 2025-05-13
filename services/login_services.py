@@ -34,6 +34,8 @@ async def login(
         logger.info(
             f"login/v1: {request_data.user_name} create session = {new_user_session._user_name}"
         )
+    else:
+        logger.info(f"login/v1: {request_data.user_name} found, update session")
 
     # 获取
     current_user_session = user_session_manager.get_user_session(request_data.user_name)

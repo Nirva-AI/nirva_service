@@ -15,7 +15,7 @@ pip install langchain langchain_core langserve langgraph fastapi langchain_opena
 ## 严格模式检查
 
 ```shell
-mypy --strict run_user_session_server.py simulator_client.py run_llm_server.py
+mypy --strict run_user_session_server.py simulator_client.py run_llm_server.py run_script.py
 ```
 
 ## 启动LLM Server

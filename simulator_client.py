@@ -143,8 +143,12 @@ async def _simulator() -> None:
         config_file_content
     )
 
+    final_server_ip_address = user_session_server_config.server_ip_address
+    if final_server_ip_address == "0.0.0.0":
+        final_server_ip_address = user_session_server_config.local_network_ip
+
     simulator_context = SimulatorContext(
-        server_ip_address=user_session_server_config.local_network_ip,
+        server_ip_address=final_server_ip_address,
         server_port=user_session_server_config.server_port,
         user_name="wei",
     )

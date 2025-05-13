@@ -18,9 +18,9 @@ class LLMServerConfig(BaseModel):
 ##################################################################################################################
 # 启动一个服务的配置
 class UserSessionServerConfig(BaseModel):
-    server_ip_address: str = "127.0.0.1"
+    server_ip_address: str = "0.0.0.0"
     server_port: int = 8000
-    local_network_ip: str = "192.168.2.64"
+    local_network_ip: str = "192.168.192.121"
 
 
 ##################################################################################################################

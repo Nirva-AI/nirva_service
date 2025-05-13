@@ -36,6 +36,14 @@ async def handle_chat_action(
     current_user_session = user_session_manager.get_user_session(request_data.user_name)
     assert current_user_session is not None
 
+    # 在这里写一个等待，故意等一会
+    # import time
+    # time.sleep(5)
+    # return ChatActionResponse(
+    #     error=0,
+    #     message=request_data.content,
+    # )
+
     try:
 
         # 组织请求
