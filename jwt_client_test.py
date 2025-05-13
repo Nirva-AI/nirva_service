@@ -4,6 +4,11 @@ from typing import Final, Optional, Dict, cast
 # 服务器地址
 BASE_URL: Final[str] = "https://localhost:8000"
 
+# mkcert 根证书路径
+MKCERT_ROOT_CA: Final[str] = (
+    r"/Users/yanghang/Library/Application Support/mkcert/rootCA.pem"
+)
+
 
 def login() -> Optional[str]:
     username = input("请输入用户名: ")
@@ -12,6 +17,7 @@ def login() -> Optional[str]:
     response = requests.post(
         f"{BASE_URL}/token",
         data={"username": username, "password": password, "grant_type": "password"},
+        verify=MKCERT_ROOT_CA,  # 使用 mkcert 的根证书
     )
 
     if response.status_code == 200:
@@ -25,7 +31,11 @@ def login() -> Optional[str]:
 
 def get_protected_data(token: str) -> Dict[str, str]:
     headers = {"Authorization": f"Bearer {token}"}
-    response = requests.get(f"{BASE_URL}/protected-data", headers=headers)
+    response = requests.get(
+        f"{BASE_URL}/protected-data",
+        headers=headers,
+        verify=MKCERT_ROOT_CA,  # 使用 mkcert 的根证书
+    )
 
     if response.status_code == 200:
         return cast(Dict[str, str], response.json())
@@ -35,8 +45,8 @@ def get_protected_data(token: str) -> Dict[str, str]:
 
 def main() -> None:
     # 测试流程
+    token: Optional[str] = None  # 初始化 token
     while True:
-
         user_input = input(
             "请输入操作: /q 是退出, /r 是重新登录: /g 是获取受保护数据: "
         )
