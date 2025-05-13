@@ -1,8 +1,8 @@
 import requests
-from typing import Optional, Dict, cast
+from typing import Final, Optional, Dict, cast
 
 # 服务器地址
-BASE_URL = "http://localhost:8000"
+BASE_URL: Final[str] = "http://localhost:8000"
 
 
 def login() -> Optional[str]:
@@ -33,13 +33,8 @@ def get_protected_data(token: str) -> Dict[str, str]:
         return {"error": "访问失败"}
 
 
-if __name__ == "__main__":
+def main() -> None:
     # 测试流程
-    token = login()
-    if token:
-        data = get_protected_data(token)
-        print("受保护数据响应:", data)
-
     while True:
 
         user_input = input(
@@ -63,9 +58,6 @@ if __name__ == "__main__":
         else:
             print("无效的操作，请重新输入")
 
-        # token = login()
-        # if token:
-        #     data = get_protected_data(token)
-        #     print("受保护数据响应:", data)
-        # else:
-        #     print("登录失败，请检查用户名和密码")
+
+if __name__ == "__main__":
+    main()
