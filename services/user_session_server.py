@@ -1,16 +1,7 @@
-from dataclasses import dataclass
 from typing import Optional, Final
 from services.user_session_manager import UserSessionManager
 from fastapi import FastAPI
 import os
-
-
-###############################################################################################################################################
-@dataclass
-class ServerConfig:
-    server_ip_address: str
-    server_port: int
-    local_network_ip: str
 
 
 ###############################################################################################################################################
@@ -22,11 +13,16 @@ class UserSessionServer:
         self,
         fast_api: FastAPI,
         user_session_manager: UserSessionManager,
-        server_config: ServerConfig,
+        server_ip_address: str,
+        server_port: int,
+        local_network_ip: str,
     ) -> None:
+
         self._fast_api: Final[FastAPI] = fast_api
         self._user_session_manager: Final[UserSessionManager] = user_session_manager
-        self._server_config: Final[ServerConfig] = server_config
+        self._server_ip_address: Final[str] = server_ip_address
+        self._server_port: Final[int] = server_port
+        self._local_network_ip: Final[str] = local_network_ip
 
     ###############################################################################################################################################
     @property
@@ -35,23 +31,18 @@ class UserSessionServer:
 
     ###############################################################################################################################################
     @property
-    def server_config(self) -> ServerConfig:
-        return self._server_config
-
-    ###############################################################################################################################################
-    @property
     def server_ip_address(self) -> str:
-        return self._server_config.server_ip_address
+        return self._server_ip_address
 
     ###############################################################################################################################################
     @property
     def server_port(self) -> int:
-        return self._server_config.server_port
+        return self._server_port
 
     ###############################################################################################################################################
     @property
     def local_network_ip(self) -> str:
-        return self._server_config.local_network_ip
+        return self._local_network_ip
 
     ###############################################################################################################################################
     @property

@@ -41,8 +41,8 @@ def _launch_user_session_server(game_server: UserSessionServerInstance) -> None:
 
     uvicorn.run(
         game_server.fast_api,
-        host=game_server._server_config.server_ip_address,
-        port=game_server._server_config.server_port,
+        host=game_server.server_ip_address,
+        port=game_server.server_port,
     )
 
 
