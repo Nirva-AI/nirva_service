@@ -5,11 +5,11 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 from typing import cast
 from fastapi import FastAPI
 from langchain.schema import HumanMessage
-from llm_service.chat_service_api import (
+from llm_services.chat_service_api import (
     ChatServiceRequest,
     ChatServiceResponse,
 )
-from llm_service.azure_chat_openai_gpt_4o_graph import (
+from llm_services.azure_chat_openai_gpt_4o_graph import (
     create_compiled_stage_graph,
     stream_graph_updates,
     State,
@@ -20,20 +20,23 @@ from config.configuration import LLMServerConfig, LLM_SERVER_CONFIG_PATH
 assert LLM_SERVER_CONFIG_PATH.exists(), f"找不到配置文件: {LLM_SERVER_CONFIG_PATH}"
 config_file_content = LLM_SERVER_CONFIG_PATH.read_text(encoding="utf-8")
 llm_server_config = LLMServerConfig.model_validate_json(config_file_content)
-
+############################################################################################################
 # 初始化 FastAPI 应用
 app = FastAPI(
     title=llm_server_config.fast_api_title,
     version=llm_server_config.fast_api_version,
     description=llm_server_config.fast_api_description,
 )
-
+############################################################################################################
 # 创建状态图
 compiled_state_graph = create_compiled_stage_graph(
     "azure_chat_openai_chatbot_node", llm_server_config.temperature
 )
 
 
+############################################################################################################
+############################################################################################################
+############################################################################################################
 # 定义处理聊天请求的路由
 @app.post(path=str(llm_server_config.api), response_model=ChatServiceResponse)
 async def process_chat_request(

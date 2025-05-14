@@ -3,7 +3,7 @@ from typing import Final, List, Any, final
 import httpx
 import asyncio
 import time
-from llm_service.chat_service_request_handler import ChatServiceRequestHandler
+from llm_services.chat_service_request_handler import ChatServiceRequestHandler
 
 
 @final

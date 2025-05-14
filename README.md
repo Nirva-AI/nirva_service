@@ -26,6 +26,12 @@ mypy --strict run_user_session_server.py simulator_client.py run_chat_server.py
 mypy --strict jwt_server_test.py jwt_client_test.py
 ```
 
+## 用pm2 批量启动 chat_server + user_session_server
+
+```shell
+./run_pm2script.sh
+```
+
 ## 升级langchain
 
 ```shell
@@ -38,3 +44,14 @@ pip show langchain langchain_core langserve langchain_openai langchain-community
 ```shell
 conda install pytest
 ```
+
+## 简单授权/身份验证 + JWT 的 demo
+
+- jwt_client_test.py
+- jwt_server_test.py
+
+## LB（ Ngnix ）的 demo
+
+- app.py
+- run1.sh
+- run2.sh

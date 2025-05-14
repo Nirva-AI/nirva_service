@@ -1,12 +1,12 @@
 from fastapi import APIRouter
-from services.user_session_server_instance import UserSessionServerInstance
+from user_services.user_session_server_instance import UserSessionServerInstance
 from models_v_0_0_1 import (
     ChatActionRequest,
     ChatActionResponse,
 )
 from loguru import logger
 from langchain_core.messages import HumanMessage, AIMessage
-from llm_service.chat_service_request_handler import ChatServiceRequestHandler
+from llm_services.chat_service_request_handler import ChatServiceRequestHandler
 
 ###################################################################################################################################################################
 chat_action_router = APIRouter()

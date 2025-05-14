@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from services.user_session_server_instance import UserSessionServerInstance
+from user_services.user_session_server_instance import UserSessionServerInstance
 from models_v_0_0_1 import (
     LoginRequest,
     LoginResponse,

@@ -1,7 +1,7 @@
 from typing import Final, Optional, Dict
 from config.configuration import LLM_SERVER_CONFIG_PATH, LLMServerConfig
-from llm_service.chat_service_request_manager import ChatServiceRequestManager
-from services.user_session import UserSession
+from llm_services.chat_service_request_manager import ChatServiceRequestManager
+from user_services.user_session import UserSession
 
 
 class UserSessionManager:
