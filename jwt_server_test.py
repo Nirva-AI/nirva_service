@@ -13,6 +13,7 @@ SECRET_KEY: Final[str] = (
 ALGORITHM: Final[str] = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES: Final[int] = 30
 ENABLE_HTTPS: Final[bool] = True  # 是否使用 HTTPS，默认是 False
+REFRESH_TOKEN_EXPIRE_DAYS: Final[int] = 7
 
 # 模拟数据库中的用户数据
 fake_users_db: Dict[str, Dict[str, str]] = {
@@ -27,6 +28,7 @@ fake_users_db: Dict[str, Dict[str, str]] = {
 class Token(BaseModel):
     access_token: str
     token_type: str
+    refresh_token: str  # 新增字段
 
 
 class User(BaseModel):
@@ -54,6 +56,21 @@ def create_access_token(
         expire = datetime.now() + expires_delta
     else:
         expire = datetime.now() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+
+def create_refresh_token(
+    data: Dict[str, Any], expires_delta: Optional[timedelta] = None
+) -> str:
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.now() + expires_delta
+    else:
+        expire = datetime.now() + timedelta(
+            days=REFRESH_TOKEN_EXPIRE_DAYS
+        )  # 默认 7 天有效期
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
@@ -103,7 +120,47 @@ async def login_for_access_token(
     access_token = create_access_token(
         data={"sub": user["username"]}, expires_delta=access_token_expires
     )
-    return Token(access_token=access_token, token_type="bearer")
+    refresh_token_expires = timedelta(days=7)  # 设置 refresh_token 的过期时间
+    refresh_token = create_refresh_token(
+        data={"sub": user["username"]}, expires_delta=refresh_token_expires
+    )
+    return Token(
+        access_token=access_token, token_type="bearer", refresh_token=refresh_token
+    )
+
+
+@app.post("/refresh-token", response_model=Token)
+async def refresh_access_token(refresh_token: str) -> Token:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="无效的刷新令牌",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: Optional[str] = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+
+    user = fake_users_db.get(username)
+    if user is None:
+        raise credentials_exception
+
+    # 生成新的 access_token
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": username}, expires_delta=access_token_expires
+    )
+    # 生成新的 refresh_token
+    refresh_token_expires = timedelta(days=7)
+    new_refresh_token = create_refresh_token(
+        data={"sub": username}, expires_delta=refresh_token_expires
+    )
+    return Token(
+        access_token=access_token, token_type="bearer", refresh_token=new_refresh_token
+    )
 
 
 # 受保护的测试接口

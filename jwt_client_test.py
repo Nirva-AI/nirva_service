@@ -37,6 +37,22 @@ def login(username: str, password: str) -> Optional[str]:
         return None
 
 
+def refresh_token(refresh_token: str) -> Optional[str]:
+    response = requests.post(
+        f"{BASE_URL}/refresh-token",
+        json={"refresh_token": refresh_token},
+        verify=ENABLE_HTTPS and MKCERT_ROOT_CA or None,
+    )
+
+    if response.status_code == 200:
+        token: str = response.json()["access_token"]
+        print("刷新令牌成功！新令牌已获取")
+        return token
+    else:
+        print("刷新令牌失败，请重新登录")
+        return None
+
+
 def get_protected_data(token: str) -> Dict[str, str]:
     headers = {"Authorization": f"Bearer {token}"}
     response = requests.get(
@@ -55,6 +71,7 @@ def get_protected_data(token: str) -> Dict[str, str]:
 def main() -> None:
     # 测试流程
     token: Optional[str] = None  # 初始化 token
+    refresh_token_value: Optional[str] = None  # 初始化 refresh_token
     while True:
         user_input = input(
             "请输入操作: /q 是退出, /a 是自动登录，/r 是重新登录: /g 是获取受保护数据: "
@@ -79,6 +96,11 @@ def main() -> None:
         elif user_input == "/g":
             if token:
                 data = get_protected_data(token)
+                if "error" in data and refresh_token_value:
+                    print("访问失败，尝试刷新令牌...")
+                    token = refresh_token(refresh_token_value)
+                    if token:
+                        data = get_protected_data(token)
                 print("受保护数据响应:", data)
             else:
                 print("请先登录")
