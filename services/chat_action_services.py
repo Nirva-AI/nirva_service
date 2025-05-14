@@ -57,7 +57,7 @@ async def handle_chat_action(
         user_session_manager.chat_service_request_manager.handle(
             request_handlers=[chat_request_handler]
         )
-        
+
         if chat_request_handler.response_content != "":
             # 处理返回添加上下文。
             current_user_session.chat_history.append(
@@ -81,6 +81,11 @@ async def handle_chat_action(
             error=1002,
             message=f"处理请求失败: {e}",
         )
+
+    return ChatActionResponse(
+        error=1003,
+        message="处理请求失败: 未知错误",
+    )
 
 
 ###################################################################################################################################################################

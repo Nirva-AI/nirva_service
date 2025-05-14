@@ -122,8 +122,7 @@ async def _handle_url_config(context: SimulatorContext) -> None:
     if response is not None:
         context._url_configuration = URLConfigurationResponse.model_validate(response)
         logger.info(f"api_endpoints: {context._url_configuration.model_dump_json()}")
-        
-        
+
         # 生成配置文件, 写死先
         url_config_file_path = GEN_CONFIGS_DIR / "url_config.json"
         url_config_file_path.write_text(
