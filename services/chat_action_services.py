@@ -6,7 +6,7 @@ from models_v_0_0_1 import (
 )
 from loguru import logger
 from langchain_core.messages import HumanMessage, AIMessage
-from llm_serves.chat_service_request_handler import ChatServiceRequestHandler
+from llm_service.chat_service_request_handler import ChatServiceRequestHandler
 
 ###################################################################################################################################################################
 chat_action_router = APIRouter()

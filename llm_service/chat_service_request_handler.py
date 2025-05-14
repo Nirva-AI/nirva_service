@@ -2,7 +2,7 @@ from loguru import logger
 from typing import List, Union, Optional, Final, final
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 import httpx
-from llm_serves.chat_service_api import (
+from llm_service.chat_service_api import (
     ChatServiceRequest,
     ChatServiceResponse,
 )

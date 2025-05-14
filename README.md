@@ -22,15 +22,8 @@ pip install bcrypt==3.2.2  # 已知兼容 passlib 1.7.4 的版本
 ## 严格模式检查
 
 ```shell
-mypy --strict run_user_session_server.py simulator_client.py run_llm_server.py run_script.py
+mypy --strict run_user_session_server.py simulator_client.py run_chat_server.py
 mypy --strict jwt_server_test.py jwt_client_test.py
-```
-
-## 启动LLM Server
-
-```shell
-pm2 start run_llm_server.py
-pm2 start run_llm_server.py run_user_session_server.py
 ```
 
 ## 升级langchain
