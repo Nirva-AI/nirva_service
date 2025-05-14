@@ -57,23 +57,24 @@ async def handle_chat_action(
         user_session_manager.chat_service_request_manager.handle(
             request_handlers=[chat_request_handler]
         )
+        
+        if chat_request_handler.response_content != "":
+            # 处理返回添加上下文。
+            current_user_session.chat_history.append(
+                HumanMessage(content=request_data.content)
+            )
+            current_user_session.chat_history.append(
+                AIMessage(content=chat_request_handler.response_content)
+            )
 
-        # 处理返回添加上下文。
-        current_user_session.chat_history.append(
-            HumanMessage(content=request_data.content)
-        )
-        current_user_session.chat_history.append(
-            AIMessage(content=chat_request_handler.response_content)
-        )
+            # 打印聊天记录
+            for msg in current_user_session.chat_history:
+                logger.warning(msg.content)
 
-        # 打印聊天记录
-        for msg in current_user_session.chat_history:
-            logger.warning(msg.content)
-
-        return ChatActionResponse(
-            error=0,
-            message=chat_request_handler.response_content,
-        )
+            return ChatActionResponse(
+                error=0,
+                message=chat_request_handler.response_content,
+            )
 
     except Exception as e:
         return ChatActionResponse(
