@@ -22,7 +22,7 @@ def _setup_logger() -> None:
 def _launch_user_session_server(game_server: UserSessionServerInstance) -> None:
     import uvicorn
 
-    from services.api_endpoints_services import api_endpoints_router
+    from services.url_config_services import url_config_router
     from services.login_services import login_router
     from services.chat_action_services import chat_action_router
 
@@ -35,7 +35,7 @@ def _launch_user_session_server(game_server: UserSessionServerInstance) -> None:
         allow_headers=["*"],
     )
 
-    game_server.fast_api.include_router(router=api_endpoints_router)
+    game_server.fast_api.include_router(router=url_config_router)
     game_server.fast_api.include_router(router=login_router)
     game_server.fast_api.include_router(router=chat_action_router)
 

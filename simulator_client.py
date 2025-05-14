@@ -2,8 +2,7 @@ from typing import Any, Dict, Final, Union, cast, final
 from loguru import logger
 import requests
 from models_v_0_0_1 import (
-    APIEndpointConfiguration,
-    APIEndpointConfigurationResponse,
+    URLConfigurationResponse,
     LoginRequest,
     LoginResponse,
     LogoutRequest,
@@ -11,7 +10,7 @@ from models_v_0_0_1 import (
     ChatActionRequest,
     ChatActionResponse,
 )
-import copy
+
 from config.configuration import (
     USER_SESSION_SERVER_CONFIG_PATH,
     UserSessionServerConfig,
@@ -47,14 +46,27 @@ class SimulatorContext:
         self._server_ip_address: Final[str] = server_ip_address
         self._server_port: Final[int] = server_port
         self._user_name: Final[str] = user_name
-        self._api_endpoints_config: APIEndpointConfiguration = (
-            APIEndpointConfiguration()
-        )
+        self._url_configuration: URLConfigurationResponse = URLConfigurationResponse()
 
     ###########################################################################################################################
     @property
-    def api_endpoints_url(self) -> str:
-        return f"http://{self._server_ip_address}:{self._server_port}/api_endpoints/v1/"
+    def config_url(self) -> str:
+        return f"http://{self._server_ip_address}:{self._server_port}/config"
+
+    ###########################################################################################################################
+    @property
+    def login_url(self) -> str:
+        return self._url_configuration.endpoints["login"]
+
+    ###########################################################################################################################
+    @property
+    def logout_url(self) -> str:
+        return self._url_configuration.endpoints["logout"]
+
+    ###########################################################################################################################
+    @property
+    def chat_action_url(self) -> str:
+        return self._url_configuration.endpoints["chat"]
 
 
 ###########################################################################################################################
@@ -81,22 +93,41 @@ def _post_request(
 
 
 ###########################################################################################################################
-async def _handle_api_endpoints(context: SimulatorContext) -> None:
-    response = _post_request(
-        context.api_endpoints_url,
-        data={},
+def _get_request(
+    url: str,
+) -> Union[Dict[str, Any], None]:
+
+    logger.debug(f"_get_request url: {url}")
+    response = requests.get(
+        url,
+        headers={"Content-Type": "application/json"},
+    )
+
+    if response.status_code == 200:
+        response_data = response.json()
+        logger.debug(f"_get_request reponse: {response_data}")
+        return cast(Dict[str, Any], response_data)
+
+    else:
+        logger.error(f"Error: {response.status_code}, {response.text}")
+    return None
+
+
+###########################################################################################################################
+async def _handle_url_config(context: SimulatorContext) -> None:
+    response = _get_request(
+        context.config_url,
     )
     if response is not None:
-        response_model = APIEndpointConfigurationResponse.model_validate(response)
-        context._api_endpoints_config = copy.copy(response_model.api_endpoints)
-        logger.info(f"api_endpoints: {response_model.model_dump_json()}")
+        context._url_configuration = URLConfigurationResponse.model_validate(response)
+        logger.info(f"api_endpoints: {context._url_configuration.model_dump_json()}")
 
 
 ###########################################################################################################################
 async def _handle_login(context: SimulatorContext) -> None:
     request_data = LoginRequest(user_name=context._user_name)
     response = _post_request(
-        context._api_endpoints_config.LOGIN_URL,
+        context.login_url,
         data=request_data.model_dump(),
     )
     if response is not None:
@@ -108,7 +139,7 @@ async def _handle_login(context: SimulatorContext) -> None:
 async def _handle_logout(context: SimulatorContext) -> None:
     request_data = LogoutRequest(user_name=context._user_name)
     response = _post_request(
-        context._api_endpoints_config.LOGOUT_URL,
+        context.logout_url,
         data=request_data.model_dump(),
     )
     if response is not None:
@@ -124,7 +155,7 @@ async def _handle_chat_action(context: SimulatorContext, user_input: str) -> Non
 
     request_data = ChatActionRequest(user_name=context._user_name, content=content)
     response = _post_request(
-        context._api_endpoints_config.CHAT_ACTION_URL,
+        context.chat_action_url,
         data=request_data.model_dump(),
     )
     if response is not None:
@@ -143,18 +174,16 @@ async def _simulator() -> None:
         config_file_content
     )
 
-    final_server_ip_address = user_session_server_config.server_ip_address
-    if final_server_ip_address == "0.0.0.0":
-        final_server_ip_address = user_session_server_config.local_network_ip
-
     simulator_context = SimulatorContext(
-        server_ip_address=final_server_ip_address,
+        server_ip_address=user_session_server_config.server_ip_address == "0.0.0.0"
+        and user_session_server_config.local_network_ip
+        or user_session_server_config.server_ip_address,
         server_port=user_session_server_config.server_port,
         user_name="wei",
     )
 
     # 直接开始。
-    await _handle_api_endpoints(simulator_context)
+    await _handle_url_config(simulator_context)
     await _handle_login(simulator_context)
 
     while True:
@@ -165,7 +194,7 @@ async def _simulator() -> None:
                 break
 
             if "/api" in user_input:
-                await _handle_api_endpoints(simulator_context)
+                await _handle_url_config(simulator_context)
             elif "/login" in user_input:
                 await _handle_login(simulator_context)
             elif "/logout" in user_input:

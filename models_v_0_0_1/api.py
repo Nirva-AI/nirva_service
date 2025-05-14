@@ -10,18 +10,11 @@ from .registry import register_base_model_class
 
 @final
 @register_base_model_class
-class APIEndpointConfiguration(BaseModel):
-    LOGIN_URL: str = ""
-    LOGOUT_URL: str = ""
-    CHAT_ACTION_URL: str = ""
-
-
-@final
-@register_base_model_class
-class APIEndpointConfigurationResponse(BaseModel):
-    api_endpoints: APIEndpointConfiguration = APIEndpointConfiguration()
-    error: int = 0
-    message: str = ""
+class URLConfigurationResponse(BaseModel):
+    api_version: str = ""
+    endpoints: dict[str, str] = {}
+    deprecated: bool = False
+    notice: str = ""
 
 
 ################################################################################################################
