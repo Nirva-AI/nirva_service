@@ -1,8 +1,11 @@
 import requests
 from typing import Final, Optional, Dict, cast
+from jwt_server_test import ENABLE_HTTPS
 
 # 服务器地址
-BASE_URL: Final[str] = "https://localhost:8000"
+BASE_URL: Final[str] = (
+    ENABLE_HTTPS and "https://localhost:8000" or "http://localhost:8000"
+)
 
 # mkcert 根证书路径
 MKCERT_ROOT_CA: Final[str] = (
@@ -10,14 +13,19 @@ MKCERT_ROOT_CA: Final[str] = (
 )
 
 
-def login() -> Optional[str]:
-    username = input("请输入用户名: ")
-    password = input("请输入密码: ")
+def login(username: str, password: str) -> Optional[str]:
+
+    while username == "":
+        username = input("请输入用户名: ")
+
+    while password == "":
+        password = input("请输入密码: ")
 
     response = requests.post(
         f"{BASE_URL}/token",
         data={"username": username, "password": password, "grant_type": "password"},
-        verify=MKCERT_ROOT_CA,  # 使用 mkcert 的根证书
+        verify=ENABLE_HTTPS and MKCERT_ROOT_CA or None,
+        # MKCERT_ROOT_CA,  # 使用 mkcert 的根证书
     )
 
     if response.status_code == 200:
@@ -34,7 +42,8 @@ def get_protected_data(token: str) -> Dict[str, str]:
     response = requests.get(
         f"{BASE_URL}/protected-data",
         headers=headers,
-        verify=MKCERT_ROOT_CA,  # 使用 mkcert 的根证书
+        verify=ENABLE_HTTPS and MKCERT_ROOT_CA or None,
+        # MKCERT_ROOT_CA,  # 使用 mkcert 的根证书
     )
 
     if response.status_code == 200:
@@ -48,13 +57,21 @@ def main() -> None:
     token: Optional[str] = None  # 初始化 token
     while True:
         user_input = input(
-            "请输入操作: /q 是退出, /r 是重新登录: /g 是获取受保护数据: "
+            "请输入操作: /q 是退出, /a 是自动登录，/r 是重新登录: /g 是获取受保护数据: "
         )
         if user_input == "/q":
             print("退出程序")
             break
+
+        elif user_input == "/a":
+            token = login("testuser", "secret")
+            if token:
+                print("重新登录成功！")
+            else:
+                print("重新登录失败，请检查用户名和密码")
+
         elif user_input == "/r":
-            token = login()
+            token = login("", "")
             if token:
                 print("重新登录成功！")
             else:

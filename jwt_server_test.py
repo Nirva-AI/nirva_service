@@ -12,6 +12,7 @@ SECRET_KEY: Final[str] = (
 )
 ALGORITHM: Final[str] = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES: Final[int] = 30
+ENABLE_HTTPS: Final[bool] = True  # 是否使用 HTTPS，默认是 False
 
 # 模拟数据库中的用户数据
 fake_users_db: Dict[str, Dict[str, str]] = {
@@ -116,13 +117,20 @@ async def get_protected_data(
 def main() -> None:
     import uvicorn
 
-    uvicorn.run(
-        app,
-        host="0.0.0.0",
-        port=8000,
-        ssl_keyfile="./localhost+3-key.pem",
-        ssl_certfile="./localhost+3.pem",
-    )
+    if ENABLE_HTTPS:
+        uvicorn.run(
+            app,
+            host="0.0.0.0",
+            port=8000,
+            ssl_keyfile="./localhost+3-key.pem",
+            ssl_certfile="./localhost+3.pem",
+        )
+    else:
+        uvicorn.run(
+            app,
+            host="0.0.0.0",
+            port=8000,
+        )
 
 
 if __name__ == "__main__":
