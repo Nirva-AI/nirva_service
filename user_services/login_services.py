@@ -21,27 +21,8 @@ async def login(
     user_session_server: UserSessionServerInstance,
 ) -> LoginResponse:
 
+    # 无所谓，直接发令牌就可以。
     logger.info(f"login/v1: {request_data.model_dump_json()}")
-
-    user_session_manager = user_session_server.user_session_manager
-
-    # 先检查会话是否存在
-    if not user_session_manager.has_user_session(request_data.user_name):
-        logger.info(f"login/v1: {request_data.user_name} not found, create session")
-        new_user_session = user_session_manager.create_user_session(
-            user_name=request_data.user_name,
-        )
-        logger.info(
-            f"login/v1: {request_data.user_name} create session = {new_user_session._user_name}"
-        )
-    else:
-        logger.info(f"login/v1: {request_data.user_name} found, update session")
-
-    # 获取
-    current_user_session = user_session_manager.get_user_session(request_data.user_name)
-    assert current_user_session is not None
-
-    #
     return LoginResponse(
         error=0,
         message=request_data.model_dump_json(),
@@ -58,21 +39,8 @@ async def logout(
 ) -> LogoutResponse:
 
     logger.info(f"/logout/v1/: {request_data.model_dump_json()}")
-
-    # 先检查会话是否存在
-    user_session_manager = user_session_server.user_session_manager
-    if not user_session_manager.has_user_session(request_data.user_name):
-        logger.error(f"logout: {request_data.user_name} not found")
-        return LogoutResponse(
-            error=1001,
-            message="没有找到会话",
-        )
-
-    # 获取
-    pre_user_session = user_session_manager.get_user_session(request_data.user_name)
-    assert pre_user_session is not None
-    user_session_manager.remove_user_session(pre_user_session)
-
+    # 移除，关令牌。
+    user_session_server.user_session_manager.delete_user_session(request_data.user_name)
     return LogoutResponse(
         error=0,
         message=request_data.model_dump_json(),

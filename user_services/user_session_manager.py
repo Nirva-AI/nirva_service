@@ -31,25 +31,15 @@ class UserSessionManager:
         )
 
     ###############################################################################################################################################
-    def has_user_session(self, user_name: str) -> bool:
-        return user_name in self._user_sessions
+    def acquire_user_session(self, user_name: str) -> Optional[UserSession]:
+        if not user_name in self._user_sessions:
+            self._user_sessions[user_name] = UserSession(user_name)
 
-    ###############################################################################################################################################
-    def get_user_session(self, user_name: str) -> Optional[UserSession]:
         return self._user_sessions.get(user_name, None)
 
     ###############################################################################################################################################
-    def create_user_session(self, user_name: str) -> UserSession:
-        if self.has_user_session(user_name):
-            assert False, f"user_session {user_name} already exists"
-        new_user_session = UserSession(user_name)
-        self._user_sessions[user_name] = new_user_session
-        return new_user_session
-
-    ###############################################################################################################################################
-    def remove_user_session(self, user_session: UserSession) -> None:
-        user_name = user_session._user_name
-        assert user_name in self._user_sessions
-        self._user_sessions.pop(user_name, None)
+    def delete_user_session(self, user_name: str) -> None:
+        if user_name in self._user_sessions:
+            self._user_sessions.pop(user_name, None)
 
     ###############################################################################################################################################

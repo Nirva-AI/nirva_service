@@ -24,17 +24,15 @@ async def handle_chat_action(
     logger.info(f"/action/chat/v1/: {request_data.model_dump_json()}")
 
     user_session_manager = user_session_server.user_session_manager
-    if not user_session_manager.has_user_session(request_data.user_name):
-        logger.error(
-            f"action/chat/v1: {request_data.user_name} has no session, please login first."
-        )
+    current_user_session = user_session_manager.acquire_user_session(
+        request_data.user_name
+    )
+    assert current_user_session is not None
+    if current_user_session is None:
         return ChatActionResponse(
             error=1001,
-            message="没有登录，请先登录",
+            message=f"用户会话 {request_data.user_name} 不存在，请先登录。",
         )
-
-    current_user_session = user_session_manager.get_user_session(request_data.user_name)
-    assert current_user_session is not None
 
     # 在这里写一个等待，故意等一会
     # import time
