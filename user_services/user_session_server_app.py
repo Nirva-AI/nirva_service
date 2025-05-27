@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from user_services.user_session_server_instance import (
     initialize_user_session_server_instance,
@@ -6,12 +7,26 @@ from fastapi import FastAPI
 from user_services.url_config_services import url_config_router
 from user_services.login_services import login_router
 from user_services.chat_action_services import chat_action_router
+from user_services.redis_client import get_redis
+from collections.abc import AsyncGenerator
+
+
+# redis
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    # 启动时连接
+    app.state.redis = get_redis()
+    yield
+    # 关闭时清理
+    app.state.redis.close()
+
 
 # singleton!
 initialize_user_session_server_instance()
 
+
 # 初始化 FastAPI 应用
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 
 #
 app.add_middleware(

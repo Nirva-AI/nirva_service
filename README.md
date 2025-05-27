@@ -9,7 +9,7 @@ Name 是环境的名（任取）。
 ```python
 conda create -n Name python=3.12.2 
 conda activate Name
-pip install langchain langchain_core langserve langgraph fastapi langchain_openai sse_starlette faiss-cpu loguru mypy pandas openpyxl overrides Jinja2 jsonschema black pandas-stubs uvicorn "python-jose[cryptography]" passlib requests python-multipart bcrypt types-python-jose sqlalchemy2-stubs types-passlib sqlalchemy asyncpg psycopg2
+pip install langchain langchain_core langserve langgraph fastapi langchain_openai sse_starlette faiss-cpu loguru mypy pandas openpyxl overrides Jinja2 jsonschema black pandas-stubs uvicorn "python-jose[cryptography]" passlib requests python-multipart bcrypt types-python-jose sqlalchemy2-stubs types-passlib sqlalchemy asyncpg psycopg2 types-redis
 ```
 
 ## 需要特别注意
@@ -24,6 +24,7 @@ pip install bcrypt==3.2.2  # 已知兼容 passlib 1.7.4 的版本
 ```shell
 mypy --strict run_user_session_server.py simulator_client.py run_chat_server.py
 mypy --strict jwt_server_test.py jwt_client_test.py postgresql_test.py
+mypy --strict user_services/redis_client.py
 ```
 
 ## 用pm2 批量启动 chat_server + user_session_server
@@ -55,3 +56,11 @@ conda install pytest
 - app.py
 - run1.sh
 - run2.sh
+
+## 安装 redis 和 fastapi-redis-cache
+
+```shell
+conda install -c conda-forge redis pyhumps
+# 或
+pip install redis fastapi-redis-cache
+```
