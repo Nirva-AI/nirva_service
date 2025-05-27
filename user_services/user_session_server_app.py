@@ -11,7 +11,7 @@ from user_services.redis_client import get_redis
 from collections.abc import AsyncGenerator
 
 
-# redis
+# redis!
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # 启动时连接

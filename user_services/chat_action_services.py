@@ -27,23 +27,8 @@ async def handle_chat_action(
     current_user_session = user_session_manager.acquire_user_session(
         request_data.user_name
     )
-    assert current_user_session is not None
-    if current_user_session is None:
-        return ChatActionResponse(
-            error=1001,
-            message=f"用户会话 {request_data.user_name} 不存在，请先登录。",
-        )
-
-    # 在这里写一个等待，故意等一会
-    # import time
-    # time.sleep(5)
-    # return ChatActionResponse(
-    #     error=0,
-    #     message=request_data.content,
-    # )
 
     try:
-
         # 组织请求
         chat_request_handler = ChatServiceRequestHandler(
             user_name=request_data.user_name,
@@ -68,6 +53,8 @@ async def handle_chat_action(
             # 打印聊天记录
             for msg in current_user_session.chat_history:
                 logger.warning(msg.content)
+
+            user_session_manager.update_user_session(current_user_session)
 
             return ChatActionResponse(
                 error=0,

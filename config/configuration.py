@@ -24,7 +24,15 @@ class LLMServerConfig(BaseModel):
 class UserSessionServerConfig(BaseModel):
     server_ip_address: str = "0.0.0.0"
     server_port: int = 8000
-    local_network_ip: str = "192.168.22.108"
+    local_network_ip: str = "192.168.2.67"
+
+
+##################################################################################################################
+# redis的配置
+class RedisConfig(BaseModel):
+    host: str = "localhost"
+    port: int = 6379
+    db: int = 0
 
 
 ##################################################################################################################
