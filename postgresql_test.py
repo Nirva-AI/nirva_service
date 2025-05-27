@@ -53,19 +53,31 @@ def test_database_operations() -> None:
     try:
         clear_database()
 
-        test_user = User(
-            username="test_user", hashed_password=pwd_context.hash("test_password")
+        test_user1 = User(
+            username="test_user1", hashed_password=pwd_context.hash("test_password1")
         )
 
-        db.add(test_user)
+        test_user2 = User(
+            username="test_user2", hashed_password=pwd_context.hash("test_password2")
+        )
+
+        db.add(test_user1)
+        db.add(test_user2)
         db.commit()
 
-        saved_user = db.query(User).filter_by(username="test_user").first()
+        saved_user1 = db.query(User).filter_by(username="test_user1").first()
+        saved_user2 = db.query(User).filter_by(username="test_user2").first()
 
-        assert saved_user is not None, "数据写入失败"
+        assert saved_user1 is not None, "数据写入失败"
         assert pwd_context.verify(
-            "test_password", saved_user.hashed_password
-        ), "密码验证失败"
+            "test_password1", saved_user1.hashed_password
+        ), "test_user1 密码验证失败"
+
+        assert saved_user2 is not None, "数据写入失败"
+        assert pwd_context.verify(
+            "test_password2", saved_user2.hashed_password
+        ), "test_user2 密码验证失败"
+
         print("✅ 测试通过")
 
     finally:
@@ -83,4 +95,5 @@ psql -U fastapi_user -d my_fastapi_db
 # 输入密码后执行
 SELECT * FROM users;
 
+退出是: \q
 """
