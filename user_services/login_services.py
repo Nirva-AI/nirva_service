@@ -40,7 +40,7 @@ async def logout(
 
     logger.info(f"/logout/v1/: {request_data.model_dump_json()}")
     # 移除，关令牌。
-    user_session_server.user_session_manager.delete_user_session(request_data.user_name)
+    user_session_server.user_sessions.delete_user_session(request_data.user_name)
     return LogoutResponse(
         error=0,
         message=request_data.model_dump_json(),
