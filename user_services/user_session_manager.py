@@ -8,6 +8,8 @@ from loguru import logger
 
 ###############################################################################################################################################
 class UserSession(BaseModel):
+    """用户会话数据模型，包含用户名和聊天历史"""
+
     user_name: str
     chat_history: List[BaseMessage] = []
 
@@ -88,10 +90,12 @@ class UserSessionManager:
         redis_history_data = user_services.redis_client.redis_lrange(history_key, 0, -1)
 
         # 将 Redis 中的聊天历史数据转换为消息对象
+        logger.debug(f"Fetching chat history for user: {user_name}")
         chat_history: List[BaseMessage] = []
         for message_json in redis_history_data:
             message = self._deserialize_message(message_json)
             if message:
+                logger.debug(f"Deserialized message: {message}")
                 chat_history.append(message)
 
         return UserSession(user_name=user_name, chat_history=chat_history)
