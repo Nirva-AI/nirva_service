@@ -6,7 +6,7 @@ from sqlalchemy.orm import (
     relationship,
 )
 import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from uuid import uuid4, UUID
 
 
@@ -69,7 +69,7 @@ class ChatMessageDB(Base):
     content: Mapped[str] = mapped_column(Text)
 
     # 附加数据 - 存储BaseMessage中的其他属性
-    additional_kwargs: Mapped[dict] = mapped_column(JSON, default=dict)
+    additional_kwargs: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
 
     # 关联关系
     session: Mapped["UserSessionDB"] = relationship(back_populates="messages")
