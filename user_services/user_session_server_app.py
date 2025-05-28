@@ -1,9 +1,5 @@
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
-
-# from user_services.user_session_server_instance import (
-#     initialize_user_session_server_instance,
-# )
 from fastapi import FastAPI
 from user_services.url_config_services import url_config_router
 from user_services.login_services import login_router
