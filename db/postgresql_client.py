@@ -10,7 +10,7 @@ from sqlalchemy.orm import (
     sessionmaker,
 )
 from passlib.context import CryptContext
-from db.postgresql_object import Base, User  # 导入User模型
+from db.postgresql_object import Base, UserDB  # 导入User模型
 
 ############################################################################################################
 # 数据库配置
@@ -45,16 +45,16 @@ def test_database_operations() -> None:
     try:
         clear_database()
 
-        saved_user1 = db.query(User).filter_by(username="test_user1").first()
+        saved_user1 = db.query(UserDB).filter_by(username="test_user1").first()
         assert saved_user1 is None, "清库失败，test_user1 仍然存在"
-        saved_user2 = db.query(User).filter_by(username="test_user2").first()
+        saved_user2 = db.query(UserDB).filter_by(username="test_user2").first()
         assert saved_user2 is None, "清库失败，test_user2 仍然存在"
 
-        test_user1 = User(
+        test_user1 = UserDB(
             username="test_user1", hashed_password=pwd_context.hash("test_password1")
         )
 
-        test_user2 = User(
+        test_user2 = UserDB(
             username="test_user2", hashed_password=pwd_context.hash("test_password2")
         )
 
@@ -62,8 +62,8 @@ def test_database_operations() -> None:
         db.add(test_user2)
         db.commit()
 
-        saved_user1 = db.query(User).filter_by(username="test_user1").first()
-        saved_user2 = db.query(User).filter_by(username="test_user2").first()
+        saved_user1 = db.query(UserDB).filter_by(username="test_user1").first()
+        saved_user2 = db.query(UserDB).filter_by(username="test_user2").first()
 
         assert saved_user1 is not None, "数据写入失败"
         assert pwd_context.verify(
