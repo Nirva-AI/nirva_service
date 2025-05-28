@@ -1,6 +1,6 @@
 from typing import List, Union, Optional
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, BaseMessage
-import user_services.redis_client
+import db.redis_client
 from pydantic import BaseModel
 import json
 from loguru import logger
@@ -69,7 +69,7 @@ class UserSessionManager:
         """获取用户会话，如果不存在则创建新的会话"""
         assert user_name != "", "user_name cannot be an empty string."
         user_session_key = self._user_session_key(user_name)
-        user_session_data = user_services.redis_client.redis_hgetall(user_session_key)
+        user_session_data = db.redis_client.redis_hgetall(user_session_key)
 
         if user_session_data == {} or user_session_data is None:
             # 不存在就创建一个新的用户会话
@@ -87,7 +87,7 @@ class UserSessionManager:
 
         # 如果存在，就从 Redis 中获取聊天历史
         history_key = self._user_history_key(user_name)
-        redis_history_data = user_services.redis_client.redis_lrange(history_key, 0, -1)
+        redis_history_data = db.redis_client.redis_lrange(history_key, 0, -1)
 
         # 将 Redis 中的聊天历史数据转换为消息对象
         logger.debug(f"Fetching chat history for user: {user_name}")
@@ -113,7 +113,7 @@ class UserSessionManager:
         history_key = self._user_history_key(user_session.user_name)
         for message in messages:
             message_json = self._serialize_message(message)
-            user_services.redis_client.redis_rpush(history_key, message_json)
+            db.redis_client.redis_rpush(history_key, message_json)
 
     ###############################################################################################################################################
     def _update_user_session(self, user_session: UserSession) -> None:
@@ -121,7 +121,7 @@ class UserSessionManager:
         user_session_key = self._user_session_key(user_session.user_name)
 
         # 更新用户基本信息
-        user_services.redis_client.redis_hset(
+        db.redis_client.redis_hset(
             user_session_key,
             {
                 "user_name": user_session.user_name,
@@ -132,20 +132,20 @@ class UserSessionManager:
         history_key = self._user_history_key(user_session.user_name)
 
         # 首先删除旧的聊天历史
-        user_services.redis_client.redis_delete(history_key)
+        db.redis_client.redis_delete(history_key)
 
         # 然后添加新的聊天历史
         if user_session.chat_history:
             for message in user_session.chat_history:
                 message_json = self._serialize_message(message)
-                user_services.redis_client.redis_rpush(history_key, message_json)
+                db.redis_client.redis_rpush(history_key, message_json)
 
     ###############################################################################################################################################
     def delete_user_session(self, user_name: str) -> None:
         """删除用户会话及其聊天历史"""
         assert user_name != "", "user_name cannot be an empty string."
         # 删除用户会话和聊天历史
-        user_services.redis_client.redis_delete(self._user_session_key(user_name))
-        user_services.redis_client.redis_delete(self._user_history_key(user_name))
+        db.redis_client.redis_delete(self._user_session_key(user_name))
+        db.redis_client.redis_delete(self._user_history_key(user_name))
 
     ###############################################################################################################################################

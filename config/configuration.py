@@ -24,7 +24,7 @@ class LLMServerConfig(BaseModel):
 class UserSessionServerConfig(BaseModel):
     server_ip_address: str = "0.0.0.0"
     server_port: int = 8000
-    local_network_ip: str = "192.168.22.108"
+    local_network_ip: str = "192.168.2.67"
 
 
 ##################################################################################################################
@@ -62,5 +62,13 @@ USER_SESSION_SERVER_CONFIG_PATH = GEN_CONFIGS_DIR / "user_session_server_config.
 user_session_server_config = UserSessionServerConfig()
 USER_SESSION_SERVER_CONFIG_PATH.write_text(
     user_session_server_config.model_dump_json(),
+    encoding="utf-8",
+)
+
+# 生成RedisConfig配置文件，写死先
+REDIS_CONFIG_PATH = GEN_CONFIGS_DIR / "redis_config.json"
+redis_config = RedisConfig()
+REDIS_CONFIG_PATH.write_text(
+    redis_config.model_dump_json(),
     encoding="utf-8",
 )
