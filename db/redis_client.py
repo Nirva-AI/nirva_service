@@ -179,6 +179,19 @@ def redis_rpush(name: str, *values: str) -> int:
 
 
 ###################################################################################################
+def redis_flushall() -> None:
+    """
+    清空Redis数据库中的所有数据。
+
+    抛出:
+        redis.RedisError: 当Redis操作失败时
+    """
+    try:
+        redis_client = _get_redis_instance()
+        redis_client.flushall()
+    except redis.RedisError as e:
+        logger.error(f"Redis error while flushing all data: {e}")
+        raise e
 
 
 # 要清空 Redis 中的所有数据，您可以使用以下命令：
