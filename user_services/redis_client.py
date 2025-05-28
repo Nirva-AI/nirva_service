@@ -89,3 +89,13 @@ def redis_lrange(name: str, start: int = 0, end: int = -1) -> List[Any]:
 
 
 ###################################################################################################
+def redis_rpush(name: str, *values: Any) -> Any:
+    try:
+        redis = _get_redis_instance()
+        return redis.rpush(name, *values)
+    except redis.RedisError as e:
+        logger.error(f"Redis error while pushing to list {name}: {e}")
+        raise e
+
+
+###################################################################################################
