@@ -40,7 +40,9 @@ class UserSessionManager:
 
     ###############################################################################################################################################
     def acquire_user_session(self, user_name: str) -> UserSession:
-        redis_data = user_services.redis_client.redis_get(self._format_name(user_name))
+        redis_data = user_services.redis_client.redis_hgetall(
+            self._format_name(user_name)
+        )
         if redis_data == {} or redis_data is None:
             new_session = UserSession(
                 user_name=user_name,
@@ -73,7 +75,7 @@ class UserSessionManager:
     ###############################################################################################################################################
     def update_user_session(self, user_session: UserSession) -> None:
         assert user_session.user_name != "", "用户会话必须有用户名"
-        user_services.redis_client.redis_set(
+        user_services.redis_client.redis_hset(
             self._format_name(user_session.user_name),
             self._serialize_user_session(user_session),
         )

@@ -1,6 +1,6 @@
 # utils/redis_client.py
 import redis
-from typing import Any, Dict, cast
+from typing import Any, Dict, cast, List
 from loguru import logger
 from config.configuration import RedisConfig
 
@@ -45,7 +45,7 @@ def _get_redis_instance() -> Any:
 
 
 ###################################################################################################
-def redis_set(name: str, mapping_data: Dict[str, str]) -> None:
+def redis_hset(name: str, mapping_data: Dict[str, str]) -> None:
     try:
         redis = _get_redis_instance()
         redis.hset(name=name, mapping=mapping_data)
@@ -55,7 +55,7 @@ def redis_set(name: str, mapping_data: Dict[str, str]) -> None:
 
 
 ###################################################################################################
-def redis_get(name: str) -> Dict[str, str]:
+def redis_hgetall(name: str) -> Dict[str, str]:
     try:
         redis = _get_redis_instance()
         if not redis.exists(name):
@@ -73,6 +73,18 @@ def redis_delete(name: str) -> None:
         redis.delete(name)
     except redis.RedisError as e:
         logger.error(f"Redis error while deleting data for {name}: {e}")
+        raise e
+
+
+###################################################################################################
+def redis_lrange(name: str, start: int = 0, end: int = -1) -> List[Any]:
+    try:
+        redis = _get_redis_instance()
+        if not redis.exists(name):
+            return []
+        return cast(List[Any], redis.lrange(name, start, end)) or []
+    except redis.RedisError as e:
+        logger.error(f"Redis error while getting list range for {name}: {e}")
         raise e
 
 
