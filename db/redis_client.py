@@ -179,3 +179,30 @@ def redis_rpush(name: str, *values: str) -> int:
 
 
 ###################################################################################################
+
+
+# 要清空 Redis 中的所有数据，您可以使用以下命令：
+
+# 方法一：使用 Redis CLI 命令行工具
+# redis-cli flushall
+# 这个命令会清空 Redis 中所有数据库的所有数据。
+
+# 方法二：只清空当前数据库
+# redis-cli flushdb
+# 这个命令只清空当前选择的数据库。
+
+# redis-cli
+# HGETALL "session:wei"
+
+# 使用Homebrew安装
+# brew install redis
+
+# # 启动Redis服务（开发环境）
+# brew services start redis
+
+# # 验证安装
+# redis-cli ping
+# # 应返回 PONG
+
+
+# HGETALL "name:Weiwei"

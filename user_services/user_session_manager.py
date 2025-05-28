@@ -1,17 +1,9 @@
 from typing import List, Union, Optional
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, BaseMessage
 import db.redis_client
-from pydantic import BaseModel
 import json
 from loguru import logger
-
-
-###############################################################################################################################################
-class UserSession(BaseModel):
-    """用户会话数据模型，包含用户名和聊天历史"""
-
-    user_name: str
-    chat_history: List[BaseMessage] = []
+from models_v_0_0_1.models import UserSession
 
 
 ###############################################################################################################################################
