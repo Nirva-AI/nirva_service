@@ -5,8 +5,9 @@ from models_v_0_0_1 import (
     ChatActionResponse,
 )
 from loguru import logger
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from llm_services.chat_service_request_handler import ChatServiceRequestHandler
+from typing import List, cast
 
 ###################################################################################################################################################################
 chat_action_router = APIRouter()
@@ -33,7 +34,10 @@ async def handle_chat_action(
         chat_request_handler = ChatServiceRequestHandler(
             user_name=request_data.user_name,
             prompt=request_data.content,
-            chat_history=current_user_session.chat_history,
+            chat_history=cast(
+                List[SystemMessage | HumanMessage | AIMessage],
+                current_user_session.chat_history,
+            ),
         )
 
         # 处理请求
