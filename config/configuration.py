@@ -1,3 +1,4 @@
+from typing import Final
 from pydantic import BaseModel
 from pathlib import Path
 
@@ -71,4 +72,9 @@ redis_config = RedisConfig()
 REDIS_CONFIG_PATH.write_text(
     redis_config.model_dump_json(),
     encoding="utf-8",
+)
+
+# mkcert 根证书路径
+MKCERT_ROOT_CA: Final[str] = (
+    r"/Users/yanghang/Library/Application Support/mkcert/rootCA.pem"
 )

@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from typing import Final, Optional, Dict
 from config.fake_user_account import fake_user_account
 from db.crypt_context import verify_password
-from db.my_jwt import (
+from db.jwt import (
     create_access_token,
     create_refresh_token,
     Token,

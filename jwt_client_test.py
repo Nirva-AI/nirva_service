@@ -2,17 +2,12 @@ import requests
 from typing import Final, Optional, Dict, cast
 from jwt_server_test import ENABLE_HTTPS
 from config.fake_user_account import fake_user_account
+from config.configuration import MKCERT_ROOT_CA
 
 # 服务器地址
 BASE_URL: Final[str] = (
     ENABLE_HTTPS and "https://localhost:8000" or "http://localhost:8000"
 )
-
-# mkcert 根证书路径
-MKCERT_ROOT_CA: Final[str] = (
-    r"/Users/yanghang/Library/Application Support/mkcert/rootCA.pem"
-)
-
 
 def login(username: str, password: str) -> Optional[str]:
 
