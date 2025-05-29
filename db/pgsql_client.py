@@ -4,6 +4,7 @@ from sqlalchemy.orm import (
 )
 from passlib.context import CryptContext
 from db.pgsql_object import Base
+from loguru import logger
 
 ############################################################################################################
 # 数据库配置
@@ -32,7 +33,7 @@ def reset_database() -> None:
     # 重新创建所有表
     Base.metadata.create_all(bind=engine)
 
-    print("🔄 数据库表已被清除然后重建")
+    logger.warning("🔄 数据库表已被清除然后重建")
 
 
 ############################################################################################################

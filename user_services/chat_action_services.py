@@ -55,7 +55,7 @@ async def handle_chat_action(
                 ]
             )
 
-            user_session_server.user_sessions.store_session_messages(
+            user_session_server.user_sessions.update_user_session_with_new_messages(
                 user_session=current_user_session,
                 messages=[
                     human_message,
