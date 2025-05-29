@@ -45,11 +45,21 @@ async def handle_chat_action(
 
         if chat_request_handler.response_content != "":
 
-            user_session_server.user_sessions.add_messages_to_user_session(
+            human_message = HumanMessage(content=request_data.content)
+            ai_message = AIMessage(content=chat_request_handler.response_content)
+
+            current_user_session.chat_history.extend(
+                [
+                    human_message,
+                    ai_message,
+                ]
+            )
+
+            user_session_server.user_sessions.store_session_messages(
                 user_session=current_user_session,
                 messages=[
-                    HumanMessage(content=request_data.content),
-                    AIMessage(content=chat_request_handler.response_content),
+                    human_message,
+                    ai_message,
                 ],
             )
 
