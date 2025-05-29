@@ -1,9 +1,10 @@
 from db.pgsql_object import UserSessionDB, ChatMessageDB, UserDB
 from models_v_0_0_1 import UserSession
 from db.pgsql_client import SessionLocal
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID
 import datetime
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, BaseMessage
 
 
 ############################################################################################################
@@ -54,24 +55,14 @@ def save_user_session(
 
         # 存储聊天消息
         for index, message in enumerate(user_session.chat_history):
-            # 提取消息类型
-            msg_type = message.type
-
-            # 提取消息内容
-            content = message.content
-
-            # 提取额外属性
-            additional_kwargs = {}
-            for key, value in message.dict().items():
-                if key not in ["type", "content"]:
-                    additional_kwargs[key] = value
+            # 序列化整个消息对象
+            message_dict = message.model_dump()
 
             # 创建消息记录
             chat_message = ChatMessageDB(
                 session_id=session.id,
-                type=msg_type,
-                content=content,
-                additional_kwargs=additional_kwargs,
+                type=message.type,  # 仍保留类型字段便于查询
+                message_data=message_dict,
                 order_index=index,
             )
             db.add(chat_message)
@@ -86,3 +77,68 @@ def save_user_session(
 
     finally:
         db.close()
+
+
+############################################################################################################
+def get_user_session(user_name: str, session_id: UUID) -> UserSession:
+    """
+    从数据库读取用户会话数据
+
+    参数:
+        user_name: 用户名
+        session_id: 会话ID
+
+    返回:
+        UserSession对象
+    """
+    db = SessionLocal()
+    try:
+        # 检查用户是否存在
+        user = db.query(UserDB).filter_by(username=user_name).first()
+        if not user:
+            raise ValueError(f"用户 '{user_name}' 不存在")
+
+        # 获取会话
+        session = (
+            db.query(UserSessionDB).filter_by(id=session_id, user_id=user.id).first()
+        )
+        if not session:
+            raise ValueError(f"会话ID '{session_id}' 不存在或不属于用户 '{user_name}'")
+
+        # 获取会话消息
+        messages_db = (
+            db.query(ChatMessageDB)
+            .filter_by(session_id=session_id)
+            .order_by(ChatMessageDB.order_index)
+            .all()
+        )
+
+        # 重建消息历史
+        chat_history: List[BaseMessage] = []
+        for msg_db in messages_db:
+            # 根据消息类型选择正确的消息类
+            msg_data = msg_db.message_data
+            msg_type = msg_data.get("type")
+            msg_obj: Optional[BaseMessage] = None
+
+            if msg_type == "human":
+                msg_obj = HumanMessage.model_validate(msg_data)
+            elif msg_type == "ai":
+                msg_obj = AIMessage.model_validate(msg_data)
+            elif msg_type == "system":
+                msg_obj = SystemMessage.model_validate(msg_data)
+            else:
+                # 处理其他可能的消息类型
+                continue
+
+            assert msg_obj is not None, f"Unknown message type: {msg_type}"
+            chat_history.append(msg_obj)
+
+        # 构建并返回UserSession
+        return UserSession(user_name=user_name, chat_history=chat_history)
+
+    finally:
+        db.close()
+
+
+############################################################################################################

@@ -1,4 +1,4 @@
-from sqlalchemy import String, Integer, ForeignKey, DateTime, JSON, Text
+from sqlalchemy import String, Integer, ForeignKey, DateTime, JSON
 from sqlalchemy.orm import (
     DeclarativeBase,
     Mapped,
@@ -62,14 +62,11 @@ class ChatMessageDB(Base):
         DateTime, default=datetime.datetime.utcnow
     )
 
-    # 消息类型 (例如: "human", "ai", "system" 等)
+    # 将整个消息存储为JSON
+    message_data: Mapped[Dict[str, Any]] = mapped_column(JSON)
+
+    # 保留消息类型作为单独字段用于筛选(可选,但推荐)
     type: Mapped[str] = mapped_column(String(50))
-
-    # 消息内容 - 存储为JSON以适应BaseMessage的结构
-    content: Mapped[str] = mapped_column(Text)
-
-    # 附加数据 - 存储BaseMessage中的其他属性
-    additional_kwargs: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
 
     # 关联关系
     session: Mapped["UserSessionDB"] = relationship(back_populates="messages")

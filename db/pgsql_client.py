@@ -1,16 +1,9 @@
-# 引入上一级的目录
-import sys
-from pathlib import Path
-
-# 添加上一级目录到系统路径
-sys.path.append(str(Path(__file__).resolve().parent.parent))
-
-from sqlalchemy import create_engine, MetaData, delete
+from sqlalchemy import create_engine
 from sqlalchemy.orm import (
     sessionmaker,
 )
 from passlib.context import CryptContext
-from db.pgsql_object import Base, UserDB  # 导入User模型
+from db.pgsql_object import Base
 
 ############################################################################################################
 # 数据库配置
@@ -29,69 +22,17 @@ Base.metadata.create_all(bind=engine)
 ############################################################################################################
 # 清库函数
 def clear_database() -> None:
-    meta = MetaData()
-    meta.reflect(bind=engine)
+    """
+    清空数据库并重建表结构
+    注意：该方法会删除所有数据，只适用于开发环境
+    """
+    # 删除所有现有表
+    Base.metadata.drop_all(bind=engine)
 
-    with engine.begin() as conn:
-        for table in reversed(meta.sorted_tables):
-            conn.execute(delete(table))
+    # 重新创建所有表
+    Base.metadata.create_all(bind=engine)
 
-
-############################################################################################################
-# 测试流程
-def test_database_operations() -> None:
-    db = SessionLocal()
-
-    try:
-        clear_database()
-
-        saved_user1 = db.query(UserDB).filter_by(username="test_user1").first()
-        assert saved_user1 is None, "清库失败，test_user1 仍然存在"
-        saved_user2 = db.query(UserDB).filter_by(username="test_user2").first()
-        assert saved_user2 is None, "清库失败，test_user2 仍然存在"
-
-        test_user1 = UserDB(
-            username="test_user1", hashed_password=pwd_context.hash("test_password1")
-        )
-
-        test_user2 = UserDB(
-            username="test_user2", hashed_password=pwd_context.hash("test_password2")
-        )
-
-        db.add(test_user1)
-        db.add(test_user2)
-        db.commit()
-
-        saved_user1 = db.query(UserDB).filter_by(username="test_user1").first()
-        saved_user2 = db.query(UserDB).filter_by(username="test_user2").first()
-
-        assert saved_user1 is not None, "数据写入失败"
-        assert pwd_context.verify(
-            "test_password1", saved_user1.hashed_password
-        ), "test_user1 密码验证失败"
-
-        assert saved_user2 is not None, "数据写入失败"
-        assert pwd_context.verify(
-            "test_password2", saved_user2.hashed_password
-        ), "test_user2 密码验证失败"
-
-        print("✅ 测试通过")
-
-    finally:
-        db.close()
-        clear_database()
-        print("🧹 数据库已清理")
+    print("🔄 数据库表已被清除然后重建")
 
 
 ############################################################################################################
-if __name__ == "__main__":
-    test_database_operations()
-
-############################################################################################################
-# """
-# psql -U fastapi_user -d my_fastapi_db
-# # 输入密码后执行
-# SELECT * FROM users;
-
-# 退出是: \q
-# """
