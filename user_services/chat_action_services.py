@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from user_services.user_session_server_instance import UserSessionServerInstance
 from models_v_0_0_1 import (
     ChatActionRequest,
@@ -8,6 +8,8 @@ from loguru import logger
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from llm_services.chat_service_request_handler import ChatServiceRequestHandler
 from typing import List, cast
+from user_services.oauth_user import get_authenticated_user
+from db.pgsql_object import UserDB
 
 ###################################################################################################################################################################
 chat_action_router = APIRouter()
@@ -20,19 +22,20 @@ chat_action_router = APIRouter()
 async def handle_chat_action(
     request_data: ChatActionRequest,
     user_session_server: UserSessionServerInstance,
+    authenticated_user: UserDB = Depends(get_authenticated_user),
 ) -> ChatActionResponse:
 
     logger.info(f"/action/chat/v1/: {request_data.model_dump_json()}")
 
     current_user_session = user_session_server.user_sessions.acquire_user_session(
-        request_data.user_name
+        authenticated_user.username
     )
 
     try:
 
         # 组织请求
         chat_request_handler = ChatServiceRequestHandler(
-            user_name=request_data.user_name,
+            user_name=authenticated_user.username,
             prompt=request_data.content,
             chat_history=cast(
                 List[SystemMessage | HumanMessage | AIMessage],

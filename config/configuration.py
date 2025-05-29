@@ -74,7 +74,7 @@ REDIS_CONFIG_PATH.write_text(
     encoding="utf-8",
 )
 
-# mkcert 根证书路径
+# mkcert 根证书路径, 后续可以改成环境变量
 MKCERT_ROOT_CA: Final[str] = (
     r"/Users/yanghang/Library/Application Support/mkcert/rootCA.pem"
 )

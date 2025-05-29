@@ -25,7 +25,6 @@ class URLConfigurationResponse(BaseModel):
 @final
 @register_base_model_class
 class ChatActionRequest(BaseModel):
-    user_name: str = ""
     content: str = ""
 
 

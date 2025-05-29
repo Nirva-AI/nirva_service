@@ -75,19 +75,24 @@ class SimulatorContext:
     def chat_action_url(self) -> str:
         return self._url_configuration.endpoints["chat"]
 
+    ###########################################################################################################################
+
+
 
 ###########################################################################################################################
 def _post_request(
-    url: str,
-    data: Dict[str, Any],
+    url: str, data: Dict[str, Any], token: Token
 ) -> Union[Dict[str, Any], None]:
 
     logger.debug(f"_post_request url: {url}, data: {data}")
 
     response = requests.post(
-        url,
+        url=url,
         json=data,
-        headers={"Content-Type": "application/json"},
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token.access_token}",
+        },
         verify=LOCAL_HTTPS_ENABLED and MKCERT_ROOT_CA or None,
     )
 
@@ -156,10 +161,11 @@ async def _handle_chat_action(context: SimulatorContext, user_input: str) -> Non
     content = _extract_user_input(user_input, "/chat")
     assert content != "", f"content: {content} is empty string."
 
-    request_data = ChatActionRequest(user_name=context._user_name, content=content)
+    request_data = ChatActionRequest(content=content)
     response = _post_request(
         context.chat_action_url,
         data=request_data.model_dump(),
+        token=context._token,
     )
     if response is not None:
         response_model = ChatActionResponse.model_validate(response)
