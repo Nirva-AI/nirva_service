@@ -11,6 +11,6 @@ from uuid import UUID
 class UserSession(BaseModel):
     """用户会话数据模型，包含用户名和聊天历史"""
 
-    user_name: str
+    username: str
     chat_history: List[BaseMessage] = []
     session_id: Optional[UUID] = None  # 可选 UUID

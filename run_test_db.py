@@ -66,7 +66,7 @@ def main() -> None:
 
     if not has_user(fake_user_account.username):
         save_user(
-            user_name=fake_user_account.username,
+            username=fake_user_account.username,
             hashed_password=fake_user_account.hashed_password,
         )
 
@@ -74,7 +74,7 @@ def main() -> None:
 
         # 创建一个用户会话
         user_session = UserSession(
-            user_name=fake_user_account.username,
+            username=fake_user_account.username,
             chat_history=[
                 HumanMessage(content=f"你好，我是用户[{fake_user_account.username}]"),
                 AIMessage(content="你好，我是AI助手"),
@@ -87,7 +87,7 @@ def main() -> None:
 
         # 更新现有会话
         updated_user_session = UserSession(
-            user_name=fake_user_account.username,
+            username=fake_user_account.username,
             chat_history=[
                 HumanMessage(content=f"你好，我是用户[{fake_user_account.username}]"),
                 AIMessage(content="你好，我是AI助手"),

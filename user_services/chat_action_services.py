@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from user_services.user_session_server_instance import UserSessionServerInstance
+from user_services.user_session_server import UserSessionServerInstance
 from models_v_0_0_1 import (
     ChatActionRequest,
     ChatActionResponse,
@@ -11,6 +11,7 @@ from typing import List, cast
 from user_services.oauth_user import get_authenticated_user
 import db.redis_user_session
 import db.pgsql_user_session
+import user_services.user_session
 
 ###################################################################################################################################################################
 chat_action_router = APIRouter()
@@ -28,15 +29,15 @@ async def handle_chat_action(
 
     logger.info(f"/action/chat/v1/: {request_data.model_dump_json()}")
 
-    current_user_session = user_session_server.user_sessions.acquire_user_session(
-        authenticated_user
-    )
-
     try:
+
+        current_user_session = user_services.user_session.get_or_create_user_session(
+            authenticated_user
+        )
 
         # 组织请求
         chat_request_handler = ChatServiceRequestHandler(
-            user_name=authenticated_user,
+            username=authenticated_user,
             prompt=request_data.content,
             chat_history=cast(
                 List[SystemMessage | HumanMessage | AIMessage],
@@ -46,16 +47,16 @@ async def handle_chat_action(
 
         # 处理请求
         user_session_server.chat_service.handle(request_handlers=[chat_request_handler])
-        if chat_request_handler.response_content == "":
+        if chat_request_handler.response_output == "":
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="处理请求失败: 响应内容为空",
+                detail="处理请求时未返回内容",
             )
 
         # 准备添加消息
         messages = [
             HumanMessage(content=request_data.content),
-            AIMessage(content=chat_request_handler.response_content),
+            AIMessage(content=chat_request_handler.response_output),
         ]
 
         # 将消息添加到会话中
@@ -78,7 +79,7 @@ async def handle_chat_action(
 
         # 返回响应
         return ChatActionResponse(
-            message=chat_request_handler.response_content,
+            message=chat_request_handler.response_output,
         )
 
     except Exception as e:

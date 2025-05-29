@@ -69,7 +69,7 @@ async def login(
 
         # 将令牌存储到 Redis 中
         db.redis_user.assign_user_token(
-            user_name=user_db.username,
+            username=user_db.username,
             token=ret,
         )
 
@@ -132,7 +132,7 @@ async def refresh(refresh_token: str) -> Token:
 
         # 更新 Redis 中的令牌
         db.redis_user.assign_user_token(
-            user_name=username,
+            username=username,
             token=ret,
         )
 

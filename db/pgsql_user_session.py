@@ -28,9 +28,9 @@ def set_user_session(
     db = SessionLocal()
     try:
         # 查找用户，如果不存在则抛出异常
-        user = db.query(UserDB).filter_by(username=user_session.user_name).first()
+        user = db.query(UserDB).filter_by(username=user_session.username).first()
         if not user:
-            raise ValueError(f"用户 '{user_session.user_name}' 不存在")
+            raise ValueError(f"用户 '{user_session.username}' 不存在")
 
         # 创建或更新会话
         if session_id:
@@ -81,12 +81,12 @@ def set_user_session(
 
 
 ############################################################################################################
-def get_user_session(user_name: str, session_id: UUID) -> UserSession:
+def get_user_session(username: str, session_id: UUID) -> UserSession:
     """
     从数据库读取用户会话数据
 
     参数:
-        user_name: 用户名
+        username: 用户名
         session_id: 会话ID
 
     返回:
@@ -95,16 +95,16 @@ def get_user_session(user_name: str, session_id: UUID) -> UserSession:
     db = SessionLocal()
     try:
         # 检查用户是否存在
-        user = db.query(UserDB).filter_by(username=user_name).first()
+        user = db.query(UserDB).filter_by(username=username).first()
         if not user:
-            raise ValueError(f"用户 '{user_name}' 不存在")
+            raise ValueError(f"用户 '{username}' 不存在")
 
         # 获取会话
         session = (
             db.query(UserSessionDB).filter_by(id=session_id, user_id=user.id).first()
         )
         if not session:
-            raise ValueError(f"会话ID '{session_id}' 不存在或不属于用户 '{user_name}'")
+            raise ValueError(f"会话ID '{session_id}' 不存在或不属于用户 '{username}'")
 
         # 获取会话消息
         messages_db = (
@@ -137,7 +137,7 @@ def get_user_session(user_name: str, session_id: UUID) -> UserSession:
 
         # 构建并返回UserSession
         return UserSession(
-            user_name=user_name, chat_history=chat_history, session_id=session_id
+            username=username, chat_history=chat_history, session_id=session_id
         )
 
     finally:
@@ -167,9 +167,9 @@ def update_user_session(
     db = SessionLocal()
     try:
         # 查找用户，如果不存在则抛出异常
-        user = db.query(UserDB).filter_by(username=user_session.user_name).first()
+        user = db.query(UserDB).filter_by(username=user_session.username).first()
         if not user:
-            raise ValueError(f"用户 '{user_session.user_name}' 不存在")
+            raise ValueError(f"用户 '{user_session.username}' 不存在")
 
         session = (
             db.query(UserSessionDB)
@@ -178,7 +178,7 @@ def update_user_session(
         )
         if not session:
             raise ValueError(
-                f"会话ID '{user_session.session_id}' 不存在或不属于用户 '{user_session.user_name}'"
+                f"会话ID '{user_session.session_id}' 不存在或不属于用户 '{user_session.username}'"
             )
 
         # 更新会话时间
@@ -219,12 +219,12 @@ def update_user_session(
 
 
 ############################################################################################################
-def get_user_sessions(user_name: str) -> List[UserSession]:
+def get_user_sessions(username: str) -> List[UserSession]:
     """
     获取指定用户的所有会话
 
     参数:
-        user_name: 用户名
+        username: 用户名
 
     返回:
         UserSession对象列表
@@ -232,9 +232,9 @@ def get_user_sessions(user_name: str) -> List[UserSession]:
     db = SessionLocal()
     try:
         # 检查用户是否存在
-        user = db.query(UserDB).filter_by(username=user_name).first()
+        user = db.query(UserDB).filter_by(username=username).first()
         if not user:
-            raise ValueError(f"用户 '{user_name}' 不存在")
+            raise ValueError(f"用户 '{username}' 不存在")
 
         # 获取用户的所有会话
         sessions = db.query(UserSessionDB).filter_by(user_id=user.id).all()
@@ -271,7 +271,7 @@ def get_user_sessions(user_name: str) -> List[UserSession]:
             # 构建UserSession对象并添加到列表中
             user_sessions.append(
                 UserSession(
-                    user_name=user_name,
+                    username=username,
                     chat_history=chat_history,
                     session_id=session.id,
                 )

@@ -3,7 +3,7 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from typing import cast
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, status
 from langchain.schema import HumanMessage
 from llm_services.chat_service_api import (
     ChatServiceRequest,
@@ -42,25 +42,40 @@ compiled_state_graph = create_compiled_stage_graph(
 async def process_chat_request(
     request_data: ChatServiceRequest,
 ) -> ChatServiceResponse:
-    # 聊天历史
-    chat_history_state: State = {
-        "messages": [message for message in request_data.chat_history]
-    }
 
-    # 用户输入
-    user_input_state: State = {"messages": [HumanMessage(content=request_data.input)]}
+    try:
+        # 聊天历史
+        chat_history_state: State = {
+            "messages": [message for message in request_data.chat_history]
+        }
 
-    # 获取回复
-    update_messages = stream_graph_updates(
-        state_compiled_graph=compiled_state_graph,
-        chat_history_state=chat_history_state,
-        user_input_state=user_input_state,
-    )
+        # 用户输入
+        user_input_state: State = {
+            "messages": [HumanMessage(content=request_data.input)]
+        }
 
-    # 返回响应
-    if len(update_messages) > 0:
-        return ChatServiceResponse(
-            user_name=request_data.user_name,
-            output=cast(str, update_messages[-1].content),
+        # 获取回复
+        update_messages = stream_graph_updates(
+            state_compiled_graph=compiled_state_graph,
+            chat_history_state=chat_history_state,
+            user_input_state=user_input_state,
         )
-    return ChatServiceResponse(user_name=request_data.user_name, output="")
+
+        # 返回响应
+        if len(update_messages) > 0:
+            return ChatServiceResponse(
+                username=request_data.username,
+                output=cast(str, update_messages[-1].content),
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="没有生成任何回复，请稍后再试。",
+            )
+
+    except Exception as e:
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"处理请求失败: {e}",
+        )

@@ -42,13 +42,13 @@ class SimulatorContext:
         self,
         server_ip_address: str,
         server_port: int,
-        user_name: str,
+        username: str,
         password: str,
     ) -> None:
 
         self._server_ip_address: Final[str] = server_ip_address
         self._server_port: Final[int] = server_port
-        self._user_name: Final[str] = user_name
+        self._username: Final[str] = username
         self._password: Final[str] = password
         self._url_configuration: URLConfigurationResponse = URLConfigurationResponse()
         self._token: Token = Token(
@@ -139,7 +139,7 @@ async def _post_login(context: SimulatorContext) -> None:
     response = requests.post(
         context.login_url,
         data={
-            "username": context._user_name,
+            "username": context._username,
             "password": context._password,
             "grant_type": "password",
         },
@@ -187,7 +187,7 @@ async def _simulator() -> None:
         and user_session_server_config.local_network_ip
         or user_session_server_config.server_ip_address,
         server_port=user_session_server_config.server_port,
-        user_name=fake_user_account.username,
+        username=fake_user_account.username,
         password="secret",  # 注意！！
     )
 
@@ -197,7 +197,7 @@ async def _simulator() -> None:
 
     while True:
         try:
-            user_input = input(f"[{simulator_context._user_name}]: ")
+            user_input = input(f"[{simulator_context._username}]: ")
             if user_input.lower() in ["/quit", "/q"]:
                 print("退出！")
                 break

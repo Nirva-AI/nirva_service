@@ -1,15 +1,12 @@
 from datetime import datetime, timedelta
 from jose import jwt, JWTError
 from pydantic import BaseModel
-from typing import Final, Optional, Dict, Any
-
-############################################################################################################
-# 配置参数
-SECRET_KEY: Final[str] = (
-    "your-secret-key-here-please-change-it"  # 生产环境要用更复杂的密钥
+from typing import Optional, Dict, Any
+from config.configuration import (
+    JWT_SIGNING_KEY,
+    JWT_SIGNING_ALGORITHM,
+    REFRESH_TOKEN_EXPIRE_DAYS,
 )
-ALGORITHM: Final[str] = "HS256"
-REFRESH_TOKEN_EXPIRE_DAYS: Final[int] = 7
 
 
 ############################################################################################################
@@ -57,7 +54,9 @@ def _encode_jwt(
     to_encode: dict[str, Any],
 ) -> str:
     try:
-        encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+        encoded_jwt = jwt.encode(
+            to_encode, JWT_SIGNING_KEY, algorithm=JWT_SIGNING_ALGORITHM
+        )
         return encoded_jwt
     except Exception as e:
         print(f"JWT 编码失败: {e}")
@@ -67,7 +66,7 @@ def _encode_jwt(
 ############################################################################################################
 def decode_jwt(token: str) -> Dict[str, Any]:
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, JWT_SIGNING_KEY, algorithms=[JWT_SIGNING_ALGORITHM])
         return payload
 
     except JWTError:
