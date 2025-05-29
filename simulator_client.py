@@ -46,11 +46,13 @@ class SimulatorContext:
         server_ip_address: str,
         server_port: int,
         user_name: str,
+        password: str,
     ) -> None:
 
         self._server_ip_address: Final[str] = server_ip_address
         self._server_port: Final[int] = server_port
         self._user_name: Final[str] = user_name
+        self._password: Final[str] = password
         self._url_configuration: URLConfigurationResponse = URLConfigurationResponse()
 
     ###########################################################################################################################
@@ -103,35 +105,21 @@ def _post_request(
 
 
 ###########################################################################################################################
-def _get_request(
-    url: str,
-) -> Union[Dict[str, Any], None]:
+async def _get_url_config(context: SimulatorContext) -> None:
 
-    logger.debug(f"_get_request url: {url}")
+    logger.debug(f"_get_request url: {context.config_url}")
     response = requests.get(
-        url,
+        context.config_url,
         headers={"Content-Type": "application/json"},
         verify=LOCAL_HTTPS_ENABLED and MKCERT_ROOT_CA or None,
     )
 
     if response.status_code == 200:
-        response_data = response.json()
-        logger.debug(f"_get_request reponse: {response_data}")
-        return cast(Dict[str, Any], response_data)
 
-    else:
-        logger.error(f"Error: {response.status_code}, {response.text}")
-    return None
-
-
-###########################################################################################################################
-async def _handle_url_config(context: SimulatorContext) -> None:
-    response = _get_request(
-        context.config_url,
-    )
-    if response is not None:
-        context._url_configuration = URLConfigurationResponse.model_validate(response)
-        logger.info(f"api_endpoints: {context._url_configuration.model_dump_json()}")
+        context._url_configuration = URLConfigurationResponse.model_validate(
+            response.json()
+        )
+        logger.info(f"url_config: {context._url_configuration.model_dump_json()}")
 
         # 生成配置文件, 写死先
         url_config_file_path = GEN_CONFIGS_DIR / "url_config.json"
@@ -139,6 +127,9 @@ async def _handle_url_config(context: SimulatorContext) -> None:
             context._url_configuration.model_dump_json(),
             encoding="utf-8",
         )
+
+    else:
+        logger.error(f"Error: {response.status_code}, {response.text}")
 
 
 ###########################################################################################################################
@@ -198,10 +189,11 @@ async def _simulator() -> None:
         or user_session_server_config.server_ip_address,
         server_port=user_session_server_config.server_port,
         user_name=fake_user_account.username,
+        password="secret",  # 注意！！
     )
 
     # 直接开始。
-    await _handle_url_config(simulator_context)
+    await _get_url_config(simulator_context)
     await _handle_login(simulator_context)
 
     while True:
@@ -212,7 +204,7 @@ async def _simulator() -> None:
                 break
 
             if "/api" in user_input:
-                await _handle_url_config(simulator_context)
+                await _get_url_config(simulator_context)
             elif "/login" in user_input:
                 await _handle_login(simulator_context)
             elif "/logout" in user_input:

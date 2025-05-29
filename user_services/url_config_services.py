@@ -26,6 +26,7 @@ async def get_url_config(
         api_version="v1",
         endpoints={
             "login": base + "login/v1/",
+            "refresh": base + "refresh/v1/",
             "logout": base + "logout/v1/",
             "chat": base + "action/chat/v1/",
         },
