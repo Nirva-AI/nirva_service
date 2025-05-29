@@ -4,6 +4,7 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, Base
 import db.redis_client
 import json
 from loguru import logger
+from uuid import UUID, uuid4
 
 
 ###############################################################################################################################################
@@ -75,7 +76,12 @@ def get_user_session(user_name: str) -> UserSession:
         if message:
             logger.debug(f"Deserialized message: {message}")
             chat_history.append(message)
-    return UserSession(user_name=user_name, chat_history=chat_history)
+
+    return UserSession(
+        user_name=user_name,
+        chat_history=chat_history,
+        session_id=UUID(user_session_data.get("session_id", "")),
+    )
 
 
 ###############################################################################################################################################
@@ -85,11 +91,16 @@ def set_user_session(user_session: UserSession) -> None:
     """更新用户会话，包括基本信息和聊天历史"""
     user_session_key = _user_session_key(user_session.user_name)
 
+    if user_session.session_id is None:
+        # 如果 session_id 为空，则生成一个新的 UUID
+        user_session.session_id = uuid4()
+
     # 更新用户基本信息
     db.redis_client.redis_hset(
         user_session_key,
         {
             "user_name": user_session.user_name,
+            "session_id": str(user_session.session_id),
         },
     )
 
