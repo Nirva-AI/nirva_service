@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from user_services.user_session_server_instance import UserSessionServerInstance
 from models_v_0_0_1 import (
     ChatActionRequest,
@@ -9,7 +9,8 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from llm_services.chat_service_request_handler import ChatServiceRequestHandler
 from typing import List, cast
 from user_services.oauth_user import get_authenticated_user
-from db.pgsql_object import UserDB
+import db.redis_user_session
+import db.pgsql_user_session
 
 ###################################################################################################################################################################
 chat_action_router = APIRouter()
@@ -22,20 +23,20 @@ chat_action_router = APIRouter()
 async def handle_chat_action(
     request_data: ChatActionRequest,
     user_session_server: UserSessionServerInstance,
-    authenticated_user: UserDB = Depends(get_authenticated_user),
+    authenticated_user: str = Depends(get_authenticated_user),
 ) -> ChatActionResponse:
 
     logger.info(f"/action/chat/v1/: {request_data.model_dump_json()}")
 
     current_user_session = user_session_server.user_sessions.acquire_user_session(
-        authenticated_user.username
+        authenticated_user
     )
 
     try:
 
         # 组织请求
         chat_request_handler = ChatServiceRequestHandler(
-            user_name=authenticated_user.username,
+            user_name=authenticated_user,
             prompt=request_data.content,
             chat_history=cast(
                 List[SystemMessage | HumanMessage | AIMessage],
@@ -45,47 +46,47 @@ async def handle_chat_action(
 
         # 处理请求
         user_session_server.chat_service.handle(request_handlers=[chat_request_handler])
-
-        if chat_request_handler.response_content != "":
-
-            human_message = HumanMessage(content=request_data.content)
-            ai_message = AIMessage(content=chat_request_handler.response_content)
-
-            current_user_session.chat_history.extend(
-                [
-                    human_message,
-                    ai_message,
-                ]
+        if chat_request_handler.response_content == "":
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="处理请求失败: 响应内容为空",
             )
 
-            user_session_server.user_sessions.update_user_session_with_new_messages(
-                user_session=current_user_session,
-                messages=[
-                    human_message,
-                    ai_message,
-                ],
-            )
+        # 准备添加消息
+        messages = [
+            HumanMessage(content=request_data.content),
+            AIMessage(content=chat_request_handler.response_content),
+        ]
 
-            # 打印聊天记录
-            for msg in current_user_session.chat_history:
-                logger.warning(msg.content)
+        # 将消息添加到会话中
+        current_user_session.chat_history.extend(messages)
 
-            # 返回响应
-            return ChatActionResponse(
-                error=0,
-                message=chat_request_handler.response_content,
-            )
-
-    except Exception as e:
-        return ChatActionResponse(
-            error=1002,
-            message=f"处理请求失败: {e}",
+        # 更新用户会话到 Redis 和 PostgreSQL
+        db.redis_user_session.update_user_session(
+            user_session=current_user_session,
+            new_messages=messages,
         )
 
-    return ChatActionResponse(
-        error=1003,
-        message="处理请求失败: 未知错误",
-    )
+        db.pgsql_user_session.update_user_session(
+            user_session=current_user_session,
+            new_messages=messages,
+        )
+
+        # 打印聊天记录
+        for msg in current_user_session.chat_history:
+            logger.warning(msg.content)
+
+        # 返回响应
+        return ChatActionResponse(
+            message=chat_request_handler.response_content,
+        )
+
+    except Exception as e:
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"处理请求失败: {e}",
+        )
 
 
 ###################################################################################################################################################################

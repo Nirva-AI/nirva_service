@@ -194,6 +194,52 @@ def redis_flushall() -> None:
         raise e
 
 
+###################################################################################################
+def redis_exists(name: str) -> bool:
+    """
+    检查Redis中是否存在指定的键。
+
+    参数:
+        name: 键名
+
+    返回:
+        bool: 如果键存在则返回True，否则返回False
+
+    抛出:
+        redis.RedisError: 当Redis操作失败时
+    """
+    try:
+        redis_client = _get_redis_instance()
+        return redis_client.exists(name) > 0
+    except redis.RedisError as e:
+        logger.error(f"Redis error while checking existence of {name}: {e}")
+        raise e
+
+
+###################################################################################################
+def redis_expire(name: str, seconds: int) -> bool:
+    """
+    为Redis中的键设置过期时间。
+
+    参数:
+        name: 键名
+        seconds: 过期时间（秒）
+
+    返回:
+        bool: 设置成功返回True，键不存在返回False
+
+    抛出:
+        redis.RedisError: 当Redis操作失败时
+    """
+    try:
+        redis_client = _get_redis_instance()
+        return redis_client.expire(name, seconds)
+    except redis.RedisError as e:
+        logger.error(f"Redis error while setting expiry for {name}: {e}")
+        raise e
+
+
+###################################################################################################
 # 要清空 Redis 中的所有数据，您可以使用以下命令：
 
 # 方法一：使用 Redis CLI 命令行工具

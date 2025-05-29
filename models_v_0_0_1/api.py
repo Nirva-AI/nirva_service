@@ -31,7 +31,6 @@ class ChatActionRequest(BaseModel):
 @final
 @register_base_model_class
 class ChatActionResponse(BaseModel):
-    error: int = 0
     message: str = ""
 
 

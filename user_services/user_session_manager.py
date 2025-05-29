@@ -1,5 +1,5 @@
-from typing import List, Union, final, cast
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, BaseMessage
+from typing import final
+from langchain_core.messages import SystemMessage
 from models_v_0_0_1.models import UserSession
 import db.redis_user_session
 import db.pgsql_user_session
@@ -57,27 +57,6 @@ class UserSessionManager:
         # 将会话存储到 Redis 中
         db.redis_user_session.set_user_session(user_session_from_db)
         return user_session_from_db
-
-    ###############################################################################################################################################
-    def update_user_session_with_new_messages(
-        self,
-        user_session: UserSession,
-        messages: List[Union[SystemMessage, HumanMessage, AIMessage]],
-    ) -> None:
-        """向用户会话添加新消息"""
-
-        assert user_session.user_name != "", "user_name cannot be an empty string."
-        assert user_session.session_id is not None, "session_id cannot be None."
-
-        db.redis_user_session.update_user_session(
-            user_session=user_session,
-            new_messages=cast(List[BaseMessage], messages),
-        )
-
-        db.pgsql_user_session.update_user_session(
-            user_session=user_session,
-            new_messages=cast(List[BaseMessage], messages),
-        )
 
     ###############################################################################################################################################
     def stop_user_session(self, user_name: str) -> None:

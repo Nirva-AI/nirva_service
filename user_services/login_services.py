@@ -12,6 +12,8 @@ from config.configuration import ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPI
 import db.pgsql_user
 from typing import Optional
 from jose import JWTError
+import db.redis_user
+
 
 ###################################################################################################################################################################
 login_router = APIRouter()
@@ -61,9 +63,18 @@ async def login(
         )
 
         # 返回令牌
-        return Token(
+        ret = Token(
             access_token=access_token, token_type="bearer", refresh_token=refresh_token
         )
+
+        # 将令牌存储到 Redis 中
+        db.redis_user.assign_user_token(
+            user_name=user_db.username,
+            token=ret,
+        )
+
+        # 正确的返回。
+        return ret
 
     except JWTError:
 
@@ -113,11 +124,19 @@ async def refresh(refresh_token: str) -> Token:
         )
 
         # 返回新的令牌
-        return Token(
+        ret = Token(
             access_token=access_token,
             token_type="bearer",
             refresh_token=new_refresh_token,
         )
+
+        # 更新 Redis 中的令牌
+        db.redis_user.assign_user_token(
+            user_name=username,
+            token=ret,
+        )
+
+        return ret
 
     except JWTError:
         raise HTTPException(
