@@ -39,7 +39,7 @@ def main() -> None:
     # 如何使用该函数
     from models_v_0_0_1 import UserSession
     from langchain_core.messages import HumanMessage, AIMessage
-    from db.postgresql_opt import save_user_session, save_user
+    from db.pgsql_opt import save_user_session, save_user
 
     save_user(
         user_name="test_user1",

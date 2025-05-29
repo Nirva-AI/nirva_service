@@ -1,6 +1,6 @@
-from db.postgresql_object import UserSessionDB, ChatMessageDB, UserDB
+from db.pgsql_object import UserSessionDB, ChatMessageDB, UserDB
 from models_v_0_0_1 import UserSession
-from db.postgresql_client import SessionLocal
+from db.pgsql_client import SessionLocal
 from typing import Optional
 from uuid import UUID
 import datetime

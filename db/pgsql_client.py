@@ -10,7 +10,7 @@ from sqlalchemy.orm import (
     sessionmaker,
 )
 from passlib.context import CryptContext
-from db.postgresql_object import Base, UserDB  # 导入User模型
+from db.pgsql_object import Base, UserDB  # 导入User模型
 
 ############################################################################################################
 # 数据库配置
