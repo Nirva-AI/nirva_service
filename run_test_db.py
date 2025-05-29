@@ -62,7 +62,7 @@ def main() -> None:
     from db.pgsql_user_session import set_user_session
     from db.pgsql_user import save_user, has_user
     from loguru import logger
-    from config.fake_user_account import fake_user_account
+    from config.user_account import fake_user_account
 
     if not has_user(fake_user_account.username):
         save_user(

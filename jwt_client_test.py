@@ -1,6 +1,6 @@
 import requests
 from typing import Final, Optional, Dict, cast
-from config.fake_user_account import fake_user_account
+from config.user_account import fake_user_account
 from config.configuration import MKCERT_ROOT_CA, LOCAL_HTTPS_ENABLED
 
 # 服务器地址

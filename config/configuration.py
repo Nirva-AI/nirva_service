@@ -80,7 +80,7 @@ MKCERT_ROOT_CA: Final[str] = (
 )
 
 # 是否使用 HTTPS，默认是 True
-LOCAL_HTTPS_ENABLED: Final[bool] = True  # 是否模拟使用 HTTPS，默认是 False
+LOCAL_HTTPS_ENABLED: Final[bool] = False  # 是否模拟使用 HTTPS，默认是 False
 
 # JWT 相关配置
 JWT_SIGNING_KEY: Final[str] = (

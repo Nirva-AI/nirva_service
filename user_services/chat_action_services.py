@@ -31,6 +31,11 @@ async def handle_chat_action(
 
     try:
 
+        if request_data.content != "":
+            return ChatActionResponse(
+                message=request_data.model_dump_json(),
+            )
+
         current_user_session = user_services.user_session.get_or_create_user_session(
             authenticated_user
         )

@@ -15,7 +15,7 @@ from config.configuration import (
     MKCERT_ROOT_CA,
 )
 
-from config.fake_user_account import fake_user_account
+from config.user_account import fake_user_account
 from db.jwt import Token
 
 

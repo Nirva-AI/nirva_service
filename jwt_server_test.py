@@ -4,7 +4,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError
 from pydantic import BaseModel
 from typing import Final, Optional, Dict
-from config.fake_user_account import fake_user_account
+from config.user_account import fake_user_account
 from db.crypt_context import verify_password
 from db.jwt import (
     create_access_token,
