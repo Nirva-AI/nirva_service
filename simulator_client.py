@@ -16,6 +16,7 @@ from config.configuration import (
 )
 
 from config.fake_user_account import fake_user_account
+from db.jwt import Token
 
 
 ###########################################################################################################################
@@ -50,6 +51,11 @@ class SimulatorContext:
         self._user_name: Final[str] = user_name
         self._password: Final[str] = password
         self._url_configuration: URLConfigurationResponse = URLConfigurationResponse()
+        self._token: Token = Token(
+            access_token="",
+            token_type="",
+            refresh_token="",
+        )
 
     ###########################################################################################################################
     @property
@@ -137,8 +143,9 @@ async def _post_login(context: SimulatorContext) -> None:
     )
 
     if response.status_code == 200:
-        token: str = response.json()["access_token"]
-        logger.warning(f"登录成功！令牌已获取{token}")
+        context._token = Token.model_validate(response.json())
+        logger.warning(f"登录成功！令牌已获取{context._token.model_dump_json()}")
+
     else:
         logger.warning("登录失败，请检查用户名和密码")
 
