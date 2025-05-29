@@ -24,42 +24,6 @@ class URLConfigurationResponse(BaseModel):
 
 @final
 @register_base_model_class
-class LoginRequest(BaseModel):
-    user_name: str = ""
-
-
-@final
-@register_base_model_class
-class LoginResponse(BaseModel):
-    error: int = 0
-    message: str = ""
-
-
-################################################################################################################
-################################################################################################################
-################################################################################################################
-
-
-@final
-@register_base_model_class
-class LogoutRequest(BaseModel):
-    user_name: str = ""
-
-
-@final
-@register_base_model_class
-class LogoutResponse(BaseModel):
-    error: int = 0
-    message: str = ""
-
-
-################################################################################################################
-################################################################################################################
-################################################################################################################
-
-
-@final
-@register_base_model_class
 class ChatActionRequest(BaseModel):
     user_name: str = ""
     content: str = ""

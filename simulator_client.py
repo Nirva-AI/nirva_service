@@ -3,10 +3,6 @@ from loguru import logger
 import requests
 from models_v_0_0_1 import (
     URLConfigurationResponse,
-    LoginRequest,
-    LoginResponse,
-    LogoutRequest,
-    LogoutResponse,
     ChatActionRequest,
     ChatActionResponse,
 )
@@ -70,11 +66,6 @@ class SimulatorContext:
 
     ###########################################################################################################################
     @property
-    def logout_url(self) -> str:
-        return self._url_configuration.endpoints["logout"]
-
-    ###########################################################################################################################
-    @property
     def chat_action_url(self) -> str:
         return self._url_configuration.endpoints["chat"]
 
@@ -133,27 +124,23 @@ async def _get_url_config(context: SimulatorContext) -> None:
 
 
 ###########################################################################################################################
-async def _handle_login(context: SimulatorContext) -> None:
-    request_data = LoginRequest(user_name=context._user_name)
-    response = _post_request(
+async def _post_login(context: SimulatorContext) -> None:
+
+    response = requests.post(
         context.login_url,
-        data=request_data.model_dump(),
+        data={
+            "username": context._user_name,
+            "password": context._password,
+            "grant_type": "password",
+        },
+        verify=LOCAL_HTTPS_ENABLED and MKCERT_ROOT_CA or None,
     )
-    if response is not None:
-        response_model = LoginResponse.model_validate(response)
-        logger.info(f"login: {response_model.model_dump_json()}")
 
-
-###########################################################################################################################
-async def _handle_logout(context: SimulatorContext) -> None:
-    request_data = LogoutRequest(user_name=context._user_name)
-    response = _post_request(
-        context.logout_url,
-        data=request_data.model_dump(),
-    )
-    if response is not None:
-        response_model = LogoutResponse.model_validate(response)
-        logger.info(f"logout: {response_model.model_dump_json()}")
+    if response.status_code == 200:
+        token: str = response.json()["access_token"]
+        logger.warning(f"登录成功！令牌已获取{token}")
+    else:
+        logger.warning("登录失败，请检查用户名和密码")
 
 
 ###########################################################################################################################
@@ -194,7 +181,7 @@ async def _simulator() -> None:
 
     # 直接开始。
     await _get_url_config(simulator_context)
-    await _handle_login(simulator_context)
+    await _post_login(simulator_context)
 
     while True:
         try:
@@ -206,9 +193,8 @@ async def _simulator() -> None:
             if "/api" in user_input:
                 await _get_url_config(simulator_context)
             elif "/login" in user_input:
-                await _handle_login(simulator_context)
-            elif "/logout" in user_input:
-                await _handle_logout(simulator_context)
+                await _post_login(simulator_context)
+
             elif "/chat" in user_input:
                 await _handle_chat_action(simulator_context, user_input)
             else:

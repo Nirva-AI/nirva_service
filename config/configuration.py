@@ -81,3 +81,9 @@ MKCERT_ROOT_CA: Final[str] = (
 
 # 是否使用 HTTPS，默认是 True
 LOCAL_HTTPS_ENABLED: Final[bool] = True  # 是否模拟使用 HTTPS，默认是 False
+
+# JWT 相关配置
+ACCESS_TOKEN_EXPIRE_MINUTES: Final[int] = 30  # 访问令牌的过期时间，单位为分钟
+
+# 设置 refresh_token 的过期时间
+REFRESH_TOKEN_EXPIRE_DAYS: Final[int] = 7  # 刷新令牌的过期时间，单位为天
