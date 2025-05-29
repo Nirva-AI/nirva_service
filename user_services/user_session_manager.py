@@ -35,7 +35,7 @@ class UserSessionManager:
             )
 
             # 第一次创建用户会话时，存储到 Redis 中
-            db.redis_user_session.update_user_session(new_session)
+            db.redis_user_session.set_user_session(new_session)
             return new_session
 
         # 如果用户会话存在，则直接返回
@@ -48,9 +48,9 @@ class UserSessionManager:
         messages: List[Union[SystemMessage, HumanMessage, AIMessage]],
     ) -> None:
         """向用户会话添加新消息"""
-        db.redis_user_session.add_messages_to_user_session(
+        db.redis_user_session.update_user_session(
             user_session=user_session,
-            messages=cast(List[BaseMessage], messages),
+            new_messages=cast(List[BaseMessage], messages),
         )
 
     ###############################################################################################################################################

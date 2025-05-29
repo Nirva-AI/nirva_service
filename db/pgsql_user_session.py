@@ -5,10 +5,11 @@ from typing import Optional, List
 from uuid import UUID
 import datetime
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, BaseMessage
+from sqlalchemy import func  # 添加这行导入语句
 
 
 ############################################################################################################
-def save_user_session(
+def set_user_session(
     user_session: UserSession,
     session_id: Optional[UUID] = None,
     session_name: Optional[str] = None,
@@ -39,7 +40,7 @@ def save_user_session(
                 raise ValueError(f"会话ID '{session_id}' 不存在")
 
             # 更新会话时间
-            session.updated_at = datetime.datetime.utcnow()
+            session.updated_at = datetime.datetime.now()
 
             # 如果提供了新的会话名称，则更新
             if session_name:
@@ -136,6 +137,74 @@ def get_user_session(user_name: str, session_id: UUID) -> UserSession:
 
         # 构建并返回UserSession
         return UserSession(user_name=user_name, chat_history=chat_history)
+
+    finally:
+        db.close()
+
+
+############################################################################################################
+def update_user_session(
+    user_session: UserSession, new_messages: List[BaseMessage], session_id: UUID
+) -> UUID:
+    """
+    向现有用户会话添加新消息
+
+    参数:
+        user_session: 当前用户会话对象
+        new_messages: 要添加的新消息列表
+        session_id: 会话ID
+
+    返回:
+        会话ID (UUID)
+    """
+    db = SessionLocal()
+    try:
+        # 查找用户，如果不存在则抛出异常
+        user = db.query(UserDB).filter_by(username=user_session.user_name).first()
+        if not user:
+            raise ValueError(f"用户 '{user_session.user_name}' 不存在")
+
+        # 获取会话
+        session = (
+            db.query(UserSessionDB).filter_by(id=session_id, user_id=user.id).first()
+        )
+        if not session:
+            raise ValueError(
+                f"会话ID '{session_id}' 不存在或不属于用户 '{user_session.user_name}'"
+            )
+
+        # 更新会话时间
+        session.updated_at = datetime.datetime.now()
+
+        # 获取当前最大的序号 - 修复这行代码
+        max_order = (
+            db.query(func.max(ChatMessageDB.order_index))
+            .filter_by(session_id=session_id)
+            .scalar()
+        )
+        current_max_order = max_order if max_order is not None else -1
+
+        # 添加新消息
+        for index, message in enumerate(new_messages):
+            # 序列化整个消息对象
+            message_dict = message.model_dump()
+
+            # 创建消息记录
+            chat_message = ChatMessageDB(
+                session_id=session.id,
+                type=message.type,  # 保留类型字段便于查询
+                message_data=message_dict,
+                order_index=current_max_order + 1 + index,  # 递增序号
+            )
+            db.add(chat_message)
+
+        # 提交事务
+        db.commit()
+        return session.id
+
+    except Exception as e:
+        db.rollback()
+        raise e
 
     finally:
         db.close()

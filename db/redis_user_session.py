@@ -21,7 +21,7 @@ def _user_history_key(user_name: str) -> str:
 
 
 ###############################################################################################################################################
-def serialize_message(message: BaseMessage) -> str:
+def _serialize_message(message: BaseMessage) -> str:
     """将消息对象序列化为JSON字符串"""
     return json.dumps(
         {
@@ -32,7 +32,7 @@ def serialize_message(message: BaseMessage) -> str:
 
 
 ###############################################################################################################################################
-def deserialize_message(message_json: str) -> Optional[BaseMessage]:
+def _deserialize_message(message_json: str) -> Optional[BaseMessage]:
     """将JSON字符串反序列化为消息对象"""
     try:
         message_data = json.loads(message_json)
@@ -71,7 +71,7 @@ def get_user_session(user_name: str) -> UserSession:
     redis_history_data = db.redis_client.redis_lrange(history_key, 0, -1)
     chat_history: List[BaseMessage] = []
     for message_json in redis_history_data:
-        message = deserialize_message(message_json)
+        message = _deserialize_message(message_json)
         if message:
             logger.debug(f"Deserialized message: {message}")
             chat_history.append(message)
@@ -81,7 +81,7 @@ def get_user_session(user_name: str) -> UserSession:
 ###############################################################################################################################################
 
 
-def update_user_session(user_session: UserSession) -> None:
+def set_user_session(user_session: UserSession) -> None:
     """更新用户会话，包括基本信息和聊天历史"""
     user_session_key = _user_session_key(user_session.user_name)
 
@@ -102,7 +102,7 @@ def update_user_session(user_session: UserSession) -> None:
     # 然后添加新的聊天历史
     if user_session.chat_history:
         for message in user_session.chat_history:
-            message_json = serialize_message(message)
+            message_json = _serialize_message(message)
             db.redis_client.redis_rpush(history_key, message_json)
 
 
@@ -118,13 +118,16 @@ def delete_user_session(user_name: str) -> None:
 
 
 ###############################################################################################################################################
-def add_messages_to_user_session(
+def update_user_session(
     user_session: UserSession,
-    messages: List[BaseMessage],
+    new_messages: List[BaseMessage],
 ) -> None:
     """向用户会话添加新消息"""
     # 更新Redis中的聊天历史
     history_key = _user_history_key(user_session.user_name)
-    for message in messages:
-        message_json = serialize_message(message)
+    for message in new_messages:
+        message_json = _serialize_message(message)
         db.redis_client.redis_rpush(history_key, message_json)
+
+
+###############################################################################################################################################

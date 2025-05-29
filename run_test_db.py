@@ -59,7 +59,7 @@ def main() -> None:
     # 如何使用该函数
     from models_v_0_0_1 import UserSession
     from langchain_core.messages import HumanMessage, AIMessage
-    from db.pgsql_user_session import save_user_session
+    from db.pgsql_user_session import set_user_session
     from db.pgsql_user import save_user, has_user
     from loguru import logger
 
@@ -84,7 +84,7 @@ def main() -> None:
         )
 
         # 保存会话
-        session_id = save_user_session(user_session, session_name="测试会话")
+        session_id = set_user_session(user_session, session_name="测试会话")
         print(f"保存的会话ID: {session_id}")
 
         # 更新现有会话
@@ -96,7 +96,7 @@ def main() -> None:
                 HumanMessage(content="我有一个问题"),
             ],
         )
-        save_user_session(updated_user_session, session_id=session_id)
+        set_user_session(updated_user_session, session_id=session_id)
         logger.debug(f"更新的会话ID: {session_id}")
 
     except Exception as e:
