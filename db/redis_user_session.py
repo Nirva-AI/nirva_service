@@ -66,7 +66,6 @@ def get_user_session(user_name: str) -> UserSession:
         return UserSession(
             user_name="",
             chat_history=[],
-            session_id=None,
         )
 
     # 获取对话历史

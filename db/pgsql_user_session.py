@@ -136,7 +136,9 @@ def get_user_session(user_name: str, session_id: UUID) -> UserSession:
             chat_history.append(msg_obj)
 
         # 构建并返回UserSession
-        return UserSession(user_name=user_name, chat_history=chat_history)
+        return UserSession(
+            user_name=user_name, chat_history=chat_history, session_id=session_id
+        )
 
     finally:
         db.close()
@@ -144,7 +146,7 @@ def get_user_session(user_name: str, session_id: UUID) -> UserSession:
 
 ############################################################################################################
 def update_user_session(
-    user_session: UserSession, new_messages: List[BaseMessage], session_id: UUID
+    user_session: UserSession, new_messages: List[BaseMessage]
 ) -> UUID:
     """
     向现有用户会话添加新消息
@@ -157,6 +159,11 @@ def update_user_session(
     返回:
         会话ID (UUID)
     """
+    # 获取会话
+    assert (
+        user_session.session_id is not None
+    ), "user_session.session_id cannot be None."
+
     db = SessionLocal()
     try:
         # 查找用户，如果不存在则抛出异常
@@ -164,13 +171,14 @@ def update_user_session(
         if not user:
             raise ValueError(f"用户 '{user_session.user_name}' 不存在")
 
-        # 获取会话
         session = (
-            db.query(UserSessionDB).filter_by(id=session_id, user_id=user.id).first()
+            db.query(UserSessionDB)
+            .filter_by(id=user_session.session_id, user_id=user.id)
+            .first()
         )
         if not session:
             raise ValueError(
-                f"会话ID '{session_id}' 不存在或不属于用户 '{user_session.user_name}'"
+                f"会话ID '{user_session.session_id}' 不存在或不属于用户 '{user_session.user_name}'"
             )
 
         # 更新会话时间
@@ -179,7 +187,7 @@ def update_user_session(
         # 获取当前最大的序号 - 修复这行代码
         max_order = (
             db.query(func.max(ChatMessageDB.order_index))
-            .filter_by(session_id=session_id)
+            .filter_by(session_id=user_session.session_id)
             .scalar()
         )
         current_max_order = max_order if max_order is not None else -1
@@ -262,7 +270,11 @@ def get_user_sessions(user_name: str) -> List[UserSession]:
 
             # 构建UserSession对象并添加到列表中
             user_sessions.append(
-                UserSession(user_name=user_name, chat_history=chat_history)
+                UserSession(
+                    user_name=user_name,
+                    chat_history=chat_history,
+                    session_id=session.id,
+                )
             )
 
         return user_sessions

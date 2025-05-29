@@ -4,7 +4,6 @@ from models_v_0_0_1.models import UserSession
 import db.redis_user_session
 import db.pgsql_user_session
 from loguru import logger
-from uuid import uuid4
 
 
 ###############################################################################################################################################
@@ -36,22 +35,21 @@ class UserSessionManager:
                         content="你需要扮演一个海盗与我对话，要用海盗的语气哦！"
                     )
                 ],
-                session_id=uuid4(),  # 生成一个新的UUID作为会话ID
             )
 
             logger.info(
                 f"Creating new user session for {user_name}: {new_session.model_dump_json()}"
             )
 
-            # 第一次创建用户会话时，存储到 Redis 和 PostgreSQL 中
+            # 将新会话存储到 PostgreSQL 数据库中, 并第一次生成 session_id
+            new_session.session_id = db.pgsql_user_session.set_user_session(new_session)
+
+            # 存储到 Redis 中
             db.redis_user_session.set_user_session(new_session)
-            db.pgsql_user_session.set_user_session(
-                new_session, session_id=new_session.session_id
-            )
+
             return new_session
 
-        # 存在于数据库中但不在 Redis 中
-        # 取第一个会话作为用户会话
+        # 存在于数据库中但不在 Redis 中 取第一个会话作为用户会话
         user_session_from_db = user_sessions_from_db[0]
         logger.info(
             f"User session for {user_name} found in database: {user_session_from_db.model_dump_json()}"
@@ -67,18 +65,18 @@ class UserSessionManager:
         messages: List[Union[SystemMessage, HumanMessage, AIMessage]],
     ) -> None:
         """向用户会话添加新消息"""
+
+        assert user_session.user_name != "", "user_name cannot be an empty string."
+        assert user_session.session_id is not None, "session_id cannot be None."
+
         db.redis_user_session.update_user_session(
             user_session=user_session,
             new_messages=cast(List[BaseMessage], messages),
         )
 
-        assert (
-            user_session.session_id is not None
-        ), "user_session.session_id cannot be None."
         db.pgsql_user_session.update_user_session(
             user_session=user_session,
             new_messages=cast(List[BaseMessage], messages),
-            session_id=user_session.session_id,
         )
 
     ###############################################################################################################################################
