@@ -2,10 +2,12 @@ from datetime import datetime, timedelta
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+
+# from passlib.context import CryptContext
 from pydantic import BaseModel
 from typing import Final, Optional, Dict, Any
 from config.fake_user_account import fake_user_account
+from db.crypt_context import verify_password
 
 # 配置参数
 SECRET_KEY: Final[str] = (
@@ -39,15 +41,15 @@ class User(BaseModel):
 
 
 # 加密工具
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 app = FastAPI()
 
 
 # 验证密码方法
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+# def verify_password(plain_password: str, hashed_password: str) -> bool:
+#     return crypt_context.verify(plain_password, hashed_password)
 
 
 # 创建JWT令牌

@@ -2,9 +2,12 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import (
     sessionmaker,
 )
-from passlib.context import CryptContext
+
+# from passlib.context import CryptContext
 from db.pgsql_object import Base
 from loguru import logger
+
+# from db.crypt_context import crypt_context
 
 """
 psql -U fastapi_user -d my_fastapi_db
@@ -20,7 +23,7 @@ engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 ############################################################################################################
 # 密码加密工具
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 ############################################################################################################
 # 创建表
 Base.metadata.create_all(bind=engine)
