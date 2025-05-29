@@ -1,4 +1,4 @@
-from typing import List, Union, Optional
+from typing import List, Union, Optional, final
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, BaseMessage
 import db.redis_client
 import json
@@ -7,6 +7,7 @@ from models_v_0_0_1.models import UserSession
 
 
 ###############################################################################################################################################
+@final
 class UserSessionManager:
     """管理用户会话数据，包括会话存储、检索和更新"""
 
