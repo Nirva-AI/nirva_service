@@ -3,6 +3,7 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, Base
 from models_v_0_0_1.models import UserSession
 import db.redis_user_session
 from loguru import logger
+from uuid import UUID, uuid4
 
 
 ###############################################################################################################################################
@@ -28,6 +29,7 @@ class UserSessionManager:
                         content="你需要扮演一个海盗与我对话，要用海盗的语气哦！"
                     )
                 ],
+                session_id=uuid4(),  # 生成一个新的UUID作为会话ID
             )
 
             logger.info(

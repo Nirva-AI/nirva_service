@@ -4,7 +4,7 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, Base
 import db.redis_client
 import json
 from loguru import logger
-from uuid import UUID, uuid4
+from uuid import UUID
 
 
 ###############################################################################################################################################
@@ -66,8 +66,10 @@ def get_user_session(user_name: str) -> UserSession:
         return UserSession(
             user_name="",
             chat_history=[],
+            session_id=None,
         )
 
+    # 获取对话历史
     history_key = _user_history_key(user_name)
     redis_history_data = db.redis_client.redis_lrange(history_key, 0, -1)
     chat_history: List[BaseMessage] = []
@@ -77,10 +79,15 @@ def get_user_session(user_name: str) -> UserSession:
             logger.debug(f"Deserialized message: {message}")
             chat_history.append(message)
 
+    # 获取用户会话的 session_id
+    session_id: Optional[UUID] = None
+    if "session_id" in user_session_data:
+        session_id = UUID(user_session_data["session_id"])
+
     return UserSession(
         user_name=user_name,
         chat_history=chat_history,
-        session_id=UUID(user_session_data.get("session_id", "")),
+        session_id=session_id,
     )
 
 
@@ -88,12 +95,12 @@ def get_user_session(user_name: str) -> UserSession:
 
 
 def set_user_session(user_session: UserSession) -> None:
+
+    assert user_session.user_name != "", "user_name cannot be an empty string."
+    assert user_session.session_id != None, "session_id cannot be None."
+
     """更新用户会话，包括基本信息和聊天历史"""
     user_session_key = _user_session_key(user_session.user_name)
-
-    if user_session.session_id is None:
-        # 如果 session_id 为空，则生成一个新的 UUID
-        user_session.session_id = uuid4()
 
     # 更新用户基本信息
     db.redis_client.redis_hset(
