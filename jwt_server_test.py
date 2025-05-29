@@ -1,84 +1,33 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from jose import JWTError, jwt
-
-# from passlib.context import CryptContext
+from jose import JWTError
 from pydantic import BaseModel
-from typing import Final, Optional, Dict, Any
+from typing import Final, Optional, Dict
 from config.fake_user_account import fake_user_account
 from db.crypt_context import verify_password
-
-# 配置参数
-SECRET_KEY: Final[str] = (
-    "your-secret-key-here-please-change-it"  # 生产环境要用更复杂的密钥
+from db.my_jwt import (
+    create_access_token,
+    create_refresh_token,
+    Token,
+    decode_jwt,
 )
-ALGORITHM: Final[str] = "HS256"
+
 ACCESS_TOKEN_EXPIRE_MINUTES: Final[int] = 30
 ENABLE_HTTPS: Final[bool] = True  # 是否使用 HTTPS，默认是 False
-REFRESH_TOKEN_EXPIRE_DAYS: Final[int] = 7
 
 # 模拟数据库中的用户数据
-fake_users_db: Dict[str, Dict[str, str]] = {
-    # "testuser": {
-    #     "username": "testuser",
-    #     "hashed_password": "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW",  # 明文是 secret
-    # }
-}
+fake_users_db: Dict[str, Dict[str, str]] = {}
 
 fake_users_db[fake_user_account.username] = fake_user_account.model_dump()
 
-
-# 数据模型
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-    refresh_token: str  # 新增字段
-
-
-class User(BaseModel):
-    username: str
-
-
-# 加密工具
-# pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 app = FastAPI()
 
 
-# 验证密码方法
-# def verify_password(plain_password: str, hashed_password: str) -> bool:
-#     return crypt_context.verify(plain_password, hashed_password)
-
-
-# 创建JWT令牌
-def create_access_token(
-    data: Dict[str, Any], expires_delta: Optional[timedelta] = None
-) -> str:
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.now() + expires_delta
-    else:
-        expire = datetime.now() + timedelta(minutes=15)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
-
-def create_refresh_token(
-    data: Dict[str, Any], expires_delta: Optional[timedelta] = None
-) -> str:
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.now() + expires_delta
-    else:
-        expire = datetime.now() + timedelta(
-            days=REFRESH_TOKEN_EXPIRE_DAYS
-        )  # 默认 7 天有效期
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+class User(BaseModel):
+    username: str
 
 
 # 用户认证
@@ -97,7 +46,8 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        # payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = decode_jwt(token)
         username: Optional[str] = payload.get("sub")
         if username is None:
             raise credentials_exception
@@ -121,9 +71,10 @@ async def login_for_access_token(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="用户名或密码错误",
         )
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    # access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user["username"]}, expires_delta=access_token_expires
+        data={"sub": user["username"]},
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
     )
     refresh_token_expires = timedelta(days=7)  # 设置 refresh_token 的过期时间
     refresh_token = create_refresh_token(
@@ -142,7 +93,8 @@ async def refresh_access_token(refresh_token: str) -> Token:
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+        # payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = decode_jwt(refresh_token)
         username: Optional[str] = payload.get("sub")
         if username is None:
             raise credentials_exception
@@ -154,9 +106,10 @@ async def refresh_access_token(refresh_token: str) -> Token:
         raise credentials_exception
 
     # 生成新的 access_token
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    # access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": username}, expires_delta=access_token_expires
+        data={"sub": username},
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
     )
     # 生成新的 refresh_token
     refresh_token_expires = timedelta(days=7)
