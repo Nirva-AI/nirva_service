@@ -22,7 +22,7 @@ pip install bcrypt==3.2.2  # 已知兼容 passlib 1.7.4 的版本
 ## 严格模式检查
 
 ```shell
-mypy --strict run_user_session_server.py simulator_client.py run_chat_server.py run_clear_db.py run_test_db.py
+mypy --strict run_user_session_server.py simulator_client.py run_chat_server.py run_clear_db.py run_test_db.py jwt_server_test.py jwt_client_test.py
 mypy --strict jwt_server_test.py jwt_client_test.py
 ```
 

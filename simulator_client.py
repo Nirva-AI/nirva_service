@@ -17,7 +17,7 @@ from config.configuration import (
     UserSessionServerConfig,
 )
 
-from config.test_user_account import simu_test_user_account
+from config.fake_user_account import fake_user_account
 
 
 ###########################################################################################################################
@@ -189,7 +189,7 @@ async def _simulator() -> None:
         and user_session_server_config.local_network_ip
         or user_session_server_config.server_ip_address,
         server_port=user_session_server_config.server_port,
-        user_name=simu_test_user_account.username,
+        user_name=fake_user_account.username,
     )
 
     # 直接开始。

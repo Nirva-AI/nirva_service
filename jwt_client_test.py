@@ -1,6 +1,7 @@
 import requests
 from typing import Final, Optional, Dict, cast
 from jwt_server_test import ENABLE_HTTPS
+from config.fake_user_account import fake_user_account
 
 # 服务器地址
 BASE_URL: Final[str] = (
@@ -81,7 +82,7 @@ def main() -> None:
             break
 
         elif user_input == "/a":
-            token = login("testuser", "secret")
+            token = login(fake_user_account.username, "secret")
             if token:
                 print("重新登录成功！")
             else:

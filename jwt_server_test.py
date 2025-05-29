@@ -5,6 +5,7 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
 from typing import Final, Optional, Dict, Any
+from config.fake_user_account import fake_user_account
 
 # 配置参数
 SECRET_KEY: Final[str] = (
@@ -17,11 +18,13 @@ REFRESH_TOKEN_EXPIRE_DAYS: Final[int] = 7
 
 # 模拟数据库中的用户数据
 fake_users_db: Dict[str, Dict[str, str]] = {
-    "testuser": {
-        "username": "testuser",
-        "hashed_password": "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW",  # 明文是 secret
-    }
+    # "testuser": {
+    #     "username": "testuser",
+    #     "hashed_password": "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW",  # 明文是 secret
+    # }
 }
+
+fake_users_db[fake_user_account.username] = fake_user_account.model_dump()
 
 
 # 数据模型
