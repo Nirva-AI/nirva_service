@@ -6,6 +6,12 @@ from passlib.context import CryptContext
 from db.pgsql_object import Base
 from loguru import logger
 
+"""
+psql -U fastapi_user -d my_fastapi_db
+# 输入密码后执行
+SELECT * FROM users;
+"""
+
 ############################################################################################################
 # 数据库配置
 your_password = "123456"
