@@ -17,6 +17,8 @@ from config.configuration import (
     UserSessionServerConfig,
 )
 
+from config.test_user_account import simu_test_user_account
+
 
 ###########################################################################################################################
 def _extract_user_input(user_input: str, symbol: str) -> str:
@@ -187,7 +189,7 @@ async def _simulator() -> None:
         and user_session_server_config.local_network_ip
         or user_session_server_config.server_ip_address,
         server_port=user_session_server_config.server_port,
-        user_name="wei",
+        user_name=simu_test_user_account.username,
     )
 
     # 直接开始。

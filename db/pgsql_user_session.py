@@ -211,3 +211,64 @@ def update_user_session(
 
 
 ############################################################################################################
+def get_user_sessions(user_name: str) -> List[UserSession]:
+    """
+    获取指定用户的所有会话
+
+    参数:
+        user_name: 用户名
+
+    返回:
+        UserSession对象列表
+    """
+    db = SessionLocal()
+    try:
+        # 检查用户是否存在
+        user = db.query(UserDB).filter_by(username=user_name).first()
+        if not user:
+            raise ValueError(f"用户 '{user_name}' 不存在")
+
+        # 获取用户的所有会话
+        sessions = db.query(UserSessionDB).filter_by(user_id=user.id).all()
+
+        user_sessions: List[UserSession] = []
+        for session in sessions:
+            # 获取会话消息
+            messages_db = (
+                db.query(ChatMessageDB)
+                .filter_by(session_id=session.id)
+                .order_by(ChatMessageDB.order_index)
+                .all()
+            )
+
+            # 重建消息历史
+            chat_history: List[BaseMessage] = []
+            for msg_db in messages_db:
+                msg_data = msg_db.message_data
+                msg_type = msg_data.get("type")
+                msg_obj: Optional[BaseMessage] = None
+
+                if msg_type == "human":
+                    msg_obj = HumanMessage.model_validate(msg_data)
+                elif msg_type == "ai":
+                    msg_obj = AIMessage.model_validate(msg_data)
+                elif msg_type == "system":
+                    msg_obj = SystemMessage.model_validate(msg_data)
+                else:
+                    continue
+
+                assert msg_obj is not None, f"Unknown message type: {msg_type}"
+                chat_history.append(msg_obj)
+
+            # 构建UserSession对象并添加到列表中
+            user_sessions.append(
+                UserSession(user_name=user_name, chat_history=chat_history)
+            )
+
+        return user_sessions
+
+    finally:
+        db.close()
+
+
+############################################################################################################

@@ -62,23 +62,23 @@ def main() -> None:
     from db.pgsql_user_session import set_user_session
     from db.pgsql_user import save_user, has_user
     from loguru import logger
+    from config.test_user_account import simu_test_user_account
 
-    test_user_name = "test_user1"
-    test_hashed_password = "13dadasdasdqeqeqeqda"
-
-    if not has_user(test_user_name):
+    if not has_user(simu_test_user_account.username):
         save_user(
-            user_name=test_user_name,
-            hashed_password=test_hashed_password,
+            user_name=simu_test_user_account.username,
+            hashed_password=simu_test_user_account.password,
         )
 
     try:
 
         # 创建一个用户会话
         user_session = UserSession(
-            user_name=test_user_name,
+            user_name=simu_test_user_account.username,
             chat_history=[
-                HumanMessage(content="你好，我是用户"),
+                HumanMessage(
+                    content=f"你好，我是用户[{simu_test_user_account.username}]"
+                ),
                 AIMessage(content="你好，我是AI助手"),
             ],
         )
@@ -89,9 +89,11 @@ def main() -> None:
 
         # 更新现有会话
         updated_user_session = UserSession(
-            user_name=test_user_name,
+            user_name=simu_test_user_account.username,
             chat_history=[
-                HumanMessage(content="你好，我是用户"),
+                HumanMessage(
+                    content=f"你好，我是用户[{simu_test_user_account.username}]"
+                ),
                 AIMessage(content="你好，我是AI助手"),
                 HumanMessage(content="我有一个问题"),
             ],
