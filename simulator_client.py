@@ -15,6 +15,8 @@ from config.configuration import (
     GEN_CONFIGS_DIR,
     USER_SESSION_SERVER_CONFIG_PATH,
     UserSessionServerConfig,
+    LOCAL_HTTPS_ENABLED,
+    MKCERT_ROOT_CA,
 )
 
 from config.fake_user_account import fake_user_account
@@ -54,6 +56,9 @@ class SimulatorContext:
     ###########################################################################################################################
     @property
     def config_url(self) -> str:
+        if LOCAL_HTTPS_ENABLED:
+            return f"https://localhost:{self._server_port}/config"
+
         return f"http://{self._server_ip_address}:{self._server_port}/config"
 
     ###########################################################################################################################
@@ -79,10 +84,12 @@ def _post_request(
 ) -> Union[Dict[str, Any], None]:
 
     logger.debug(f"_post_request url: {url}, data: {data}")
+
     response = requests.post(
         url,
         json=data,
         headers={"Content-Type": "application/json"},
+        verify=LOCAL_HTTPS_ENABLED and MKCERT_ROOT_CA or None,
     )
 
     if response.status_code == 200:
@@ -104,6 +111,7 @@ def _get_request(
     response = requests.get(
         url,
         headers={"Content-Type": "application/json"},
+        verify=LOCAL_HTTPS_ENABLED and MKCERT_ROOT_CA or None,
     )
 
     if response.status_code == 200:

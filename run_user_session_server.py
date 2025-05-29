@@ -12,6 +12,7 @@ def main() -> None:
         UserSessionServerConfig,
         USER_SESSION_SERVER_CONFIG_PATH,
         LOGS_DIR,
+        LOCAL_HTTPS_ENABLED,
     )
 
     assert (
@@ -27,11 +28,22 @@ def main() -> None:
         log_start_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         logger.add(LOGS_DIR / f"{log_start_time}.log", level="DEBUG")
 
-        uvicorn.run(
-            app,
-            host=user_session_server_config.server_ip_address,
-            port=user_session_server_config.server_port,
-        )
+        if LOCAL_HTTPS_ENABLED:
+            # 本机回环测试https
+            uvicorn.run(
+                app,
+                host="0.0.0.0",
+                port=user_session_server_config.server_port,
+                ssl_keyfile="./localhost+3-key.pem",
+                ssl_certfile="./localhost+3.pem",
+            )
+        else:
+            # 正常测试的启动，可能有局域网的IP地址
+            uvicorn.run(
+                app,
+                host=user_session_server_config.server_ip_address,
+                port=user_session_server_config.server_port,
+            )
 
     except Exception as e:
         logger.error(f"Exception: {e}")

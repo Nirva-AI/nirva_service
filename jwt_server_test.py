@@ -12,9 +12,9 @@ from db.jwt import (
     Token,
     decode_jwt,
 )
+from config.configuration import LOCAL_HTTPS_ENABLED
 
 ACCESS_TOKEN_EXPIRE_MINUTES: Final[int] = 30
-ENABLE_HTTPS: Final[bool] = True  # 是否使用 HTTPS，默认是 False
 
 # 模拟数据库中的用户数据
 fake_users_db: Dict[str, Dict[str, str]] = {}
@@ -132,7 +132,7 @@ async def get_protected_data(
 def main() -> None:
     import uvicorn
 
-    if ENABLE_HTTPS:
+    if LOCAL_HTTPS_ENABLED:
         uvicorn.run(
             app,
             host="0.0.0.0",

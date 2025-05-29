@@ -78,3 +78,6 @@ REDIS_CONFIG_PATH.write_text(
 MKCERT_ROOT_CA: Final[str] = (
     r"/Users/yanghang/Library/Application Support/mkcert/rootCA.pem"
 )
+
+# 是否使用 HTTPS，默认是 True
+LOCAL_HTTPS_ENABLED: Final[bool] = True  # 是否模拟使用 HTTPS，默认是 False

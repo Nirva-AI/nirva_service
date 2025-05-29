@@ -1,13 +1,13 @@
 import requests
 from typing import Final, Optional, Dict, cast
-from jwt_server_test import ENABLE_HTTPS
 from config.fake_user_account import fake_user_account
-from config.configuration import MKCERT_ROOT_CA
+from config.configuration import MKCERT_ROOT_CA, LOCAL_HTTPS_ENABLED
 
 # 服务器地址
 BASE_URL: Final[str] = (
-    ENABLE_HTTPS and "https://localhost:8000" or "http://localhost:8000"
+    LOCAL_HTTPS_ENABLED and "https://localhost:8000" or "http://localhost:8000"
 )
+
 
 def login(username: str, password: str) -> Optional[str]:
 
@@ -20,7 +20,7 @@ def login(username: str, password: str) -> Optional[str]:
     response = requests.post(
         f"{BASE_URL}/token",
         data={"username": username, "password": password, "grant_type": "password"},
-        verify=ENABLE_HTTPS and MKCERT_ROOT_CA or None,
+        verify=LOCAL_HTTPS_ENABLED and MKCERT_ROOT_CA or None,
         # MKCERT_ROOT_CA,  # 使用 mkcert 的根证书
     )
 
@@ -37,7 +37,7 @@ def refresh_token(refresh_token: str) -> Optional[str]:
     response = requests.post(
         f"{BASE_URL}/refresh-token",
         json={"refresh_token": refresh_token},
-        verify=ENABLE_HTTPS and MKCERT_ROOT_CA or None,
+        verify=LOCAL_HTTPS_ENABLED and MKCERT_ROOT_CA or None,
     )
 
     if response.status_code == 200:
@@ -54,7 +54,7 @@ def get_protected_data(token: str) -> Dict[str, str]:
     response = requests.get(
         f"{BASE_URL}/protected-data",
         headers=headers,
-        verify=ENABLE_HTTPS and MKCERT_ROOT_CA or None,
+        verify=LOCAL_HTTPS_ENABLED and MKCERT_ROOT_CA or None,
         # MKCERT_ROOT_CA,  # 使用 mkcert 的根证书
     )
 
