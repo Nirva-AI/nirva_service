@@ -75,6 +75,10 @@ class SimulatorContext:
     def chat_action_url(self) -> str:
         return self._url_configuration.endpoints["chat"]
 
+    @property
+    def logout_url(self) -> str:
+        return self._url_configuration.endpoints["logout"]
+
     ###########################################################################################################################
 
 
@@ -155,7 +159,7 @@ async def _post_login(context: SimulatorContext) -> None:
 
 
 ###########################################################################################################################
-async def _handle_chat_action(context: SimulatorContext, user_input: str) -> None:
+async def _post_chat_action(context: SimulatorContext, user_input: str) -> None:
 
     content = _extract_user_input(user_input, "/chat")
     assert content != "", f"content: {content} is empty string."
@@ -169,6 +173,27 @@ async def _handle_chat_action(context: SimulatorContext, user_input: str) -> Non
     if response is not None:
         response_model = ChatActionResponse.model_validate(response)
         logger.info(f"_handle_chat_action: {response_model.model_dump_json()}")
+
+
+###########################################################################################################################
+# 在您的simulator_client.py中添加登出功能
+async def _post_logout(context: SimulatorContext) -> None:
+    """处理用户登出请求"""
+    # 1. 通知服务器使令牌失效
+    response = requests.post(
+        context.logout_url,
+        headers={"Authorization": f"Bearer {context._token.access_token}"},
+        verify=LOCAL_HTTPS_ENABLED and MKCERT_ROOT_CA or None,
+    )
+
+    if response.status_code == 200:
+        logger.info("成功通知服务器登出")
+    else:
+        logger.warning(f"服务器登出通知失败: {response.status_code}, {response.text}")
+
+    # 2. 清除本地令牌
+    context._token = Token(access_token="", token_type="", refresh_token="")
+    logger.info("已清除本地令牌，用户登出成功")
 
 
 ###########################################################################################################################
@@ -202,13 +227,15 @@ async def _simulator() -> None:
                 print("退出！")
                 break
 
-            if "/api" in user_input:
+            if "/config" in user_input:
                 await _get_url_config(simulator_context)
             elif "/login" in user_input:
                 await _post_login(simulator_context)
-
+            # 在_simulator函数的while循环中添加
+            elif "/logout" in user_input:
+                await _post_logout(simulator_context)
             elif "/chat" in user_input:
-                await _handle_chat_action(simulator_context, user_input)
+                await _post_chat_action(simulator_context, user_input)
             else:
                 logger.info(f"Unknown command: {user_input}")
 

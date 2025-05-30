@@ -7,6 +7,7 @@ from config.configuration import (
     JWT_SIGNING_ALGORITHM,
     REFRESH_TOKEN_EXPIRE_DAYS,
 )
+import uuid
 
 
 ############################################################################################################
@@ -28,7 +29,11 @@ def create_access_token(
         expire = datetime.now() + expires_delta
     else:
         expire = datetime.now() + timedelta(minutes=15)
-    to_encode.update({"exp": expire})
+
+    # 添加一个唯一标识符用于令牌撤销 (新增)
+    jti = str(uuid.uuid4())
+    to_encode.update({"exp": expire, "jti": jti})
+
     encoded_jwt = _encode_jwt(to_encode)
     return encoded_jwt
 

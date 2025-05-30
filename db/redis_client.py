@@ -240,6 +240,30 @@ def redis_expire(name: str, seconds: int) -> bool:
 
 
 ###################################################################################################
+def redis_setex(name: str, seconds: int, value: RedisValueType) -> bool:
+    """
+    设置Redis键的值，并设置过期时间。
+
+    参数:
+        name: 键名
+        value: 要设置的值
+        seconds: 过期时间（秒）
+
+    返回:
+        bool: 设置成功返回True，键不存在返回False
+
+    抛出:
+        redis.RedisError: 当Redis操作失败时
+    """
+    try:
+        redis_client = _get_redis_instance()
+        return redis_client.setex(name, seconds, value)
+    except redis.RedisError as e:
+        logger.error(f"Redis error while setting value for {name}: {e}")
+        raise e
+
+
+###################################################################################################
 # 要清空 Redis 中的所有数据，您可以使用以下命令：
 
 # 方法一：使用 Redis CLI 命令行工具

@@ -25,6 +25,16 @@ async def get_authenticated_user(token: str = Depends(oauth2_scheme)) -> str:
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
+        # 检查令牌是否在黑名单中 (新增)
+        if "jti" in payload:
+            jti = payload.get("jti")
+            if jti is not None and db.redis_user.is_token_blacklisted(str(jti)):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="令牌已被撤销",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+
         if db.redis_user.is_user_token_present(username):
             # 如果 Redis 中存在用户令牌，直接返回用户名
             return username

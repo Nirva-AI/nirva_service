@@ -33,7 +33,7 @@ async def handle_chat_action(
 
         if request_data.content != "":
             return ChatActionResponse(
-                message=request_data.model_dump_json(),
+                message=f"收到: {request_data.content}",
             )
 
         current_user_session = user_services.user_session.get_or_create_user_session(
