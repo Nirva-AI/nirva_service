@@ -1,4 +1,4 @@
-from typing import Any, Dict, Final, Union, cast, final
+from typing import Any, Dict, Final, Union, cast, final, Optional
 from loguru import logger
 import requests
 from models_v_0_0_1 import (
@@ -75,38 +75,17 @@ class SimulatorContext:
     def chat_action_url(self) -> str:
         return self._url_configuration.endpoints["chat"]
 
+    ###########################################################################################################################
     @property
     def logout_url(self) -> str:
         return self._url_configuration.endpoints["logout"]
 
     ###########################################################################################################################
+    @property
+    def refresh_token_url(self) -> str:
+        return self._url_configuration.endpoints["refresh"]
 
-
-###########################################################################################################################
-def _post_request(
-    url: str, data: Dict[str, Any], token: Token
-) -> Union[Dict[str, Any], None]:
-
-    logger.debug(f"_post_request url: {url}, data: {data}")
-
-    response = requests.post(
-        url=url,
-        json=data,
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {token.access_token}",
-        },
-        verify=LOCAL_HTTPS_ENABLED and MKCERT_ROOT_CA or None,
-    )
-
-    if response.status_code == 200:
-        response_data = response.json()
-        logger.debug(f"_post_request reponse: {response_data}")
-        return cast(Dict[str, Any], response_data)
-
-    else:
-        logger.error(f"Error: {response.status_code}, {response.text}")
-    return None
+    ###########################################################################################################################
 
 
 ###########################################################################################################################
@@ -159,24 +138,6 @@ async def _post_login(context: SimulatorContext) -> None:
 
 
 ###########################################################################################################################
-async def _post_chat_action(context: SimulatorContext, user_input: str) -> None:
-
-    content = _extract_user_input(user_input, "/chat")
-    assert content != "", f"content: {content} is empty string."
-
-    request_data = ChatActionRequest(content=content)
-    response = _post_request(
-        context.chat_action_url,
-        data=request_data.model_dump(),
-        token=context._token,
-    )
-    if response is not None:
-        response_model = ChatActionResponse.model_validate(response)
-        logger.info(f"_handle_chat_action: {response_model.model_dump_json()}")
-
-
-###########################################################################################################################
-# 在您的simulator_client.py中添加登出功能
 async def _post_logout(context: SimulatorContext) -> None:
     """处理用户登出请求"""
     # 1. 通知服务器使令牌失效
@@ -194,6 +155,163 @@ async def _post_logout(context: SimulatorContext) -> None:
     # 2. 清除本地令牌
     context._token = Token(access_token="", token_type="", refresh_token="")
     logger.info("已清除本地令牌，用户登出成功")
+
+
+###########################################################################################################################
+def _refresh_token(context: SimulatorContext) -> bool:
+    """刷新访问令牌"""
+    if context._token.refresh_token == "":
+        logger.error("没有可用的刷新令牌，无法刷新访问令牌。")
+        return False
+
+    response = requests.post(
+        context.refresh_token_url,
+        json={"refresh_token": context._token.refresh_token},
+        verify=LOCAL_HTTPS_ENABLED and MKCERT_ROOT_CA or None,
+    )
+
+    if response.status_code == 200:
+        data = response.json()
+        context._token.access_token = data["access_token"]
+        context._token.refresh_token = data["refresh_token"]
+        return True
+    return False
+
+
+###########################################################################################################################
+def _safe_post(
+    url: str, data: Dict[str, Any], context: SimulatorContext
+) -> Union[Dict[str, Any], None]:
+    """发送POST请求，自动处理令牌刷新"""
+
+    logger.debug(f"_post_request url: {url}, data: {data}")
+
+    # 初始请求
+    response = requests.post(
+        url=url,
+        json=data,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {context._token.access_token}",
+        },
+        verify=LOCAL_HTTPS_ENABLED and MKCERT_ROOT_CA or None,
+    )
+
+    # 处理令牌过期情况 (401状态码)
+    if response.status_code == 401 and context._token.refresh_token:
+        logger.info("令牌已过期，尝试刷新...")
+
+        # 尝试刷新令牌
+        refresh_success = _refresh_token(context)
+
+        if refresh_success:
+            logger.info("令牌刷新成功，重新尝试请求")
+            # 使用新令牌重新发送请求
+            response = requests.post(
+                url=url,
+                json=data,
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {context._token.access_token}",
+                },
+                verify=LOCAL_HTTPS_ENABLED and MKCERT_ROOT_CA or None,
+            )
+        else:
+            logger.error("令牌刷新失败")
+
+    # 处理最终的响应结果
+    if response.status_code == 200:
+        response_data = response.json()
+        logger.debug(f"_post_request response: {response_data}")
+        return cast(Dict[str, Any], response_data)
+    else:
+        logger.error(f"请求失败: {response.status_code}, {response.text}")
+        return None
+
+
+###########################################################################################################################
+def _safe_get(
+    url: str,
+    context: SimulatorContext,
+    params: Optional[Dict[str, Any]] = None,
+) -> Union[Dict[str, Any], None]:
+    """发送GET请求，自动处理令牌刷新
+
+    Args:
+        url: 请求的URL
+        params: URL查询参数
+        context: 包含认证令牌的上下文
+
+    Returns:
+        解析后的JSON响应或None（如果请求失败）
+    """
+
+    logger.debug(f"_safe_get url: {url}, params: {params}")
+
+    # 初始请求
+    response = requests.get(
+        url=url,
+        params=params,
+        headers={
+            "Authorization": f"Bearer {context._token.access_token}" if context else "",
+        },
+        verify=LOCAL_HTTPS_ENABLED and MKCERT_ROOT_CA or None,
+    )
+
+    # 处理令牌过期情况 (401状态码)
+    if response.status_code == 401 and context and context._token.refresh_token:
+        logger.info("令牌已过期，尝试刷新...")
+
+        # 尝试刷新令牌
+        refresh_success = _refresh_token(context)
+
+        if refresh_success:
+            logger.info("令牌刷新成功，重新尝试请求")
+            # 使用新令牌重新发送请求
+            response = requests.get(
+                url=url,
+                params=params,
+                headers={
+                    "Authorization": f"Bearer {context._token.access_token}",
+                },
+                verify=LOCAL_HTTPS_ENABLED and MKCERT_ROOT_CA or None,
+            )
+        else:
+            logger.error("令牌刷新失败")
+
+    # 处理最终的响应结果
+    if response.status_code == 200:
+        try:
+            response_data = response.json()
+            logger.debug(f"_safe_get response: {response_data}")
+            return cast(Dict[str, Any], response_data)
+        except ValueError:
+            # 处理响应不是JSON的情况
+            logger.warning("响应不是有效的JSON格式")
+            return None
+    else:
+        logger.error(f"请求失败: {response.status_code}, {response.text}")
+        return None
+
+
+###########################################################################################################################
+async def _post_chat_action(context: SimulatorContext, user_input: str) -> None:
+
+    content = _extract_user_input(user_input, "/chat")
+    assert content != "", f"content: {content} is empty string."
+
+    request_data = ChatActionRequest(content=content)
+    response = _safe_post(
+        context.chat_action_url,
+        data=request_data.model_dump(),
+        context=context,  # 传递整个context而不仅仅是token
+    )
+    if response is not None:
+        response_model = ChatActionResponse.model_validate(response)
+        logger.info(f"_handle_chat_action: {response_model.model_dump_json()}")
+
+
+###########################################################################################################################
 
 
 ###########################################################################################################################
@@ -231,7 +349,6 @@ async def _simulator() -> None:
                 await _get_url_config(simulator_context)
             elif "/login" in user_input:
                 await _post_login(simulator_context)
-            # 在_simulator函数的while循环中添加
             elif "/logout" in user_input:
                 await _post_logout(simulator_context)
             elif "/chat" in user_input:

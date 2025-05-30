@@ -1,5 +1,5 @@
 import requests
-from typing import Final, Optional, Dict, cast
+from typing import Final, Optional, Dict, cast, Any
 from config.user_account import fake_user_account
 from config.configuration import MKCERT_ROOT_CA, LOCAL_HTTPS_ENABLED
 
@@ -9,99 +9,120 @@ BASE_URL: Final[str] = (
 )
 
 
-def login(username: str, password: str) -> Optional[str]:
+class ApiClient:
+    def __init__(self, base_url: str):
+        self.base_url = base_url
+        self.access_token: Optional[str] = None
+        self.refresh_token: Optional[str] = None
 
-    while username == "":
-        username = input("请输入用户名: ")
+    def login(self, username: str, password: str) -> bool:
+        """登录并获取初始令牌"""
+        response = requests.post(
+            f"{self.base_url}/token",
+            data={"username": username, "password": password, "grant_type": "password"},
+            verify=LOCAL_HTTPS_ENABLED and MKCERT_ROOT_CA or None,
+        )
 
-    while password == "":
-        password = input("请输入密码: ")
+        if response.status_code == 200:
+            data = response.json()
+            self.access_token = data["access_token"]
+            self.refresh_token = data["refresh_token"]
+            return True
+        return False
 
-    response = requests.post(
-        f"{BASE_URL}/token",
-        data={"username": username, "password": password, "grant_type": "password"},
-        verify=LOCAL_HTTPS_ENABLED and MKCERT_ROOT_CA or None,
-        # MKCERT_ROOT_CA,  # 使用 mkcert 的根证书
-    )
+    def request(
+        self,
+        method: str,
+        endpoint: str,
+        data: Optional[Dict[str, Any]] = None,
+        params: Optional[Dict[str, Any]] = None,
+    ) -> requests.Response:
+        """自动处理令牌刷新的请求方法"""
+        headers = {}
+        if self.access_token:
+            headers["Authorization"] = f"Bearer {self.access_token}"
 
-    if response.status_code == 200:
-        token: str = response.json()["access_token"]
-        print("登录成功！令牌已获取")
-        return token
-    else:
-        print("登录失败，请检查用户名和密码")
-        return None
+        url = f"{self.base_url}/{endpoint.lstrip('/')}"
+        response = requests.request(
+            method,
+            url,
+            json=data,
+            params=params,
+            headers=headers,
+            verify=LOCAL_HTTPS_ENABLED and MKCERT_ROOT_CA or None,
+        )
 
+        # 如果返回401且有刷新令牌，尝试刷新令牌并重试
+        if response.status_code == 401 and self.refresh_token:
+            if self._refresh_token():
+                # 更新令牌并重试请求
+                headers["Authorization"] = f"Bearer {self.access_token}"
+                response = requests.request(
+                    method,
+                    url,
+                    json=data,
+                    params=params,
+                    headers=headers,
+                    verify=LOCAL_HTTPS_ENABLED and MKCERT_ROOT_CA or None,
+                )
 
-def refresh_token(refresh_token: str) -> Optional[str]:
-    response = requests.post(
-        f"{BASE_URL}/refresh-token",
-        json={"refresh_token": refresh_token},
-        verify=LOCAL_HTTPS_ENABLED and MKCERT_ROOT_CA or None,
-    )
+        return response
 
-    if response.status_code == 200:
-        token: str = response.json()["access_token"]
-        print("刷新令牌成功！新令牌已获取")
-        return token
-    else:
-        print("刷新令牌失败，请重新登录")
-        return None
+    def _refresh_token(self) -> bool:
+        """刷新访问令牌"""
+        if not self.refresh_token:
+            return False
 
+        response = requests.post(
+            f"{self.base_url}/refresh-token",
+            json={"refresh_token": self.refresh_token},
+            verify=LOCAL_HTTPS_ENABLED and MKCERT_ROOT_CA or None,
+        )
 
-def get_protected_data(token: str) -> Dict[str, str]:
-    headers = {"Authorization": f"Bearer {token}"}
-    response = requests.get(
-        f"{BASE_URL}/protected-data",
-        headers=headers,
-        verify=LOCAL_HTTPS_ENABLED and MKCERT_ROOT_CA or None,
-        # MKCERT_ROOT_CA,  # 使用 mkcert 的根证书
-    )
+        if response.status_code == 200:
+            data = response.json()
+            self.access_token = data["access_token"]
+            self.refresh_token = data["refresh_token"]
+            return True
+        return False
 
-    if response.status_code == 200:
-        return cast(Dict[str, str], response.json())
-    else:
-        return {"error": "访问失败"}
+    # 便捷方法
+    def get(
+        self, endpoint: str, params: Optional[Dict[str, Any]] = None
+    ) -> requests.Response:
+        return self.request("GET", endpoint, params=params)
+
+    def post(
+        self, endpoint: str, data: Optional[Dict[str, Any]] = None
+    ) -> requests.Response:
+        return self.request("POST", endpoint, data=data)
+
+    # API方法示例
+    def get_protected_data(self) -> Dict[str, Any]:
+        """获取受保护数据的示例方法"""
+        response = self.get("protected-data")
+        if response.status_code == 200:
+            return cast(Dict[str, Any], response.json())
+        return {"error": f"访问失败: {response.status_code}"}
 
 
 def main() -> None:
-    # 测试流程
-    token: Optional[str] = None  # 初始化 token
-    refresh_token_value: Optional[str] = None  # 初始化 refresh_token
-    while True:
-        user_input = input(
-            "请输入操作: /q 是退出, /a 是自动登录，/r 是重新登录: /g 是获取受保护数据: "
-        )
-        if user_input == "/q":
-            print("退出程序")
-            break
+    client = ApiClient(BASE_URL)
 
-        elif user_input == "/a":
-            token = login(fake_user_account.username, "secret")
-            if token:
-                print("重新登录成功！")
-            else:
-                print("重新登录失败，请检查用户名和密码")
+    # 登录一次，后续所有请求自动维护令牌
+    if client.login(fake_user_account.username, "secret"):
+        print("登录成功！")
 
-        elif user_input == "/r":
-            token = login("", "")
-            if token:
-                print("重新登录成功！")
-            else:
-                print("重新登录失败，请检查用户名和密码")
-        elif user_input == "/g":
-            if token:
-                data = get_protected_data(token)
-                if "error" in data and refresh_token_value:
-                    print("访问失败，尝试刷新令牌...")
-                    token = refresh_token(refresh_token_value)
-                    if token:
-                        data = get_protected_data(token)
-                print("受保护数据响应:", data)
-            else:
-                print("请先登录")
-        else:
-            print("无效的操作，请重新输入")
+        while True:
+            user_input = input("请输入操作: /q 退出, /g 获取数据: ")
+
+            if user_input == "/q":
+                break
+
+            elif user_input == "/g":
+                # 简化的API调用，不需要手动处理令牌刷新
+                data = client.get_protected_data()
+                print("受保护数据:", data)
 
 
 if __name__ == "__main__":

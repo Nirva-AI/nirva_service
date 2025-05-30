@@ -23,7 +23,6 @@ pip install bcrypt==3.2.2  # 已知兼容 passlib 1.7.4 的版本
 
 ```shell
 mypy --strict run_user_session_server.py simulator_client.py run_chat_server.py run_clear_db.py run_test_db.py jwt_server_test.py jwt_client_test.py
-mypy --strict jwt_server_test.py jwt_client_test.py
 ```
 
 ## 用pm2 批量启动 chat_server + user_session_server
