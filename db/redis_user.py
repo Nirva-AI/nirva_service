@@ -1,6 +1,6 @@
 from typing import Dict
 import db.redis_client
-from db.jwt import Token
+from db.jwt import UserToken
 
 
 ###############################################################################################################################################
@@ -18,7 +18,7 @@ def _blacklist_token_key(token_id: str) -> str:
 
 
 ###############################################################################################################################################
-def assign_user_token(username: str, token: Token) -> None:
+def assign_user_token(username: str, token: UserToken) -> None:
     user_token_key = _user_token_key(username)
     db.redis_client.redis_delete(user_token_key)
     db.redis_client.redis_hset(user_token_key, token.model_dump())
@@ -29,6 +29,18 @@ def assign_user_token(username: str, token: Token) -> None:
 def is_user_token_present(username: str) -> bool:
     user_token_key = _user_token_key(username)
     return db.redis_client.redis_exists(user_token_key)
+
+
+###############################################################################################################################################
+def remove_user_token(username: str) -> None:
+    """
+    从Redis中删除用户的令牌
+
+    参数:
+        username: 用户名
+    """
+    user_token_key = _user_token_key(username)
+    db.redis_client.redis_delete(user_token_key)
 
 
 ###############################################################################################################################################

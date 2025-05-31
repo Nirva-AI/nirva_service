@@ -4,7 +4,7 @@ from jose import JWTError
 from typing import Optional
 from db.jwt import (
     decode_jwt,
-    Token,
+    UserToken,
 )
 import db.pgsql_user
 import db.redis_user
@@ -50,7 +50,7 @@ async def get_authenticated_user(token: str = Depends(oauth2_scheme)) -> str:
         user_db = db.pgsql_user.get_user(username)
         db.redis_user.assign_user_token(
             user_db.username,
-            Token(
+            UserToken(
                 access_token=token,
                 token_type="bearer",
                 refresh_token="",  # 假设没有刷新令牌

@@ -9,7 +9,7 @@ from db.crypt_context import verify_password
 from db.jwt import (
     create_access_token,
     create_refresh_token,
-    Token,
+    UserToken,
     decode_jwt,
 )
 from config.configuration import LOCAL_HTTPS_ENABLED
@@ -61,10 +61,10 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
 
 
 # 登录接口
-@app.post("/token", response_model=Token)
+@app.post("/token", response_model=UserToken)
 async def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
-) -> Token:
+) -> UserToken:
     user = authenticate_user(form_data.username, form_data.password)
     if not user:
         raise HTTPException(
@@ -80,13 +80,13 @@ async def login_for_access_token(
     refresh_token = create_refresh_token(
         data={"sub": user["username"]}, expires_delta=refresh_token_expires
     )
-    return Token(
+    return UserToken(
         access_token=access_token, token_type="bearer", refresh_token=refresh_token
     )
 
 
-@app.post("/refresh-token", response_model=Token)
-async def refresh_access_token(refresh_token: str) -> Token:
+@app.post("/refresh-token", response_model=UserToken)
+async def refresh_access_token(refresh_token: str) -> UserToken:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="无效的刷新令牌",
@@ -116,7 +116,7 @@ async def refresh_access_token(refresh_token: str) -> Token:
     new_refresh_token = create_refresh_token(
         data={"sub": username}, expires_delta=refresh_token_expires
     )
-    return Token(
+    return UserToken(
         access_token=access_token, token_type="bearer", refresh_token=new_refresh_token
     )
 

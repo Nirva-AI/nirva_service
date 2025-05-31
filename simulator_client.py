@@ -16,7 +16,7 @@ from config.configuration import (
 )
 
 from config.user_account import fake_user_account
-from db.jwt import Token
+from db.jwt import UserToken
 
 
 ###########################################################################################################################
@@ -51,7 +51,7 @@ class SimulatorContext:
         self._username: Final[str] = username
         self._password: Final[str] = password
         self._url_configuration: URLConfigurationResponse = URLConfigurationResponse()
-        self._token: Token = Token(
+        self._token: UserToken = UserToken(
             access_token="",
             token_type="",
             refresh_token="",
@@ -130,7 +130,7 @@ async def _post_login(context: SimulatorContext) -> None:
     )
 
     if response.status_code == 200:
-        context._token = Token.model_validate(response.json())
+        context._token = UserToken.model_validate(response.json())
         logger.warning(f"登录成功！令牌已获取{context._token.model_dump_json()}")
 
     else:
@@ -153,7 +153,7 @@ async def _post_logout(context: SimulatorContext) -> None:
         logger.warning(f"服务器登出通知失败: {response.status_code}, {response.text}")
 
     # 2. 清除本地令牌
-    context._token = Token(access_token="", token_type="", refresh_token="")
+    context._token = UserToken(access_token="", token_type="", refresh_token="")
     logger.info("已清除本地令牌，用户登出成功")
 
 

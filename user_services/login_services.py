@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Form
 from fastapi.security import OAuth2PasswordRequestForm
 from db.crypt_context import verify_password
 from db.jwt import (
     create_access_token,
     create_refresh_token,
-    Token,
+    UserToken,
     decode_jwt,
 )
 from datetime import timedelta
@@ -24,10 +24,10 @@ login_router = APIRouter()
 ###################################################################################################################################################################
 ###################################################################################################################################################################
 ###################################################################################################################################################################
-@login_router.post(path="/login/v1/", response_model=Token)
+@login_router.post(path="/login/v1/", response_model=UserToken)
 async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
-) -> Token:
+) -> UserToken:
 
     try:
 
@@ -65,7 +65,7 @@ async def login(
         )
 
         # 返回令牌
-        ret = Token(
+        ret = UserToken(
             access_token=access_token, token_type="bearer", refresh_token=refresh_token
         )
 
@@ -90,9 +90,16 @@ async def login(
 ###################################################################################################################################################################
 ###################################################################################################################################################################
 
+# from fastapi import Form
 
-@login_router.post(path="/refresh/v1/", response_model=Token)
-async def refresh(refresh_token: str) -> Token:
+# @login_router.post(path="/refresh/v1/", response_model=Token)
+# async def refresh(refresh_token: str = Form(...)) -> Token:
+#     # 其余代码保持不变
+#     ...
+
+
+@login_router.post(path="/refresh/v1/", response_model=UserToken)
+async def refresh(refresh_token: str = Form(...)) -> UserToken:
 
     try:
 
@@ -126,7 +133,7 @@ async def refresh(refresh_token: str) -> Token:
         )
 
         # 返回新的令牌
-        ret = Token(
+        ret = UserToken(
             access_token=access_token,
             token_type="bearer",
             refresh_token=new_refresh_token,
@@ -185,7 +192,7 @@ async def logout(
 
         # 选择性操作：删除用户在Redis中的令牌信息（使所有设备登出）
         # 取消注释下面的代码以启用此功能
-        # db.redis_user.remove_user_token(current_user)
+        db.redis_user.remove_user_token(current_user)
 
         # 返回成功响应
         return {

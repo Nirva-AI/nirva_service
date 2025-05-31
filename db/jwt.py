@@ -12,7 +12,7 @@ import uuid
 
 ############################################################################################################
 # 数据模型
-class Token(BaseModel):
+class UserToken(BaseModel):
     access_token: str
     token_type: str
     refresh_token: str  # 新增字段
