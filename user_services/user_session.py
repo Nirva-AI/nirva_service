@@ -26,7 +26,9 @@ def get_or_create_user_session(username: str) -> UserSession:
         new_session = UserSession(
             username=username,
             chat_history=[
-                SystemMessage(content=builtin_prompt.user_session_system_message()),
+                SystemMessage(
+                    content=builtin_prompt.user_session_system_message(username)
+                ),
             ],
         )
 
