@@ -68,6 +68,7 @@ def main() -> None:
         save_user(
             username=fake_user_account.username,
             hashed_password=fake_user_account.hashed_password,
+            display_name=fake_user_account.display_name,
         )
 
     try:

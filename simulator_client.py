@@ -44,12 +44,14 @@ class SimulatorContext:
         server_port: int,
         username: str,
         password: str,
+        display_name: str,
     ) -> None:
 
         self._server_ip_address: Final[str] = server_ip_address
         self._server_port: Final[int] = server_port
         self._username: Final[str] = username
         self._password: Final[str] = password
+        self._display_name: Final[str] = display_name
         self._url_configuration: URLConfigurationResponse = URLConfigurationResponse()
         self._token: UserToken = UserToken(
             access_token="",
@@ -332,6 +334,7 @@ async def _simulator() -> None:
         server_port=user_session_server_config.server_port,
         username=fake_user_account.username,
         password="secret",  # 注意！！
+        display_name=fake_user_account.display_name,
     )
 
     # 直接开始。
@@ -340,7 +343,7 @@ async def _simulator() -> None:
 
     while True:
         try:
-            user_input = input(f"[{simulator_context._username}]: ")
+            user_input = input(f"[{simulator_context._display_name}]: ")
             if user_input.lower() in ["/quit", "/q"]:
                 print("退出！")
                 break

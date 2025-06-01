@@ -3,10 +3,7 @@ from db.pgsql_client import SessionLocal
 
 
 ############################################################################################################
-def save_user(
-    username: str,
-    hashed_password: str,
-) -> UserDB:
+def save_user(username: str, hashed_password: str, display_name: str) -> UserDB:
     """
     保存用户到PostgreSQL数据库
 
@@ -19,7 +16,11 @@ def save_user(
     """
     db = SessionLocal()
     try:
-        user = UserDB(username=username, hashed_password=hashed_password)
+        user = UserDB(
+            username=username,
+            hashed_password=hashed_password,
+            display_name=display_name,
+        )
         db.add(user)
         db.commit()
         db.refresh(user)

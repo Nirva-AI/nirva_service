@@ -7,7 +7,7 @@ from db.jwt import UserToken
 def _user_access_token_key(username: str) -> str:
     """生成用户会话键名"""
     assert username != "", "username cannot be an empty string."
-    return f"token:{username}"
+    return f"user_token:{username}"
 
 
 ###############################################################################################################################################
@@ -18,10 +18,10 @@ def _blacklist_access_token_key(token_id: str) -> str:
 
 
 ###############################################################################################################################################
-def _user_displaye_name_key(token_id: str) -> str:
+def _user_displaye_name_key(username: str) -> str:
     """生成用户显示名称键名"""
-    assert token_id != "", "token_id cannot be an empty string."
-    return f"display_name:{token_id}"
+    assert username != "", "token_id cannot be an empty string."
+    return f"display_name:{username}"
 
 
 ###############################################################################################################################################
@@ -77,6 +77,33 @@ def is_access_token_blacklisted(token_id: str) -> bool:
     """
     blacklist_key = _blacklist_access_token_key(token_id)
     return db.redis_client.redis_exists(blacklist_key)
+
+
+###############################################################################################################################################
+def set_user_display_name(username: str, display_name: str) -> None:
+    """
+    设置用户的显示名称
+    参数:
+        username: 用户名
+        display_name: 用户的显示名称
+    该函数将用户的显示名称存储在Redis中，键名为"display_name:{username}"。
+    """
+    display_name_key = _user_displaye_name_key(username)
+    db.redis_client.redis_set(display_name_key, display_name)
+
+
+###############################################################################################################################################
+def get_user_display_name(username: str) -> str:
+    """
+    获取用户的显示名称
+    参数:
+        username: 用户名
+    返回:
+        str: 用户的显示名称，如果不存在则返回空字符串
+    该函数从Redis中获取用户的显示名称，键名为"display_name:{username}"。
+    """
+    display_name_key = _user_displaye_name_key(username)
+    return db.redis_client.redis_get(display_name_key) or ""
 
 
 ###############################################################################################################################################

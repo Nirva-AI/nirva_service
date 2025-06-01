@@ -75,6 +75,11 @@ async def login(
             token=ret,
         )
 
+        db.redis_user.set_user_display_name(
+            username=user_db.username,
+            display_name=user_db.display_name or user_db.username,
+        )
+
         # 正确的返回。
         return ret
 
