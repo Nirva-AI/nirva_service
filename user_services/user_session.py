@@ -1,6 +1,7 @@
 from langchain_core.messages import SystemMessage
 from models_v_0_0_1.models import UserSession
 import db.redis_user_session
+import db.pgsql_user
 import db.pgsql_user_session
 from loguru import logger
 import prompt.builtin as builtin_prompt
@@ -22,12 +23,18 @@ def get_or_create_user_session(username: str) -> UserSession:
     # 如果用户会话不存在，从数据库中获取
     user_sessions_from_db = db.pgsql_user_session.get_user_sessions(username)
     if len(user_sessions_from_db) == 0:
+
+        user_from_db = db.pgsql_user.get_user(username)
+
         # 不存在就创建一个新的用户会话
         new_session = UserSession(
             username=username,
             chat_history=[
                 SystemMessage(
-                    content=builtin_prompt.user_session_system_message(username)
+                    content=builtin_prompt.user_session_system_message(
+                        username,
+                        "",
+                    )
                 ),
             ],
         )

@@ -70,7 +70,7 @@ async def login(
         )
 
         # 将令牌存储到 Redis 中
-        db.redis_user.assign_user_token(
+        db.redis_user.assign_user_access_token(
             username=user_db.username,
             token=ret,
         )
@@ -131,7 +131,7 @@ async def refresh(refresh_token: str = Form(...)) -> UserToken:
         )
 
         # 更新 Redis 中的令牌
-        db.redis_user.assign_user_token(
+        db.redis_user.assign_user_access_token(
             username=username,
             token=ret,
         )
@@ -177,11 +177,11 @@ async def logout(
             remaining_time = max(1, int(exp_timestamp - current_timestamp))
 
             # 将令牌添加到黑名单
-            db.redis_user.add_to_blacklist(str(jti), remaining_time)
+            db.redis_user.add_access_token_to_blacklist(str(jti), remaining_time)
 
         # 选择性操作：删除用户在Redis中的令牌信息（使所有设备登出）
         # 取消注释下面的代码以启用此功能
-        db.redis_user.remove_user_token(current_user)
+        db.redis_user.remove_user_access_token(current_user)
 
         # 返回成功响应
         return {

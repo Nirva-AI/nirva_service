@@ -9,19 +9,34 @@ import datetime
 from typing import List, Optional, Dict, Any
 from uuid import uuid4, UUID
 
+""" 数据库迁移
+alembic revision --autogenerate -m "Add display_name to UserDB"
+alembic upgrade head
+"""
+
 
 # 基类定义
 class Base(DeclarativeBase):
     pass
 
 
+class UUIDBase(Base):
+    """包含UUID主键的基类"""
+
+    __abstract__ = True
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, index=True, default=uuid4)
+
+
 # 用户模型
-class UserDB(Base):
+class UserDB(UUIDBase):
     __tablename__ = "users"
 
-    id: Mapped[int] = mapped_column(primary_key=True, index=True)
     username: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+    display_name: Mapped[Optional[str]] = mapped_column(
+        String(100), index=True, nullable=True
+    )
 
     # 关联到用户会话
     sessions: Mapped[List["UserSessionDB"]] = relationship(
@@ -30,16 +45,15 @@ class UserDB(Base):
 
 
 # 用户会话模型
-class UserSessionDB(Base):
+class UserSessionDB(UUIDBase):
     __tablename__ = "user_sessions"
 
-    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))  # 从int改为UUID
     created_at: Mapped[datetime.datetime] = mapped_column(
-        DateTime, default=datetime.datetime.utcnow
+        DateTime, default=datetime.datetime.now
     )
     updated_at: Mapped[datetime.datetime] = mapped_column(
-        DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow
+        DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now
     )
     session_name: Mapped[Optional[str]] = mapped_column(String(255))
 
@@ -53,13 +67,12 @@ class UserSessionDB(Base):
 
 
 # 聊天消息模型
-class ChatMessageDB(Base):
+class ChatMessageDB(UUIDBase):
     __tablename__ = "chat_messages"
 
-    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     session_id: Mapped[UUID] = mapped_column(ForeignKey("user_sessions.id"))
     created_at: Mapped[datetime.datetime] = mapped_column(
-        DateTime, default=datetime.datetime.utcnow
+        DateTime, default=datetime.datetime.now
     )
 
     # 将整个消息存储为JSON

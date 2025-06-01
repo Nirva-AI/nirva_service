@@ -12,6 +12,7 @@ from user_services.oauth_user import get_authenticated_user
 import db.redis_user_session
 import db.pgsql_user_session
 import user_services.user_session
+import prompt.builtin as builtin_prompt
 
 ###################################################################################################################################################################
 chat_action_router = APIRouter()
@@ -43,7 +44,11 @@ async def handle_chat_action(
         # 组织请求
         chat_request_handler = ChatServiceRequestHandler(
             username=authenticated_user,
-            prompt=request_data.content,
+            prompt=builtin_prompt.user_session_chat_message(
+                username=authenticated_user,
+                display_name="",
+                content=request_data.content,
+            ),
             chat_history=cast(
                 List[SystemMessage | HumanMessage | AIMessage],
                 current_user_session.chat_history,
