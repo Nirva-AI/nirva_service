@@ -2,9 +2,10 @@ import sys
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
-from typing import cast
+# from typing import cast
 from fastapi import FastAPI, HTTPException, status
-from langchain.schema import HumanMessage
+
+# from langchain.schema import HumanMessage
 from llm_services.chat_service_api import (
     ChatServiceRequest,
     ChatServiceResponse,
@@ -50,9 +51,7 @@ async def process_chat_request(
         }
 
         # 用户输入
-        user_input_state: State = {
-            "messages": [HumanMessage(content=request_data.input)]
-        }
+        user_input_state: State = {"messages": [request_data.message]}
 
         # 获取回复
         update_messages = stream_graph_updates(
@@ -64,8 +63,7 @@ async def process_chat_request(
         # 返回响应
         if len(update_messages) > 0:
             return ChatServiceResponse(
-                username=request_data.username,
-                output=cast(str, update_messages[-1].content),
+                messages=update_messages,
             )
         else:
             raise HTTPException(

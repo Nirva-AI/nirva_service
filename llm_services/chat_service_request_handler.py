@@ -1,5 +1,5 @@
 from loguru import logger
-from typing import List, Union, Final, final
+from typing import List, Union, Final, final, cast
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 import httpx
 from llm_services.chat_service_api import (
@@ -24,16 +24,17 @@ class ChatServiceRequestHandler:
         self._chat_history: List[Union[SystemMessage, HumanMessage, AIMessage]] = (
             chat_history
         )
-        self._response: ChatServiceResponse = ChatServiceResponse(
-            username=username, output=""
-        )
+        self._response: ChatServiceResponse = ChatServiceResponse()
         self._username: str = username
         self._timeout: Final[int] = 30
 
     ################################################################################################################################################################################
     @property
     def response_output(self) -> str:
-        return self._response.output
+        if len(self._response.messages) == 0:
+            logger.warning(f"{self._username} response is empty.")
+            return ""
+        return cast(str, self._response.messages[-1].content)
 
     ################################################################################################################################################################################
     def request(self, url: str) -> None:
@@ -45,8 +46,7 @@ class ChatServiceRequestHandler:
             response = requests.post(
                 url=url,
                 json=ChatServiceRequest(
-                    username=self._username,
-                    input=self._prompt,
+                    message=HumanMessage(content=self._prompt, name=self._username),
                     chat_history=self._chat_history,
                 ).model_dump(),
                 timeout=self._timeout,
@@ -75,8 +75,7 @@ class ChatServiceRequestHandler:
             response = await client.post(
                 url=url,
                 json=ChatServiceRequest(
-                    username=self._username,
-                    input=self._prompt,
+                    message=HumanMessage(content=self._prompt, name=self._username),
                     chat_history=self._chat_history,
                 ).model_dump(),
                 timeout=self._timeout,
