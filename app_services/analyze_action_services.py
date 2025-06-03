@@ -15,7 +15,6 @@ from app_services.oauth_user import get_authenticated_user
 import db.redis_user
 import prompt.builtin as builtin_prompt
 from prompt.builtin import LabelExtractionResponse, ReflectionResponse
-from config.user_account import FAKE_USER
 import utils.format_string as format_string
 import json
 
@@ -204,25 +203,21 @@ async def handle_analyze_action(
     logger.info(f"/action/analyze/v1/: {request_data.model_dump_json()}")
 
     try:
-        if request_data.content not in FAKE_USER.data:
+
+        transcript_content = (
+            request_data.content
+        )  # invisible_path.read_text(encoding="utf-8").strip()
+        assert transcript_content != "", "转录内容不能为空"
+        if transcript_content == "":
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"内容 '{request_data.content}' 不在预定义数据中。",
+                detail="转录内容不能为空。",
             )
 
         display_name = db.redis_user.get_user_display_name(username=authenticated_user)
         assert (
             display_name != ""
         ), f"用户 {authenticated_user} 的显示名称不能为空，请先设置显示名称。"
-
-        invisible_path = Path("invisible") / request_data.content
-        assert invisible_path.exists(), f"Log path does not exist: {invisible_path}"
-
-        transcript_content = invisible_path.read_text(encoding="utf-8").strip()
-
-        # 格式化日期
-        # formatted_date = datetime.datetime.now().strftime("%Y-%m-%d")
-        formatted_date = "2025-04-19"  # 测试用，固定日期
 
         chat_history: List[SystemMessage | HumanMessage | AIMessage] = [
             SystemMessage(
@@ -233,7 +228,8 @@ async def handle_analyze_action(
             HumanMessage(content=builtin_prompt.event_segmentation_message()),
             HumanMessage(
                 content=builtin_prompt.transcript_message(
-                    formatted_date=formatted_date, transcript_content=transcript_content
+                    formatted_date=request_data.datetime,
+                    transcript_content=transcript_content,
                 )
             ),
         ]
@@ -269,3 +265,6 @@ async def handle_analyze_action(
 ###################################################################################################################################################################
 ###################################################################################################################################################################
 ###################################################################################################################################################################
+
+
+# pm2 start run_analyzer_server.py

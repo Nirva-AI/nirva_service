@@ -1,3 +1,5 @@
+import datetime
+from pathlib import Path
 from typing import Any, Dict, Final, Union, cast, final, Optional
 from loguru import logger
 import requests
@@ -325,10 +327,21 @@ async def _post_chat_action(context: SimulatorContext, user_input: str) -> None:
 async def _post_analyze_action(context: SimulatorContext, user_input: str) -> None:
     """处理分析请求，发送到服务器进行分析"""
 
-    content = _extract_user_input(user_input, "/analyze")
-    assert content != "", f"content: {content} is empty string."
+    upload_file = _extract_user_input(user_input, "/analyze")
+    assert upload_file != "", f"content: {upload_file} is empty string."
 
-    request_data = AnalyzeActionRequest(content=content)
+    invisible_path = Path("invisible") / upload_file
+    if not invisible_path.exists():
+        logger.error(f"Log path does not exist: {invisible_path}")
+        return
+    # assert invisible_path.exists(), f"Log path does not exist: {invisible_path}"
+    transcript_content = invisible_path.read_text(encoding="utf-8").strip()
+    assert transcript_content != "", "转录内容不能为空"
+
+    request_data = AnalyzeActionRequest(
+        content=transcript_content,
+        datetime=datetime.datetime.now().strftime("%Y-%m-%d"),
+    )
     response = _safe_post(
         context.analyze_action_url,
         data=request_data.model_dump(),
@@ -339,7 +352,7 @@ async def _post_analyze_action(context: SimulatorContext, user_input: str) -> No
         logger.info(f"_handle_analyze_action: {response_model.model_dump_json()}")
 
         # LOGS_DIR
-        log_file_path = LOGS_DIR / f"analyze_result_{content}.json"
+        log_file_path = LOGS_DIR / f"analyze_result_{upload_file}.json"
         log_file_path.write_text(
             response_model.model_dump_json(),
             encoding="utf-8",
@@ -385,6 +398,11 @@ async def _simulator() -> None:
                 await _post_chat_action(simulator_context, user_input)
             elif "/analyze" in user_input:  # 添加这行
                 # /analyze 04-19-01.txt
+                # "04-19-01.txt",
+                # "04-19-02.txt",
+                # "04-19-03.txt",
+                # "05-09-01.txt",
+                # "05-09-02.txt",
                 await _post_analyze_action(simulator_context, user_input)  # 添加这行
             else:
                 logger.info(f"Unknown command: {user_input}")

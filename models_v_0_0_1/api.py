@@ -1,3 +1,4 @@
+import datetime
 from typing import final
 from pydantic import BaseModel
 from .registry import register_base_model_class
@@ -43,6 +44,7 @@ class ChatActionResponse(BaseModel):
 @register_base_model_class
 class AnalyzeActionRequest(BaseModel):
     content: str = ""
+    datetime: str = ""
 
 
 @final
