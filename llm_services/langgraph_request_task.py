@@ -2,15 +2,15 @@ from loguru import logger
 from typing import List, Union, Final, final, cast
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 import httpx
-from llm_services.chat_service_api import (
-    ChatServiceRequest,
-    ChatServiceResponse,
+from llm_services.langgraph_models import (
+    LanggraphRequest,
+    LanggraphResponse,
 )
 import requests
 
 
 @final
-class ChatServiceRequestHandler:
+class LanggraphRequestTask:
 
     ################################################################################################################################################################################
     def __init__(
@@ -24,7 +24,7 @@ class ChatServiceRequestHandler:
         self._chat_history: List[Union[SystemMessage, HumanMessage, AIMessage]] = (
             chat_history
         )
-        self._response: ChatServiceResponse = ChatServiceResponse()
+        self._response: LanggraphResponse = LanggraphResponse()
         self._username: str = username
         self._timeout: Final[int] = 30
 
@@ -45,7 +45,7 @@ class ChatServiceRequestHandler:
 
             response = requests.post(
                 url=url,
-                json=ChatServiceRequest(
+                json=LanggraphRequest(
                     message=HumanMessage(content=self._prompt, name=self._username),
                     chat_history=self._chat_history,
                 ).model_dump(),
@@ -53,7 +53,7 @@ class ChatServiceRequestHandler:
             )
 
             if response.status_code == 200:
-                self._response = ChatServiceResponse.model_validate(response.json())
+                self._response = LanggraphResponse.model_validate(response.json())
                 logger.info(
                     f"{self._username} request-response:\n{self._response.model_dump_json()}"
                 )
@@ -74,7 +74,7 @@ class ChatServiceRequestHandler:
 
             response = await client.post(
                 url=url,
-                json=ChatServiceRequest(
+                json=LanggraphRequest(
                     message=HumanMessage(content=self._prompt, name=self._username),
                     chat_history=self._chat_history,
                 ).model_dump(),
@@ -82,7 +82,7 @@ class ChatServiceRequestHandler:
             )
 
             if response.status_code == 200:
-                self._response = ChatServiceResponse.model_validate(response.json())
+                self._response = LanggraphResponse.model_validate(response.json())
                 logger.info(
                     f"{self._username} a_request-response:\n{self._response.model_dump_json()}"
                 )

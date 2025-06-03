@@ -9,8 +9,8 @@ from models_v_0_0_1 import (
 
 from config.configuration import (
     GEN_CONFIGS_DIR,
-    USER_SESSION_SERVER_CONFIG_PATH,
-    UserSessionServerConfig,
+    # USER_SESSION_SERVER_CONFIG_PATH,
+    AppserviceServerConfig,
     LOCAL_HTTPS_ENABLED,
     MKCERT_ROOT_CA,
 )
@@ -319,19 +319,21 @@ async def _post_chat_action(context: SimulatorContext, user_input: str) -> None:
 ###########################################################################################################################
 async def _simulator() -> None:
 
-    assert (
-        USER_SESSION_SERVER_CONFIG_PATH.exists()
-    ), f"找不到配置文件: {USER_SESSION_SERVER_CONFIG_PATH}"
-    config_file_content = USER_SESSION_SERVER_CONFIG_PATH.read_text(encoding="utf-8")
-    user_session_server_config = UserSessionServerConfig.model_validate_json(
-        config_file_content
-    )
+    # assert (
+    #     USER_SESSION_SERVER_CONFIG_PATH.exists()
+    # ), f"找不到配置文件: {USER_SESSION_SERVER_CONFIG_PATH}"
+    # config_file_content = USER_SESSION_SERVER_CONFIG_PATH.read_text(encoding="utf-8")
+    # user_session_server_config = UserSessionServerConfig.model_validate_json(
+    #     config_file_content
+    # )
+
+    app_service_server_config = AppserviceServerConfig()
 
     simulator_context = SimulatorContext(
-        server_ip_address=user_session_server_config.server_ip_address == "0.0.0.0"
-        and user_session_server_config.local_network_ip
-        or user_session_server_config.server_ip_address,
-        server_port=user_session_server_config.server_port,
+        server_ip_address=app_service_server_config.server_ip_address == "0.0.0.0"
+        and app_service_server_config.local_network_ip
+        or app_service_server_config.server_ip_address,
+        server_port=app_service_server_config.server_port,
         username=FAKE_USER.username,
         password="secret",  # 注意！！
         display_name=FAKE_USER.display_name,

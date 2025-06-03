@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 
 ############################################################################################################
-class ChatServiceRequest(BaseModel):
+class LanggraphRequest(BaseModel):
     message: HumanMessage
     chat_history: List[Union[SystemMessage, HumanMessage, AIMessage]] = []
 
@@ -13,7 +13,7 @@ class ChatServiceRequest(BaseModel):
 
 
 ############################################################################################################
-class ChatServiceResponse(BaseModel):
+class LanggraphResponse(BaseModel):
     messages: List[BaseMessage] = []
 
     class Config:

@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from user_services.user_session_server import UserSessionServerInstance
+from user_services.app_service_server import AppserviceServerInstance
 from models_v_0_0_1 import (
     ChatActionRequest,
     ChatActionResponse,
 )
 from loguru import logger
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
-from llm_services.chat_service_request_handler import ChatServiceRequestHandler
+from llm_services.langgraph_request_task import LanggraphRequestTask
 from typing import List, cast
 from user_services.oauth_user import get_authenticated_user
 import db.redis_user_session
@@ -25,7 +25,7 @@ chat_action_router = APIRouter()
 @chat_action_router.post(path="/action/chat/v1/", response_model=ChatActionResponse)
 async def handle_chat_action(
     request_data: ChatActionRequest,
-    user_session_server: UserSessionServerInstance,
+    user_session_server: AppserviceServerInstance,
     authenticated_user: str = Depends(get_authenticated_user),
 ) -> ChatActionResponse:
 
@@ -53,7 +53,7 @@ async def handle_chat_action(
         )
 
         # 组织请求
-        chat_request_handler = ChatServiceRequestHandler(
+        chat_request_handler = LanggraphRequestTask(
             username=authenticated_user,
             prompt=prompt,
             chat_history=cast(
@@ -63,7 +63,9 @@ async def handle_chat_action(
         )
 
         # 处理请求
-        user_session_server.chat_service.handle(request_handlers=[chat_request_handler])
+        user_session_server.langgraph_service.chat(
+            request_handlers=[chat_request_handler]
+        )
         if chat_request_handler.response_output == "":
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

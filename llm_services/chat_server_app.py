@@ -3,21 +3,18 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from fastapi import FastAPI, HTTPException, status
-from llm_services.chat_service_api import (
-    ChatServiceRequest,
-    ChatServiceResponse,
+from llm_services.langgraph_models import (
+    LanggraphRequest,
+    LanggraphResponse,
 )
 from llm_services.chat_azure_openai_gpt_4o_graph import (
     create_compiled_stage_graph,
     stream_graph_updates,
     State,
 )
-from config.configuration import LLMServerConfig, LLM_SERVER_CONFIG_PATH
+from config.configuration import ChatServerConfig
 
-# 检查配置文件是否存在
-assert LLM_SERVER_CONFIG_PATH.exists(), f"找不到配置文件: {LLM_SERVER_CONFIG_PATH}"
-config_file_content = LLM_SERVER_CONFIG_PATH.read_text(encoding="utf-8")
-llm_server_config = LLMServerConfig.model_validate_json(config_file_content)
+llm_server_config = ChatServerConfig()
 ############################################################################################################
 # 初始化 FastAPI 应用
 app = FastAPI(
@@ -36,10 +33,10 @@ compiled_state_graph = create_compiled_stage_graph(
 ############################################################################################################
 ############################################################################################################
 # 定义处理聊天请求的路由
-@app.post(path=str(llm_server_config.api), response_model=ChatServiceResponse)
+@app.post(path=str(llm_server_config.api), response_model=LanggraphResponse)
 async def process_chat_request(
-    request_data: ChatServiceRequest,
-) -> ChatServiceResponse:
+    request_data: LanggraphRequest,
+) -> LanggraphResponse:
 
     try:
         # 聊天历史
@@ -59,7 +56,7 @@ async def process_chat_request(
 
         # 返回响应
         if len(update_messages) > 0:
-            return ChatServiceResponse(
+            return LanggraphResponse(
                 messages=update_messages,
             )
         else:

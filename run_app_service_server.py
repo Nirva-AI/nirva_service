@@ -6,22 +6,24 @@ def main() -> None:
     # 启动 FastAPI 应用
     import uvicorn
 
-    from user_services.user_session_server_app import app
+    from user_services.app_service_server_app import app
     from loguru import logger
     from config.configuration import (
-        UserSessionServerConfig,
-        USER_SESSION_SERVER_CONFIG_PATH,
+        AppserviceServerConfig,
+        # USER_SESSION_SERVER_CONFIG_PATH,
         LOGS_DIR,
         LOCAL_HTTPS_ENABLED,
     )
 
-    assert (
-        USER_SESSION_SERVER_CONFIG_PATH.exists()
-    ), f"找不到配置文件: {USER_SESSION_SERVER_CONFIG_PATH}"
-    config_file_content = USER_SESSION_SERVER_CONFIG_PATH.read_text(encoding="utf-8")
-    user_session_server_config = UserSessionServerConfig.model_validate_json(
-        config_file_content
-    )
+    # assert (
+    #     USER_SESSION_SERVER_CONFIG_PATH.exists()
+    # ), f"找不到配置文件: {USER_SESSION_SERVER_CONFIG_PATH}"
+    # config_file_content = USER_SESSION_SERVER_CONFIG_PATH.read_text(encoding="utf-8")
+    # user_session_server_config = UserSessionServerConfig.model_validate_json(
+    #     config_file_content
+    # )
+
+    app_service_config = AppserviceServerConfig()
 
     try:
 
@@ -33,7 +35,7 @@ def main() -> None:
             uvicorn.run(
                 app,
                 host="0.0.0.0",
-                port=user_session_server_config.server_port,
+                port=app_service_config.server_port,
                 ssl_keyfile="./localhost+3-key.pem",
                 ssl_certfile="./localhost+3.pem",
             )
@@ -41,8 +43,8 @@ def main() -> None:
             # 正常测试的启动，可能有局域网的IP地址
             uvicorn.run(
                 app,
-                host=user_session_server_config.server_ip_address,
-                port=user_session_server_config.server_port,
+                host=app_service_config.server_ip_address,
+                port=app_service_config.server_port,
             )
 
     except Exception as e:
