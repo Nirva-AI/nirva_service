@@ -2,7 +2,7 @@
 def main() -> None:
 
     # 启动 FastAPI 应用
-    from langgraph_services.chat_server_app import app, chat_server_config
+    from langgraph_services.chat_server_fastapi import app, chat_server_config
     from loguru import logger
     import uvicorn
 

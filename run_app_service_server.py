@@ -6,7 +6,7 @@ def main() -> None:
     # 启动 FastAPI 应用
     import uvicorn
 
-    from app_services.app_service_server_app import app
+    from app_services.app_service_server_fastapi import app
     from loguru import logger
     from config.configuration import (
         AppserviceServerConfig,

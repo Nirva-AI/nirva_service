@@ -2,7 +2,7 @@
 def main() -> None:
 
     # 启动 FastAPI 应用
-    from langgraph_services.analyzer_server_app import app, analyzer_server_config
+    from langgraph_services.analyzer_server_fastapi import app, analyzer_server_config
     from loguru import logger
     import uvicorn
 
