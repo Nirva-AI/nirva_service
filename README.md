@@ -49,12 +49,6 @@ conda install pytest
 - jwt_client_test.py
 - jwt_server_test.py
 
-## LB（ Ngnix ）的 demo
-
-- app.py
-- run1.sh
-- run2.sh
-
 ## 安装 redis 和 fastapi-redis-cache
 
 ```shell
