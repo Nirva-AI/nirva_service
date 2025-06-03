@@ -1,7 +1,7 @@
 from typing import final
 from pydantic import BaseModel
 from .registry import register_base_model_class
-
+from prompt.builtin import LabelExtractionResponse, ReflectionResponse
 
 ################################################################################################################
 ################################################################################################################
@@ -48,6 +48,8 @@ class AnalyzeActionRequest(BaseModel):
 @final
 @register_base_model_class
 class AnalyzeActionResponse(BaseModel):
+    label_extraction: LabelExtractionResponse | None = None
+    reflection: ReflectionResponse | None = None
     message: str = ""
 
 

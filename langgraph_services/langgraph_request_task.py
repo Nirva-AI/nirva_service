@@ -1,5 +1,5 @@
 from loguru import logger
-from typing import List, Union, Final, final, cast
+from typing import List, Optional, Union, Final, final, cast
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 import httpx
 from langgraph_services.langgraph_models import (
@@ -18,6 +18,7 @@ class LanggraphRequestTask:
         username: str,
         prompt: str,
         chat_history: List[Union[SystemMessage, HumanMessage, AIMessage]],
+        timeout: Optional[int] = None,
     ) -> None:
 
         self._prompt: Final[str] = prompt
@@ -26,7 +27,7 @@ class LanggraphRequestTask:
         )
         self._response: LanggraphResponse = LanggraphResponse()
         self._username: str = username
-        self._timeout: Final[int] = 30
+        self._timeout: Final[int] = timeout if timeout is not None else 30
 
     ################################################################################################################################################################################
     @property

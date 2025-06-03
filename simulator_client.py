@@ -11,10 +11,10 @@ from models_v_0_0_1 import (
 
 from config.configuration import (
     GEN_CONFIGS_DIR,
-    # USER_SESSION_SERVER_CONFIG_PATH,
     AppserviceServerConfig,
     LOCAL_HTTPS_ENABLED,
     MKCERT_ROOT_CA,
+    LOGS_DIR,
 )
 
 from config.user_account import FAKE_USER
@@ -204,6 +204,7 @@ def _safe_post(
             "Authorization": f"Bearer {context._token.access_token}",
         },
         verify=LOCAL_HTTPS_ENABLED and MKCERT_ROOT_CA or None,
+        timeout=60,  # 设置超时时间为60秒
     )
 
     # 处理令牌过期情况 (401状态码)
@@ -337,20 +338,19 @@ async def _post_analyze_action(context: SimulatorContext, user_input: str) -> No
         response_model = AnalyzeActionResponse.model_validate(response)
         logger.info(f"_handle_analyze_action: {response_model.model_dump_json()}")
 
+        # LOGS_DIR
+        log_file_path = LOGS_DIR / f"analyze_result_{content}.json"
+        log_file_path.write_text(
+            response_model.model_dump_json(),
+            encoding="utf-8",
+        )
+
 
 ###########################################################################################################################
 
 
 ###########################################################################################################################
 async def _simulator() -> None:
-
-    # assert (
-    #     USER_SESSION_SERVER_CONFIG_PATH.exists()
-    # ), f"找不到配置文件: {USER_SESSION_SERVER_CONFIG_PATH}"
-    # config_file_content = USER_SESSION_SERVER_CONFIG_PATH.read_text(encoding="utf-8")
-    # user_session_server_config = UserSessionServerConfig.model_validate_json(
-    #     config_file_content
-    # )
 
     app_service_server_config = AppserviceServerConfig()
 
@@ -384,6 +384,7 @@ async def _simulator() -> None:
             elif "/chat" in user_input:
                 await _post_chat_action(simulator_context, user_input)
             elif "/analyze" in user_input:  # 添加这行
+                # /analyze 04-19-01.txt
                 await _post_analyze_action(simulator_context, user_input)  # 添加这行
             else:
                 logger.info(f"Unknown command: {user_input}")

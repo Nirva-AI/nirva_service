@@ -54,9 +54,7 @@ class LanggraphService:
         start_time = time.time()
         batch_results = await asyncio.gather(*coros, return_exceptions=True)
         end_time = time.time()
-        logger.debug(
-            f"ChatServiceRequestManager.gather:{end_time - start_time:.2f} seconds"
-        )
+        logger.debug(f"LanggraphService.gather:{end_time - start_time:.2f} seconds")
 
         # 记录失败请求
         for result in batch_results:
@@ -82,9 +80,7 @@ class LanggraphService:
             start_time = time.time()
             request_handler.request(endpoint_url)
             end_time = time.time()
-            logger.debug(
-                f"ChatServiceRequestManager.handle:{end_time - start_time:.2f} seconds"
-            )
+            logger.debug(f"LanggraphService.handle:{end_time - start_time:.2f} seconds")
 
     ################################################################################################################################################################################
     def chat(self, request_handlers: List[LanggraphRequestTask]) -> None:
@@ -95,5 +91,13 @@ class LanggraphService:
         )
         # 更新
         self._chat_service_request_distribution_index += len(request_handlers)
+
+    ################################################################################################################################################################################
+    def analyze(self, request_handlers: List[LanggraphRequestTask]) -> None:
+        self._handle(
+            request_handlers=request_handlers,
+            urls=self._analyzer_service_localhost_urls,
+            request_distribution_index=0,
+        )
 
     ################################################################################################################################################################################
