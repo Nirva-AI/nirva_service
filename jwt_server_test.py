@@ -4,7 +4,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError
 from pydantic import BaseModel
 from typing import Final, Optional, Dict
-from config.user_account import fake_user_account
+from config.user_account import FAKE_USER
 from db.crypt_context import verify_password
 from db.jwt import (
     create_access_token,
@@ -19,7 +19,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES: Final[int] = 30
 # 模拟数据库中的用户数据
 fake_users_db: Dict[str, Dict[str, str]] = {}
 
-fake_users_db[fake_user_account.username] = fake_user_account.model_dump()
+fake_users_db[FAKE_USER.username] = FAKE_USER.model_dump()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 

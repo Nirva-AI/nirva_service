@@ -1,5 +1,5 @@
 from langchain_core.messages import SystemMessage
-from models_v_0_0_1.models import UserSession
+from models_v_0_0_1.session import UserSession
 import db.redis_user_session
 import db.pgsql_user_session
 from loguru import logger

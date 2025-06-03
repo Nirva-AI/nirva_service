@@ -1,6 +1,6 @@
 import requests
 from typing import Final, Optional, Dict, cast, Any
-from config.user_account import fake_user_account
+from config.user_account import FAKE_USER
 from config.configuration import MKCERT_ROOT_CA, LOCAL_HTTPS_ENABLED
 
 # 服务器地址
@@ -110,7 +110,7 @@ def main() -> None:
     client = ApiClient(BASE_URL)
 
     # 登录一次，后续所有请求自动维护令牌
-    if client.login(fake_user_account.username, "secret"):
+    if client.login(FAKE_USER.username, "secret"):
         print("登录成功！")
 
         while True:

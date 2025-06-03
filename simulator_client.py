@@ -15,7 +15,7 @@ from config.configuration import (
     MKCERT_ROOT_CA,
 )
 
-from config.user_account import fake_user_account
+from config.user_account import FAKE_USER
 from db.jwt import UserToken
 
 
@@ -332,9 +332,9 @@ async def _simulator() -> None:
         and user_session_server_config.local_network_ip
         or user_session_server_config.server_ip_address,
         server_port=user_session_server_config.server_port,
-        username=fake_user_account.username,
+        username=FAKE_USER.username,
         password="secret",  # 注意！！
-        display_name=fake_user_account.display_name,
+        display_name=FAKE_USER.display_name,
     )
 
     # 直接开始。
