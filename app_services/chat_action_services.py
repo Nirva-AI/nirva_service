@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from user_services.app_service_server import AppserviceServerInstance
+from app_services.app_service_server import AppserviceServerInstance
 from models_v_0_0_1 import (
     ChatActionRequest,
     ChatActionResponse,
@@ -8,11 +8,11 @@ from loguru import logger
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langgraph_services.langgraph_request_task import LanggraphRequestTask
 from typing import List, cast
-from user_services.oauth_user import get_authenticated_user
+from app_services.oauth_user import get_authenticated_user
 import db.redis_user_session
 import db.pgsql_user_session
 import db.redis_user
-import user_services.user_session
+import app_services.user_session
 import prompt.builtin as builtin_prompt
 
 ###################################################################################################################################################################
@@ -42,7 +42,7 @@ async def handle_chat_action(
         assert (
             display_name != ""
         ), f"用户 {authenticated_user} 的显示名称不能为空，请先设置显示名称。"
-        current_user_session = user_services.user_session.get_or_create_user_session(
+        current_user_session = app_services.user_session.get_or_create_user_session(
             authenticated_user, display_name
         )
 

@@ -5,6 +5,8 @@ from models_v_0_0_1 import (
     URLConfigurationResponse,
     ChatActionRequest,
     ChatActionResponse,
+    AnalyzeActionRequest,  # 添加这行
+    AnalyzeActionResponse,  # 添加这行
 )
 
 from config.configuration import (
@@ -86,6 +88,11 @@ class SimulatorContext:
     @property
     def refresh_token_url(self) -> str:
         return self._url_configuration.endpoints["refresh"]
+
+    ###########################################################################################################################
+    @property
+    def analyze_action_url(self) -> str:
+        return self._url_configuration.endpoints["analyze"]
 
     ###########################################################################################################################
 
@@ -314,6 +321,24 @@ async def _post_chat_action(context: SimulatorContext, user_input: str) -> None:
 
 
 ###########################################################################################################################
+async def _post_analyze_action(context: SimulatorContext, user_input: str) -> None:
+    """处理分析请求，发送到服务器进行分析"""
+
+    content = _extract_user_input(user_input, "/analyze")
+    assert content != "", f"content: {content} is empty string."
+
+    request_data = AnalyzeActionRequest(content=content)
+    response = _safe_post(
+        context.analyze_action_url,
+        data=request_data.model_dump(),
+        context=context,  # 传递整个context而不仅仅是token
+    )
+    if response is not None:
+        response_model = AnalyzeActionResponse.model_validate(response)
+        logger.info(f"_handle_analyze_action: {response_model.model_dump_json()}")
+
+
+###########################################################################################################################
 
 
 ###########################################################################################################################
@@ -358,6 +383,8 @@ async def _simulator() -> None:
                 await _post_logout(simulator_context)
             elif "/chat" in user_input:
                 await _post_chat_action(simulator_context, user_input)
+            elif "/analyze" in user_input:  # 添加这行
+                await _post_analyze_action(simulator_context, user_input)  # 添加这行
             else:
                 logger.info(f"Unknown command: {user_input}")
 

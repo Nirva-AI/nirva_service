@@ -13,7 +13,7 @@ import db.pgsql_user
 from typing import Optional, Dict, Any
 from jose import JWTError
 import db.redis_user
-from user_services.oauth_user import get_authenticated_user, oauth2_scheme
+from app_services.oauth_user import get_authenticated_user, oauth2_scheme
 import time
 
 

@@ -1,9 +1,10 @@
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI
-from user_services.url_config_services import url_config_router
-from user_services.login_services import login_router
-from user_services.chat_action_services import chat_action_router
+from app_services.url_config_services import url_config_router
+from app_services.login_services import login_router
+from app_services.chat_action_services import chat_action_router
+from app_services.analyze_action_services import analyze_action_router
 from db.redis_client import get_redis
 from collections.abc import AsyncGenerator
 
@@ -33,3 +34,4 @@ app.add_middleware(
 app.include_router(router=url_config_router)
 app.include_router(router=login_router)
 app.include_router(router=chat_action_router)
+app.include_router(router=analyze_action_router)
