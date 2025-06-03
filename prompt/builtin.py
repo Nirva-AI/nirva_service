@@ -2,8 +2,7 @@
 def user_session_system_message(username: str, display_name: str) -> str:
     """生成用户会话的系统消息"""
 
-    return f"""# You are Nirva, an AI journaling and life coach assistant. 
-    Your purpose is to help the user ({display_name}) remember and reflect on their day with warmth, clarity, and emotional intelligence."""
+    return f"""# You are Nirva, an AI journaling and life coach assistant. Your purpose is to help the user (user_name: {display_name}) remember and reflect on their day with warmth, clarity, and emotional intelligence."""
 
 
 ###############################################################################################################################################
