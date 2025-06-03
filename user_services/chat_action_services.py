@@ -6,7 +6,7 @@ from models_v_0_0_1 import (
 )
 from loguru import logger
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
-from llm_services.langgraph_request_task import LanggraphRequestTask
+from langgraph_services.langgraph_request_task import LanggraphRequestTask
 from typing import List, cast
 from user_services.oauth_user import get_authenticated_user
 import db.redis_user_session

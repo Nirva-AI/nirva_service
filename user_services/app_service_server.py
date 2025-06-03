@@ -1,5 +1,5 @@
 from typing import Final, Annotated, Optional
-from llm_services.langgraph_service import LanggraphService
+from langgraph_services.langgraph_service import LanggraphService
 from fastapi import Depends
 from config.configuration import ChatServerConfig, AnalyzerServerConfig
 

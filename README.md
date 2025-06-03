@@ -22,7 +22,8 @@ pip install bcrypt==3.2.2  # 已知兼容 passlib 1.7.4 的版本
 ## 严格模式检查
 
 ```shell
-mypy --strict run_app_service_server.py simulator_client.py run_chat_server.py run_clear_db.py run_test_db.py jwt_server_test.py jwt_client_test.py llm_services/analyzer_azure_openai_gpt_4o_graph.py
+mypy --strict run_app_service_server.py simulator_client.py run_chat_server.py run_analyzer_server.py run_clear_db.py run_test_db.py
+mypy --strict  jwt_server_test.py jwt_client_test.py
 ```
 
 ## 用pm2 批量启动 chat_server + app_service_server

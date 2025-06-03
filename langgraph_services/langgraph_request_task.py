@@ -2,7 +2,7 @@ from loguru import logger
 from typing import List, Union, Final, final, cast
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 import httpx
-from llm_services.langgraph_models import (
+from langgraph_services.langgraph_models import (
     LanggraphRequest,
     LanggraphResponse,
 )
