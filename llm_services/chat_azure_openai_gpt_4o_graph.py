@@ -48,9 +48,9 @@ def create_compiled_stage_graph(
             # 2) 打印完整堆栈信息，方便进一步排查
             traceback.print_exc()
 
-        # 当出现 Azure 内容过滤的情况，或者其他类型异常时，视需求可在此返回空字符串或者自定义提示。
-        # return {"messages": [AIMessage(content="")]}
-        raise e
+            # 当出现 Azure 内容过滤的情况，或者其他类型异常时，视需求可在此返回空字符串或者自定义提示。
+            # return {"messages": [AIMessage(content="")]}
+            raise e
 
     graph_builder = StateGraph(State)
     graph_builder.add_node(node_name, invoke_azure_chat_openai_llm_action)

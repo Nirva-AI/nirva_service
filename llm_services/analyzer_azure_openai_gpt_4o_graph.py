@@ -5,7 +5,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 import os
 import traceback
-from typing import Annotated, Final, Optional, cast, Dict, List
+from typing import Annotated, Final, Optional, Dict, List
 from typing_extensions import TypedDict
 from langgraph.graph import StateGraph
 from langgraph.graph.message import add_messages
@@ -166,9 +166,6 @@ def create_compiled_stage_graph(
             traceback.print_exc()
             raise e  # 重新抛出异常，确保调用者知道发生了错误
 
-        # 当出现 Azure 内容过滤的情况，或者其他类型异常时，视需求可在此返回空字符串或者自定义提示。
-        # return {"messages": [AIMessage(content="")]}
-
     graph_builder = StateGraph(State)
     graph_builder.add_node(node_name, invoke_azure_chat_openai_llm_action)
     graph_builder.set_entry_point(node_name)
@@ -191,8 +188,6 @@ def stream_graph_updates(
 
     for event in state_compiled_graph.stream(merged_message_context):
         for value in event.values():
-            # ai_messages: List[AIMessage] = cast(List[AIMessage], value["messages"])
-            # print("Assistant:", ai_messages[-1].content)
             ret.extend(value["messages"])
 
     return ret
