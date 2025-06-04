@@ -18,6 +18,7 @@ import utils.format_string as format_string
 from langgraph_services.langgraph_models import (
     RequestTaskMessageType,
 )
+import time
 
 
 class AnalyzeProcessContext:
@@ -181,6 +182,8 @@ async def handle_analyze_action(
     logger.info(f"/action/analyze/v1/: {request_data.model_dump_json()}")
 
     try:
+        # 开始计时
+        start_time = time.time()
 
         transcript_content = request_data.content
         assert transcript_content != "", "转录内容不能为空"
@@ -234,11 +237,16 @@ async def handle_analyze_action(
                 detail="反思过程未返回有效响应。",
             )
 
+        # 计算执行时间并记录
+        end_time = time.time()
+        execution_time = end_time - start_time
+        logger.info(f"分析过程总执行时间: {execution_time:.2f} 秒")
+
         # 返回分析结果
         return AnalyzeActionResponse(
             label_extraction=analyze_process_context._label_extraction_response,
             reflection=analyze_process_context._reflection_response,
-            message="分析过程已完成",
+            message=f"分析过程已完成 (用时: {execution_time:.2f}秒)",
         )
 
     except Exception as e:

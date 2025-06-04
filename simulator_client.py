@@ -398,6 +398,8 @@ async def _simulator() -> None:
                 await _post_chat_action(simulator_context, user_input)
             elif "/analyze" in user_input:  # 添加这行
                 # /analyze 04-19-01.txt
+                # /analyze 2025-04-19-01.txt
+                # /analyze 2025-05-09-01.txt
                 # "04-19-01.txt",
                 # "04-19-02.txt",
                 # "04-19-03.txt",
