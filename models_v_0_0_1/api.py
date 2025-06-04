@@ -1,8 +1,8 @@
-import datetime
+# import datetime
 from typing import final
 from pydantic import BaseModel
 from .registry import register_base_model_class
-from prompt.builtin import LabelExtractionResponse, ReflectionResponse
+from .prompt import LabelExtractionResponse, ReflectionResponse
 
 ################################################################################################################
 ################################################################################################################

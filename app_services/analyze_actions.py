@@ -13,7 +13,7 @@ from typing import List, Optional, cast
 from app_services.oauth_user import get_authenticated_user
 import db.redis_user
 import prompt.builtin as builtin_prompt
-from prompt.builtin import LabelExtractionResponse, ReflectionResponse
+from models_v_0_0_1 import LabelExtractionResponse, ReflectionResponse
 import utils.format_string as format_string
 from langgraph_services.langgraph_models import (
     RequestTaskMessageType,
