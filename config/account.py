@@ -1,6 +1,8 @@
+from typing import final
 from pydantic import BaseModel
 
 
+@final
 class UserAccount(BaseModel):
     username: str
     hashed_password: str

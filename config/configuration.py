@@ -1,4 +1,4 @@
-from typing import Final
+from typing import Final, final
 from pydantic import BaseModel
 from pathlib import Path
 
@@ -9,36 +9,42 @@ from pathlib import Path
 
 ##################################################################################################################
 # 启动一个服务的配置
+@final
 class ChatServerConfig(BaseModel):
     port: int = 8500
     temperature: float = 0.7
-    api: str = "/v1/llm_serve/chat/"
-    fast_api_title: str = "chat_azure_openai_gpt_4o_graph"
+    chat_service_api: str = "/chat/v1/"
+    test_get_api: str = "/chat/test/get/v1/"
+    fast_api_title: str = "chat_service"
     fast_api_version: str = "0.0.1"
     fast_api_description: str = ""
 
 
 ##################################################################################################################
 # 启动一个服务的配置
+@final
 class AnalyzerServerConfig(BaseModel):
     port: int = 8600
     temperature: float = 0.7
-    api: str = "/v1/llm_serve/analyze/"
-    fast_api_title: str = "analyzer_azure_openai_gpt_4o_graph"
+    analyze_service_api: str = "/analyze/v1/"
+    test_get_api: str = "/analyze/test/get/v1/"
+    fast_api_title: str = "analyzer_service"
     fast_api_version: str = "0.0.1"
     fast_api_description: str = ""
 
 
 ##################################################################################################################
 # 启动一个服务的配置
+@final
 class AppserviceServerConfig(BaseModel):
     server_ip_address: str = "0.0.0.0"
     server_port: int = 8000
-    local_network_ip: str = "192.168.2.70"
+    local_network_ip: str = "192.168.22.108"
 
 
 ##################################################################################################################
 # redis的配置
+@final
 class RedisConfig(BaseModel):
     host: str = "localhost"
     port: int = 6379

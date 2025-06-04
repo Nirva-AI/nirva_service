@@ -4,7 +4,7 @@ def main() -> None:
     from db.pgsql_client import reset_database
     from db.redis_client import redis_flushall
     from db.pgsql_user import save_user, has_user
-    from config.user_account import FAKE_USER
+    from config.account import FAKE_USER
     from loguru import logger
 
     # 清空 Redis 数据库

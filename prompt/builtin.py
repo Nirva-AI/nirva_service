@@ -1,5 +1,5 @@
 from pydantic import BaseModel, SecretStr, Field
-from typing import List, Dict, Literal
+from typing import List, Dict, Literal, final
 import json
 
 
@@ -126,6 +126,7 @@ def transcript_message(formatted_date: str, transcript_content: str) -> str:
 ###############################################################################################################################################
 
 
+@final
 class EventAnalysis(BaseModel):
     event_id: str = Field(description="Unique identifier (e.g., event_01, event_02)")
     event_title: str = Field(
@@ -188,6 +189,7 @@ class EventAnalysis(BaseModel):
 
 
 ###############################################################################################################################################
+@final
 class LabelExtractionResponse(BaseModel):
     events: List[EventAnalysis] = Field(
         description="A list of structured event analyses, each containing detailed information about a specific event in user_name's day."
@@ -216,6 +218,7 @@ For each individual event identified in Step 1, generate a structured analysis t
 ###############################################################################################################################################
 
 
+@final
 class Gratitude(BaseModel):
     gratitude_summary: List[str] = Field(
         description="3 bullet points of gratitude, each <50 words"
@@ -233,6 +236,9 @@ class Gratitude(BaseModel):
 
 
 ###############################################################################################################################################
+
+
+@final
 class ChallengesAndGrowth(BaseModel):
     growth_summary: List[str] = Field(description="3 improvement areas, each <50 words")
     obstacles_faced: str = Field(
@@ -247,6 +253,9 @@ class ChallengesAndGrowth(BaseModel):
 
 
 ###############################################################################################################################################
+
+
+@final
 class LearningAndInsights(BaseModel):
     new_knowledge: str = Field(
         description="Technical learning, creative techniques, practical skills, fresh perspectives"
@@ -263,6 +272,9 @@ class LearningAndInsights(BaseModel):
 
 
 ###############################################################################################################################################
+
+
+@final
 class ConnectionsAndRelationships(BaseModel):
     meaningful_interactions: str = Field(
         description="Quality and impact of interactions beyond just names"
@@ -276,6 +288,9 @@ class ConnectionsAndRelationships(BaseModel):
 
 
 ###############################################################################################################################################
+
+
+@final
 class LookingForward(BaseModel):
     do_differently_tomorrow: str = Field(
         description="Based on today's experiences and lessons"
@@ -289,6 +304,9 @@ class LookingForward(BaseModel):
 
 
 ###############################################################################################################################################
+
+
+@final
 class DailyReflection(BaseModel):
     reflection_summary: str = Field(
         description="How the day unfolded overall, <50 words"
@@ -311,6 +329,9 @@ class DailyReflection(BaseModel):
 
 
 ###############################################################################################################################################
+
+
+@final
 class ReflectionResponse(BaseModel):
     daily_reflection: DailyReflection = Field(
         description="A comprehensive reflection on user_name's day, including gratitude, challenges, learnings, connections, and forward-looking plans"

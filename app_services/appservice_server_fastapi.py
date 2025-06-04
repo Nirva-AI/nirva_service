@@ -1,10 +1,10 @@
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI
-from app_services.url_config_services import url_config_router
-from app_services.login_services import login_router
-from app_services.chat_action_services import chat_action_router
-from app_services.analyze_action_services import analyze_action_router
+from app_services.url_config import url_config_router
+from app_services.login import login_router
+from app_services.chat_actions import chat_action_router
+from app_services.analyze_actions import analyze_action_router
 from db.redis_client import get_redis
 from collections.abc import AsyncGenerator
 

@@ -17,7 +17,7 @@ from loguru import logger
 import json
 import utils.format_string as format_string
 import prompt.builtin as builtin
-from config.user_account import FAKE_USER
+from config.account import FAKE_USER
 
 
 ############################################################################################################

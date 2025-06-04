@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+from typing import Dict
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from fastapi import FastAPI, HTTPException, status
@@ -32,9 +33,11 @@ compiled_state_graph = create_compiled_stage_graph(
 ############################################################################################################
 ############################################################################################################
 ############################################################################################################
-# 定义处理聊天请求的路由
-@app.post(path=str(analyzer_server_config.api), response_model=LanggraphResponse)
-async def process_analyze_request(
+@app.post(
+    path=str(analyzer_server_config.analyze_service_api),
+    response_model=LanggraphResponse,
+)
+async def handle_analyze_request(
     request_data: LanggraphRequest,
 ) -> LanggraphResponse:
 
@@ -71,3 +74,25 @@ async def process_analyze_request(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"处理请求失败: {e}",
         )
+
+
+############################################################################################################
+############################################################################################################
+############################################################################################################
+# 定义测试GET请求的路由
+@app.get(path=str(analyzer_server_config.test_get_api))
+async def handle_test_get_request() -> Dict[str, str]:
+    """
+    简单的GET端点，用于测试服务是否正常运行
+    """
+    return {
+        "status": "ok",
+        "message": "Chat服务运行正常",
+        "version": analyzer_server_config.fast_api_version,
+        "service": analyzer_server_config.fast_api_title,
+    }
+
+
+############################################################################################################
+############################################################################################################
+############################################################################################################

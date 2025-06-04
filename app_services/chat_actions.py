@@ -5,15 +5,20 @@ from models_v_0_0_1 import (
     ChatActionResponse,
 )
 from loguru import logger
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
-from langgraph_services.langgraph_request_task import LanggraphRequestTask
-from typing import List, cast
+from langchain_core.messages import HumanMessage, AIMessage
+from langgraph_services.langgraph_request_task import (
+    LanggraphRequestTask,
+)
+from typing import cast
 from app_services.oauth_user import get_authenticated_user
 import db.redis_user_session
 import db.pgsql_user_session
 import db.redis_user
 import app_services.user_session
 import prompt.builtin as builtin_prompt
+from langgraph_services.langgraph_models import (
+    RequestTaskMessageType,
+)
 
 ###################################################################################################################################################################
 chat_action_router = APIRouter()
@@ -25,7 +30,7 @@ chat_action_router = APIRouter()
 @chat_action_router.post(path="/action/chat/v1/", response_model=ChatActionResponse)
 async def handle_chat_action(
     request_data: ChatActionRequest,
-    user_session_server: AppserviceServerInstance,
+    appservice_server: AppserviceServerInstance,
     authenticated_user: str = Depends(get_authenticated_user),
 ) -> ChatActionResponse:
 
@@ -33,6 +38,12 @@ async def handle_chat_action(
 
     try:
 
+        # 测试健康检查。
+        # services_health = (
+        #     await appservice_server.langgraph_service.check_services_health()
+        # )
+
+        # 测试。
         # if request_data.content != "":
         #     return ChatActionResponse(
         #         message=f"收到: {request_data.content}",
@@ -53,20 +64,18 @@ async def handle_chat_action(
         )
 
         # 组织请求
-        chat_request_handler = LanggraphRequestTask(
+        request_task = LanggraphRequestTask(
             username=authenticated_user,
             prompt=prompt,
             chat_history=cast(
-                List[SystemMessage | HumanMessage | AIMessage],
+                RequestTaskMessageType,
                 current_user_session.chat_history,
             ),
         )
 
         # 处理请求
-        user_session_server.langgraph_service.chat(
-            request_handlers=[chat_request_handler]
-        )
-        if chat_request_handler.response_output == "":
+        appservice_server.langgraph_service.chat(request_handlers=[request_task])
+        if len(request_task._response.messages) == 0:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="处理请求时未返回内容",
@@ -75,7 +84,7 @@ async def handle_chat_action(
         # 准备添加消息
         messages = [
             HumanMessage(content=prompt),
-            AIMessage(content=chat_request_handler.response_output),
+            AIMessage(content=request_task.last_response_message_content),
         ]
 
         # 将消息添加到会话中
@@ -94,11 +103,11 @@ async def handle_chat_action(
 
         # 打印聊天记录
         for msg in current_user_session.chat_history:
-            logger.warning(msg.content)
+            logger.info(msg.content)
 
         # 返回响应
         return ChatActionResponse(
-            message=chat_request_handler.response_output,
+            message=request_task.last_response_message_content,
         )
 
     except Exception as e:

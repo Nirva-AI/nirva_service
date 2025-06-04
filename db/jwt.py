@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from jose import jwt, JWTError
 from pydantic import BaseModel
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, final
 from config.configuration import (
     JWT_SIGNING_KEY,
     JWT_SIGNING_ALGORITHM,
@@ -12,6 +12,7 @@ import uuid
 
 ############################################################################################################
 # 数据模型
+@final
 class UserToken(BaseModel):
     access_token: str
     token_type: str

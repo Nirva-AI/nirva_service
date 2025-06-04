@@ -1,10 +1,11 @@
 from loguru import logger
-from typing import List, Optional, Union, Final, final, cast
+from typing import Optional, Final, final, cast
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 import httpx
 from langgraph_services.langgraph_models import (
     LanggraphRequest,
     LanggraphResponse,
+    RequestTaskMessageType,
 )
 import requests
 
@@ -17,21 +18,25 @@ class LanggraphRequestTask:
         self,
         username: str,
         prompt: str,
-        chat_history: List[Union[SystemMessage, HumanMessage, AIMessage]],
+        chat_history: RequestTaskMessageType,
         timeout: Optional[int] = None,
     ) -> None:
 
         self._prompt: Final[str] = prompt
-        self._chat_history: List[Union[SystemMessage, HumanMessage, AIMessage]] = (
-            chat_history
-        )
+        self._chat_history: RequestTaskMessageType = chat_history
         self._response: LanggraphResponse = LanggraphResponse()
         self._username: str = username
         self._timeout: Final[int] = timeout if timeout is not None else 30
 
+        for message in self._chat_history:
+            if not isinstance(message, (SystemMessage, HumanMessage, AIMessage)):
+                assert (
+                    False
+                ), f"Invalid message type: {type(message)}. Expected SystemMessage, HumanMessage, or AIMessage."
+
     ################################################################################################################################################################################
     @property
-    def response_output(self) -> str:
+    def last_response_message_content(self) -> str:
         if len(self._response.messages) == 0:
             logger.warning(f"{self._username} response is empty.")
             return ""

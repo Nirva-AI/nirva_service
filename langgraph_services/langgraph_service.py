@@ -1,5 +1,5 @@
 from loguru import logger
-from typing import Final, List, Any, final
+from typing import Dict, Final, List, Any, final
 import httpx
 import asyncio
 import time
@@ -13,24 +13,30 @@ class LanggraphService:
     def __init__(
         self,
         chat_service_localhost_urls: List[str],
+        chat_service_test_get_urls: List[str],
         analyzer_service_localhost_urls: List[str],
+        analyzer_service_test_get_urls: List[str],
     ) -> None:
 
         # 异步请求客户端
         self._async_client: Final[httpx.AsyncClient] = httpx.AsyncClient()
 
-        # 运行的服务器
-        assert len(chat_service_localhost_urls) > 0
+        # 聊天服务的 URL
         self._chat_service_localhost_urls: Final[List[str]] = (
             chat_service_localhost_urls
         )
-
-        # 不同的请求分配到不同的 URL
         self._chat_service_request_distribution_index: int = 0
+        # 聊天服务的测试 GET URL
+        self._chat_service_test_get_urls: Final[List[str]] = chat_service_test_get_urls
 
         # 分析服务的 URL
         self._analyzer_service_localhost_urls: Final[List[str]] = (
             analyzer_service_localhost_urls
+        )
+        self._analyzer_service_request_distribution_index: int = 0
+        # 分析服务的测试 GET URL
+        self._analyzer_service_test_get_urls: Final[List[str]] = (
+            analyzer_service_test_get_urls
         )
 
     ################################################################################################################################################################################
@@ -97,7 +103,78 @@ class LanggraphService:
         self._handle(
             request_handlers=request_handlers,
             urls=self._analyzer_service_localhost_urls,
-            request_distribution_index=0,
+            request_distribution_index=self._analyzer_service_request_distribution_index,
         )
+        self._analyzer_service_request_distribution_index += len(request_handlers)
+
+    ################################################################################################################################################################################
+    async def check_services_health(self) -> Dict[str, List[Dict[str, Any]]]:
+        """
+        检查聊天服务和分析服务的健康状态
+
+        Returns:
+            Dict[str, List[Dict[str, Any]]]: 包含每个服务所有端点健康状态的字典
+        """
+        chat_services_status = []
+        analyzer_services_status = []
+
+        # 检查聊天服务
+        for url in self._chat_service_test_get_urls:
+            try:
+                start_time = time.time()
+                response = await self._async_client.get(url)
+                end_time = time.time()
+
+                if response.status_code == 200:
+                    status_info = {
+                        "url": url,
+                        "status": "healthy",
+                        "response_time": f"{(end_time - start_time):.2f}s",
+                        "details": response.json(),
+                    }
+                else:
+                    status_info = {
+                        "url": url,
+                        "status": "unhealthy",
+                        "response_time": f"{(end_time - start_time):.2f}s",
+                        "error": f"状态码: {response.status_code}",
+                    }
+            except Exception as e:
+                status_info = {"url": url, "status": "unreachable", "error": str(e)}
+
+            chat_services_status.append(status_info)
+            logger.debug(f"Chat服务健康检查 {url}: {status_info['status']}")
+
+        # 检查分析服务
+        for url in self._analyzer_service_test_get_urls:
+            try:
+                start_time = time.time()
+                response = await self._async_client.get(url)
+                end_time = time.time()
+
+                if response.status_code == 200:
+                    status_info = {
+                        "url": url,
+                        "status": "healthy",
+                        "response_time": f"{(end_time - start_time):.2f}s",
+                        "details": response.json(),
+                    }
+                else:
+                    status_info = {
+                        "url": url,
+                        "status": "unhealthy",
+                        "response_time": f"{(end_time - start_time):.2f}s",
+                        "error": f"状态码: {response.status_code}",
+                    }
+            except Exception as e:
+                status_info = {"url": url, "status": "unreachable", "error": str(e)}
+
+            analyzer_services_status.append(status_info)
+            logger.debug(f"分析服务健康检查 {url}: {status_info['status']}")
+
+        return {
+            "chat_services": chat_services_status,
+            "analyzer_services": analyzer_services_status,
+        }
 
     ################################################################################################################################################################################

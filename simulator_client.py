@@ -19,7 +19,7 @@ from config.configuration import (
     LOGS_DIR,
 )
 
-from config.user_account import FAKE_USER
+from config.account import FAKE_USER
 from db.jwt import UserToken
 
 
@@ -365,13 +365,13 @@ async def _post_analyze_action(context: SimulatorContext, user_input: str) -> No
 ###########################################################################################################################
 async def _simulator() -> None:
 
-    app_service_server_config = AppserviceServerConfig()
+    appservice_server_config = AppserviceServerConfig()
 
     simulator_context = SimulatorContext(
-        server_ip_address=app_service_server_config.server_ip_address == "0.0.0.0"
-        and app_service_server_config.local_network_ip
-        or app_service_server_config.server_ip_address,
-        server_port=app_service_server_config.server_port,
+        server_ip_address=appservice_server_config.server_ip_address == "0.0.0.0"
+        and appservice_server_config.local_network_ip
+        or appservice_server_config.server_ip_address,
+        server_port=appservice_server_config.server_port,
         username=FAKE_USER.username,
         password="secret",  # 注意！！
         display_name=FAKE_USER.display_name,

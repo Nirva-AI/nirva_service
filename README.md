@@ -22,11 +22,11 @@ pip install bcrypt==3.2.2  # 已知兼容 passlib 1.7.4 的版本
 ## 严格模式检查
 
 ```shell
-mypy --strict run_app_service_server.py simulator_client.py run_chat_server.py run_analyzer_server.py run_clear_db.py run_test_db.py
+mypy --strict run_appservice_server.py simulator_client.py run_chat_server.py run_analyzer_server.py run_clear_db.py run_test_db.py
 mypy --strict  jwt_server_test.py jwt_client_test.py
 ```
 
-## 用pm2 批量启动 chat_server + app_service_server
+## 用pm2 批量启动 chat_server + appservice_server
 
 ```shell
 ./run_pm2script.sh
@@ -57,3 +57,7 @@ conda install -c conda-forge redis pyhumps
 # 或
 pip install redis fastapi-redis-cache
 ```
+
+## 注意conda环境
+
+conda env export > environment.yml
