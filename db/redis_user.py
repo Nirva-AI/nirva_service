@@ -1,4 +1,3 @@
-from typing import Dict
 import db.redis_client
 from db.jwt import UserToken
 

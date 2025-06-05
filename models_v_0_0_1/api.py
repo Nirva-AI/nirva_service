@@ -3,6 +3,7 @@ from typing import final
 from pydantic import BaseModel
 from .registry import register_base_model_class
 from .prompt import LabelExtractionResponse, ReflectionResponse
+from datetime import datetime
 
 ################################################################################################################
 ################################################################################################################
@@ -43,8 +44,10 @@ class ChatActionResponse(BaseModel):
 @final
 @register_base_model_class
 class AnalyzeActionRequest(BaseModel):
-    content: str = ""
-    datetime: str = ""
+    time_stamp: datetime = datetime.now()
+    file_number: int = 0
+
+    model_config = {"json_encoders": {datetime: lambda v: v.isoformat()}}
 
 
 @final
@@ -52,6 +55,28 @@ class AnalyzeActionRequest(BaseModel):
 class AnalyzeActionResponse(BaseModel):
     label_extraction: LabelExtractionResponse | None = None
     reflection: ReflectionResponse | None = None
+    message: str = ""
+
+
+################################################################################################################
+################################################################################################################
+################################################################################################################
+
+
+@final
+@register_base_model_class
+class UploadTranscriptActionRequest(BaseModel):
+    transcript_content: str = ""
+    time_stamp: datetime = datetime.now()
+    file_number: int = 0
+    file_suffix: str = "txt"
+
+    model_config = {"json_encoders": {datetime: lambda v: v.isoformat()}}
+
+
+@final
+@register_base_model_class
+class UploadTranscriptActionResponse(BaseModel):
     message: str = ""
 
 

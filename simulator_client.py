@@ -1,6 +1,6 @@
 import datetime
 from pathlib import Path
-from typing import Any, Dict, Final, Union, cast, final, Optional
+from typing import Any, Dict, Final, Union, cast, final, Optional, Tuple
 from loguru import logger
 import requests
 from models_v_0_0_1 import (
@@ -9,6 +9,8 @@ from models_v_0_0_1 import (
     ChatActionResponse,
     AnalyzeActionRequest,  # 添加这行
     AnalyzeActionResponse,  # 添加这行
+    UploadTranscriptActionRequest,
+    UploadTranscriptActionResponse,
 )
 
 from config.configuration import (
@@ -95,6 +97,11 @@ class SimulatorContext:
     @property
     def analyze_action_url(self) -> str:
         return self._url_configuration.endpoints["analyze"]
+
+    ###########################################################################################################################
+    @property
+    def upload_transcript_url(self) -> str:
+        return self._url_configuration.endpoints["upload_transcript"]
 
     ###########################################################################################################################
 
@@ -331,22 +338,29 @@ async def _post_analyze_action(context: SimulatorContext, user_input: str) -> No
     assert upload_file != "", f"content: {upload_file} is empty string."
 
     invisible_path = Path("invisible") / upload_file
+    assert invisible_path.exists(), f"Log path does not exist: {invisible_path}"
     if not invisible_path.exists():
         logger.error(f"Log path does not exist: {invisible_path}")
         return
-    # assert invisible_path.exists(), f"Log path does not exist: {invisible_path}"
+
     transcript_content = invisible_path.read_text(encoding="utf-8").strip()
     assert transcript_content != "", "转录内容不能为空"
 
+    parse_info = _parse_data_from_filename(upload_file)
+    if parse_info is None:
+        logger.error(f"无法从文件名 {upload_file} 中解析出日期时间、文件编号或后缀。")
+        return
+
     request_data = AnalyzeActionRequest(
-        content=transcript_content,
-        datetime=datetime.datetime.now().strftime("%Y-%m-%d"),
+        time_stamp=parse_info[0],
+        file_number=parse_info[1],
     )
     response = _safe_post(
         context.analyze_action_url,
-        data=request_data.model_dump(),
+        data=request_data.model_dump(mode="json"),
         context=context,  # 传递整个context而不仅仅是token
     )
+
     if response is not None:
         response_model = AnalyzeActionResponse.model_validate(response)
         logger.info(f"_handle_analyze_action: {response_model.model_dump_json()}")
@@ -356,6 +370,78 @@ async def _post_analyze_action(context: SimulatorContext, user_input: str) -> No
         log_file_path.write_text(
             response_model.model_dump_json(),
             encoding="utf-8",
+        )
+
+
+###########################################################################################################################
+def _parse_data_from_filename(
+    filename: str,
+) -> Optional[Tuple[datetime.datetime, int, str]]:
+    """从文件名中提取日期时间字符串、文件编号和后缀"""
+
+    # 从这种文件名字为 ‘nirva-2025-04-19-00.txt’，提取日期时间字符串2025, 04, 19。后缀为txt, file_number为0
+    parts = filename.split("-")
+    if len(parts) < 5:
+        logger.error(f"文件名格式不正确: {filename}")
+        return None
+    try:
+        year = int(parts[1])
+        month = int(parts[2])
+        day = int(parts[3])
+        file_number = int(parts[4].split(".")[0])  # 提取文件编号
+        file_suffix = parts[4].split(".")[-1]  # 提取文件后缀
+
+        # 创建日期时间对象
+        date_time = datetime.datetime(year, month, day)
+        # isof = date_time.isoformat()  # 确保日期时间格式正确
+
+        return date_time, file_number, file_suffix
+    except ValueError as e:
+        logger.error(f"解析文件名时出错: {e}, 文件名: {filename}")
+        # 如果解析失败，返回None
+        logger.error(f"无法从文件名 {filename} 中解析出日期时间、文件编号或后缀。")
+
+    return None
+
+
+###########################################################################################################################
+async def _post_upload_transcript_action(
+    context: SimulatorContext, user_input: str
+) -> None:
+    """处理分析请求，发送到服务器进行分析"""
+
+    upload_file = _extract_user_input(user_input, "/upload_transcript")
+    assert upload_file != "", f"content: {upload_file} is empty string."
+
+    invisible_path = Path("invisible") / upload_file
+    assert invisible_path.exists(), f"Log path does not exist: {invisible_path}"
+    if not invisible_path.exists():
+        logger.error(f"Log path does not exist: {invisible_path}")
+        return
+
+    transcript_content = invisible_path.read_text(encoding="utf-8").strip()
+    assert transcript_content != "", "转录内容不能为空"
+
+    parse_info = _parse_data_from_filename(upload_file)
+    if parse_info is None:
+        logger.error(f"无法从文件名 {upload_file} 中解析出日期时间、文件编号或后缀。")
+        return
+
+    request_data = UploadTranscriptActionRequest(
+        transcript_content=transcript_content,
+        time_stamp=parse_info[0],
+        file_number=parse_info[1],
+        file_suffix=parse_info[2],
+    )
+    response = _safe_post(
+        context.upload_transcript_url,
+        data=request_data.model_dump(mode="json"),
+        context=context,  # 传递整个context而不仅仅是token
+    )
+    if response is not None:
+        response_model = UploadTranscriptActionResponse.model_validate(response)
+        logger.info(
+            f"_post_upload_transcript_action: {response_model.model_dump_json()}"
         )
 
 
@@ -397,21 +483,28 @@ async def _simulator() -> None:
             elif "/chat" in user_input:
                 await _post_chat_action(simulator_context, user_input)
             elif "/analyze" in user_input:  # 添加这行
-                # /analyze 04-19-01.txt
-                # /analyze 2025-04-19-01.txt
-                # /analyze 2025-05-09-01.txt
-                # "04-19-01.txt",
-                # "04-19-02.txt",
-                # "04-19-03.txt",
-                # "05-09-01.txt",
-                # "05-09-02.txt",
-                await _post_analyze_action(simulator_context, user_input)  # 添加这行
+                # /analyze nirva-2025-04-19-00.txt
+                # /analyze nirva-2025-05-09-00.txt
+                await _post_analyze_action(simulator_context, user_input)
+
+            elif "/upload_transcript" in user_input:
+
+                # /upload_transcript nirva-2025-04-19-00.txt
+                # /upload_transcript nirva-2025-05-09-00.txt
+
+                copy_user_input = str(user_input)
+                await _post_upload_transcript_action(simulator_context, user_input)
+                copy_user_input = copy_user_input.replace(
+                    "/upload_transcript", "/analyze"
+                )
+                await _post_analyze_action(simulator_context, copy_user_input)
+
             else:
                 logger.info(f"Unknown command: {user_input}")
 
         except Exception as e:
             logger.error(f"Exception: {e}")
-            break
+            # break
 
     ## 结束了
     logger.info("Simulate client exit!")
@@ -425,6 +518,9 @@ async def main() -> None:
 ###########################################################################################################################
 
 if __name__ == "__main__":
+
+    # _parse_data_from_filename("nirva-2025-04-19-00.txt")
+
     import asyncio
 
     asyncio.run(main())

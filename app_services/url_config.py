@@ -30,6 +30,7 @@ async def get_url_config(
             "logout": base + "logout/v1/",
             "chat": base + "action/chat/v1/",
             "analyze": base + "action/analyze/v1/",
+            "upload_transcript": base + "action/upload_transcript/v1/",
         },
     )
 

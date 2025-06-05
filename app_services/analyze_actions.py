@@ -3,6 +3,10 @@ from app_services.app_service_server import AppserviceServerInstance
 from models_v_0_0_1 import (
     AnalyzeActionRequest,
     AnalyzeActionResponse,
+    UploadTranscriptActionRequest,
+    UploadTranscriptActionResponse,
+    LabelExtractionResponse,
+    ReflectionResponse,
 )
 from loguru import logger
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
@@ -13,12 +17,12 @@ from typing import List, Optional, cast
 from app_services.oauth_user import get_authenticated_user
 import db.redis_user
 import prompt.builtin as builtin_prompt
-from models_v_0_0_1 import LabelExtractionResponse, ReflectionResponse
 import utils.format_string as format_string
 from langgraph_services.langgraph_models import (
     RequestTaskMessageType,
 )
 import time
+import db.redis_upload_transcript
 
 
 class AnalyzeProcessContext:
@@ -185,7 +189,22 @@ async def handle_analyze_action(
         # 开始计时
         start_time = time.time()
 
-        transcript_content = request_data.content
+        if not db.redis_upload_transcript.is_transcript_stored(
+            username=authenticated_user,
+            time_stamp=request_data.time_stamp,
+            file_number=request_data.file_number,
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="转录内容未找到，请先上传转录内容。",
+            )
+
+        #
+        transcript_content = db.redis_upload_transcript.get_transcript(
+            username=authenticated_user,
+            time_stamp=request_data.time_stamp,
+            file_number=request_data.file_number,
+        )
         assert transcript_content != "", "转录内容不能为空"
         if transcript_content == "":
             raise HTTPException(
@@ -207,7 +226,7 @@ async def handle_analyze_action(
                 HumanMessage(content=builtin_prompt.event_segmentation_message()),
                 HumanMessage(
                     content=builtin_prompt.transcript_message(
-                        formatted_date=request_data.datetime,
+                        formatted_date=request_data.time_stamp.strftime("%Y-%m-%d"),
                         transcript_content=transcript_content,
                     )
                 ),
@@ -247,6 +266,64 @@ async def handle_analyze_action(
             label_extraction=analyze_process_context._label_extraction_response,
             reflection=analyze_process_context._reflection_response,
             message=f"分析过程已完成 (用时: {execution_time:.2f}秒)",
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"处理请求失败: {e}",
+        )
+
+
+###################################################################################################################################################################
+###################################################################################################################################################################
+###################################################################################################################################################################
+
+
+@analyze_action_router.post(
+    path="/action/upload_transcript/v1/", response_model=UploadTranscriptActionResponse
+)
+async def handle_upload_transcript_action(
+    request_data: UploadTranscriptActionRequest,
+    # appservice_server: AppserviceServerInstance,
+    authenticated_user: str = Depends(get_authenticated_user),
+) -> UploadTranscriptActionResponse:
+
+    logger.info(f"/action/upload_transcript/v1/: {request_data.model_dump_json()}")
+
+    try:
+
+        assert request_data.transcript_content != "", "转录内容不能为空"
+        if request_data.transcript_content == "":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="转录内容不能为空。",
+            )
+
+        if db.redis_upload_transcript.is_transcript_stored(
+            username=authenticated_user,
+            time_stamp=request_data.time_stamp,
+            file_number=request_data.file_number,
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="该转录内容已存在，请勿重复上传。",
+            )
+
+        # 存储转录内容到 Redis
+        db.redis_upload_transcript.store_transcript(
+            username=authenticated_user,
+            time_stamp=request_data.time_stamp,
+            file_number=request_data.file_number,
+            transcript_content=request_data.transcript_content,
+            # expiration_time=60 * 60,  # 设置过期时间为1小时
+        )
+        logger.info(
+            f"转录内容已存储: 用户={authenticated_user}, 时间戳={request_data.time_stamp}, 文件编号={request_data.file_number}"
+        )
+
+        return UploadTranscriptActionResponse(
+            message=f"转录内容已存储: 用户={authenticated_user}, 时间戳={request_data.time_stamp}, 文件编号={request_data.file_number}",
         )
 
     except Exception as e:
