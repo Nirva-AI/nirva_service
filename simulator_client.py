@@ -1,7 +1,7 @@
-from dataclasses import dataclass
 import datetime
 from pathlib import Path
 from typing import Any, Dict, Final, List, Union, cast, final, Optional, Tuple
+import uuid
 from loguru import logger
 import requests
 from models_v_0_0_1 import (
@@ -12,6 +12,8 @@ from models_v_0_0_1 import (
     AnalyzeActionResponse,  # 添加这行
     UploadTranscriptActionRequest,
     UploadTranscriptActionResponse,
+    MessageRole,
+    ChatMessage,
 )
 
 from config.configuration import (
@@ -24,12 +26,6 @@ from config.configuration import (
 
 from config.account import FAKE_USER
 from db.jwt import UserToken
-
-
-@dataclass
-class ChatMessage:
-    type: str
-    content: str
 
 
 ###########################################################################################################################
@@ -328,13 +324,14 @@ async def _post_chat_action(context: SimulatorContext, user_input: str) -> None:
     assert content != "", f"content: {content} is empty string."
 
     request_data = ChatActionRequest(
-        content=content, chat_history_types=[], chat_history_contents=[]
+        human_message=ChatMessage(
+            id=str(uuid.uuid4()),
+            role=MessageRole.HUMAN,
+            content=content,
+            time_stamp=datetime.datetime.now().isoformat(),
+        ),
+        chat_history=context._chat_history,
     )
-
-    # 将聊天历史转换为请求数据
-    for message in context._chat_history:
-        request_data.chat_history_types.append(message.type)
-        request_data.chat_history_contents.append(message.content)
 
     response = _safe_post(
         context.chat_action_url,
@@ -346,12 +343,8 @@ async def _post_chat_action(context: SimulatorContext, user_input: str) -> None:
         logger.info(f"_handle_chat_action: {response_model.model_dump_json()}")
 
         ## 更新聊天历史
-        context._chat_history.append(
-            ChatMessage(type="human", content=response_model.human_message_content)
-        )
-        context._chat_history.append(
-            ChatMessage(type="ai", content=response_model.ai_response_content)
-        )
+        context._chat_history.append(request_data.human_message)
+        context._chat_history.append(response_model.ai_message)
 
 
 ###########################################################################################################################

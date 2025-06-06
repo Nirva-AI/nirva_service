@@ -1,8 +1,12 @@
+import datetime
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from app_services.app_service_server import AppserviceServerInstance
 from models_v_0_0_1 import (
     ChatActionRequest,
     ChatActionResponse,
+    MessageRole,
+    ChatMessage,
 )
 from loguru import logger
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
@@ -14,20 +18,9 @@ from app_services.oauth_user import get_authenticated_user
 import db.redis_user
 import prompt.builtin as builtin_prompt
 from langgraph_services.langgraph_models import (
-    RequestTaskMessageType,
+    RequestTaskMessageListType,
 )
 
-
-# 测试健康检查。
-# services_health = (
-#     await appservice_server.langgraph_service.check_services_health()
-# )
-
-# 测试。
-# if request_data.content != "":
-#     return ChatActionResponse(
-#         message=f"收到: {request_data.content}",
-#     )
 
 ###################################################################################################################################################################
 chat_action_router = APIRouter()
@@ -35,24 +28,19 @@ chat_action_router = APIRouter()
 
 ###################################################################################################################################################################
 def _assemble_chat_messages(
-    messages_type: List[str], messages_content: List[str]
-) -> RequestTaskMessageType:
-    """
-    根据消息类型和内容构建聊天历史消息列表。
-    """
-    assert len(messages_type) == len(messages_content), "消息类型和内容长度不匹配。"
+    chat_history: List[ChatMessage],
+) -> RequestTaskMessageListType:
 
-    ret_messages: RequestTaskMessageType = []
-    for message_type, message_content in zip(messages_type, messages_content):
-        if message_type == "system":
-            ret_messages.append(SystemMessage(content=message_content))
-        elif message_type == "human":
-            ret_messages.append(HumanMessage(content=message_content))
-        elif message_type == "ai":
-            ret_messages.append(AIMessage(content=message_content))
+    ret_messages: RequestTaskMessageListType = []
+    for msg in chat_history:
+        if msg.role == MessageRole.SYSTEM:
+            ret_messages.append(SystemMessage(content=msg.content))
+        elif msg.role == MessageRole.HUMAN:
+            ret_messages.append(HumanMessage(content=msg.content))
+        elif msg.role == MessageRole.AI:
+            ret_messages.append(AIMessage(content=msg.content))
         else:
-            logger.warning(f"Unknown message type: {message_type}")
-            raise ValueError(f"Unknown message type: {message_type}")
+            logger.warning(f"Unknown message role: {msg.role}")
 
     return ret_messages
 
@@ -71,44 +59,44 @@ async def handle_chat_action(
 
     try:
 
-        if len(request_data.content.strip()) == 0:
+        # 检查内容。
+        if len(request_data.human_message.content.strip()) == 0:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="请求内容不能为空",
             )
 
+        # 检查用户是否已认证。
         display_name = db.redis_user.get_user_display_name(username=authenticated_user)
         assert (
             display_name != ""
         ), f"用户 {authenticated_user} 的显示名称不能为空，请先设置显示名称。"
 
+        # 构建提示词。
         prompt = builtin_prompt.user_session_chat_message(
             username=authenticated_user,
             display_name=display_name,
-            content=request_data.content,
+            content=request_data.human_message.content,
         )
 
-        # 组织请求
-        system_messages = [
-            SystemMessage(
-                content=builtin_prompt.user_session_system_message(
-                    authenticated_user,
-                    display_name,
-                )
-            ),
-        ]
-
-        chat_history = _assemble_chat_messages(
-            messages_type=request_data.chat_history_types,
-            messages_content=request_data.chat_history_contents,
+        # 系统提示词。
+        system_message = SystemMessage(
+            content=builtin_prompt.user_session_system_message(
+                authenticated_user,
+                display_name,
+            )
         )
 
+        # 构建对话历史
+        chat_history = _assemble_chat_messages(request_data.chat_history)
+
+        # 构建请求任务
         request_task = LanggraphRequestTask(
             username=authenticated_user,
             prompt=prompt,
             chat_history=cast(
-                RequestTaskMessageType,
-                system_messages + chat_history,
+                RequestTaskMessageListType,
+                [system_message] + chat_history,
             ),
         )
 
@@ -120,23 +108,33 @@ async def handle_chat_action(
                 detail="处理请求时未返回内容",
             )
 
-        # 准备添加消息
-        messages: RequestTaskMessageType = [
-            HumanMessage(content=prompt),
-            AIMessage(content=request_task.last_response_message_content),
-        ]
-
-        # 将消息添加到会话中
-        chat_history.extend(messages)
+        # 检查最后一条消息是否为 AI 消息
+        if request_task._response.messages[-1].type != "ai":
+            logger.error(
+                f"处理请求时最后一条消息不是 AI 消息: {request_task._response.messages[-1]}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="处理请求时最后一条消息不是 AI 消息",
+            )
 
         # 打印聊天记录
-        for msg in system_messages + chat_history:
+        for msg in (
+            [system_message]
+            + chat_history
+            + [HumanMessage(content=prompt)]
+            + request_task._response.messages
+        ):
             logger.warning(msg.content)
 
         # 返回响应
         return ChatActionResponse(
-            human_message_content=prompt,
-            ai_response_content=request_task.last_response_message_content,
+            ai_message=ChatMessage(
+                id=str(uuid.uuid4()),
+                role=MessageRole.AI,  # AI消息
+                content=request_task.last_response_message_content,
+                time_stamp=datetime.datetime.now().isoformat(),
+            ),
         )
 
     except Exception as e:

@@ -1,9 +1,10 @@
 # import datetime
-from typing import final, List
+from typing import Optional, final, List
 from pydantic import BaseModel
 from .registry import register_base_model_class
 from .prompt import LabelExtractionResponse, ReflectionResponse
 from datetime import datetime
+from enum import IntEnum
 
 ################################################################################################################
 ################################################################################################################
@@ -25,18 +26,33 @@ class URLConfigurationResponse(BaseModel):
 
 
 @final
+class MessageRole(IntEnum):
+    SYSTEM = 0
+    HUMAN = 1
+    AI = 2
+
+
+@final
+@register_base_model_class
+class ChatMessage(BaseModel):
+    id: str
+    role: int  # MessageRole 0: system, 1: human, 2: ai
+    content: str
+    time_stamp: str
+    tags: Optional[List[str]] = None
+
+
+@final
 @register_base_model_class
 class ChatActionRequest(BaseModel):
-    content: str
-    chat_history_types: List[str]
-    chat_history_contents: List[str]
+    human_message: ChatMessage
+    chat_history: List[ChatMessage] = []
 
 
 @final
 @register_base_model_class
 class ChatActionResponse(BaseModel):
-    human_message_content: str
-    ai_response_content: str
+    ai_message: ChatMessage
 
 
 ################################################################################################################

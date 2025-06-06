@@ -5,7 +5,7 @@ import httpx
 from langgraph_services.langgraph_models import (
     LanggraphRequest,
     LanggraphResponse,
-    RequestTaskMessageType,
+    RequestTaskMessageListType,
 )
 import requests
 
@@ -18,12 +18,12 @@ class LanggraphRequestTask:
         self,
         username: str,
         prompt: str,
-        chat_history: RequestTaskMessageType,
+        chat_history: RequestTaskMessageListType,
         timeout: Optional[int] = None,
     ) -> None:
 
         self._prompt: Final[str] = prompt
-        self._chat_history: RequestTaskMessageType = chat_history
+        self._chat_history: RequestTaskMessageListType = chat_history
         self._response: LanggraphResponse = LanggraphResponse()
         self._username: str = username
         self._timeout: Final[int] = timeout if timeout is not None else 30

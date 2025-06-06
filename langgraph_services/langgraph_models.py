@@ -3,14 +3,14 @@ from langchain.schema import AIMessage, HumanMessage, SystemMessage, BaseMessage
 from pydantic import BaseModel
 
 
-RequestTaskMessageType = List[SystemMessage | HumanMessage | AIMessage]
+RequestTaskMessageListType = List[SystemMessage | HumanMessage | AIMessage]
 
 
 ############################################################################################################
 @final
 class LanggraphRequest(BaseModel):
     message: HumanMessage
-    chat_history: RequestTaskMessageType = []
+    chat_history: RequestTaskMessageListType = []
 
     class Config:
         arbitrary_types_allowed = True

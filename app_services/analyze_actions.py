@@ -19,7 +19,7 @@ import db.redis_user
 import prompt.builtin as builtin_prompt
 import utils.format_string as format_string
 from langgraph_services.langgraph_models import (
-    RequestTaskMessageType,
+    RequestTaskMessageListType,
 )
 import time
 import db.redis_upload_transcript
@@ -53,7 +53,7 @@ def execute_label_extraction(
             username=analyze_process_context._authenticated_user,
             prompt=builtin_prompt.label_extraction_message(),
             chat_history=cast(
-                RequestTaskMessageType, analyze_process_context._chat_history
+                RequestTaskMessageListType, analyze_process_context._chat_history
             ),
             timeout=60,
         )
@@ -117,7 +117,7 @@ def execute_reflection(
             username=analyze_process_context._authenticated_user,
             prompt=builtin_prompt.reflection_message(),
             chat_history=cast(
-                RequestTaskMessageType, analyze_process_context._chat_history
+                RequestTaskMessageListType, analyze_process_context._chat_history
             ),
             timeout=60,
         )
