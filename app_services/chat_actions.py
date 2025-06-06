@@ -12,7 +12,8 @@ from langgraph_services.langgraph_request_task import (
 from typing import cast
 from app_services.oauth_user import get_authenticated_user
 import db.redis_user_session
-import db.pgsql_user_session
+
+# import db.pgsql_user_session
 import db.redis_user
 import app_services.user_session
 import prompt.builtin as builtin_prompt
@@ -92,11 +93,6 @@ async def handle_chat_action(
 
         # 更新用户会话到 Redis 和 PostgreSQL
         db.redis_user_session.update_user_session(
-            user_session=current_user_session,
-            new_messages=messages,
-        )
-
-        db.pgsql_user_session.update_user_session(
             user_session=current_user_session,
             new_messages=messages,
         )

@@ -78,15 +78,9 @@ def get_user_session(username: str) -> UserSession:
             logger.debug(f"Deserialized message: {message}")
             chat_history.append(message)
 
-    # 获取用户会话的 session_id
-    session_id: Optional[UUID] = None
-    if "session_id" in user_session_data:
-        session_id = UUID(user_session_data["session_id"])
-
     return UserSession(
         username=username,
         chat_history=chat_history,
-        session_id=session_id,
     )
 
 
@@ -96,7 +90,6 @@ def get_user_session(username: str) -> UserSession:
 def set_user_session(user_session: UserSession) -> None:
 
     assert user_session.username != "", "username cannot be an empty string."
-    assert user_session.session_id != None, "session_id cannot be None."
 
     """更新用户会话，包括基本信息和聊天历史"""
     user_session_key = _user_session_key(user_session.username)
@@ -106,7 +99,6 @@ def set_user_session(user_session: UserSession) -> None:
         user_session_key,
         {
             "username": user_session.username,
-            "session_id": str(user_session.session_id),
         },
     )
 

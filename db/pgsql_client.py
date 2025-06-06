@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import (
     sessionmaker,
 )
@@ -22,8 +22,18 @@ def reset_database() -> None:
     清空数据库并重建表结构
     注意：该方法会删除所有数据，只适用于开发环境
     """
-    # 删除所有现有表
-    Base.metadata.drop_all(bind=engine)
+    # 使用直接的SQL命令执行级联删除
+    with engine.begin() as conn:
+        # 先禁用约束检查，然后删除所有表
+        conn.execute(text("SET CONSTRAINTS ALL DEFERRED"))
+
+        # 对所有表使用CASCADE选项执行删除
+        tables = conn.execute(
+            text("SELECT tablename FROM pg_tables WHERE schemaname = 'public'")
+        ).fetchall()
+
+        for table in tables:
+            conn.execute(text(f'DROP TABLE IF EXISTS "{table[0]}" CASCADE'))
 
     # 重新创建所有表
     Base.metadata.create_all(bind=engine)

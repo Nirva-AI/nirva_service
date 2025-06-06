@@ -39,7 +39,7 @@ class AnalyzerServerConfig(BaseModel):
 class AppserviceServerConfig(BaseModel):
     server_ip_address: str = "0.0.0.0"
     server_port: int = 8000
-    local_network_ip: str = "192.168.2.70"
+    local_network_ip: str = "192.168.22.108"
 
 
 ##################################################################################################################
