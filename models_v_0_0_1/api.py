@@ -4,7 +4,6 @@ from pydantic import BaseModel
 from .registry import register_base_model_class
 from .prompt import LabelExtractionResponse, ReflectionResponse
 from datetime import datetime
-from langchain_core.messages import BaseMessage
 
 ################################################################################################################
 ################################################################################################################
@@ -28,29 +27,16 @@ class URLConfigurationResponse(BaseModel):
 @final
 @register_base_model_class
 class ChatActionRequest(BaseModel):
-    content: str = ""
+    content: str
+    chat_history_types: List[str]
+    chat_history_contents: List[str]
 
 
 @final
 @register_base_model_class
 class ChatActionResponse(BaseModel):
-    message: str = ""
-    highest_sequence: int = 0
-
-
-# @final
-# @register_base_model_class
-# class CheckSessionResponse(BaseModel):
-#     highest_sequence: int = 0
-
-
-# @final
-# @register_base_model_class
-# class FetchChatHistoryResponse(BaseModel):
-
-#     messages: List[BaseMessage]
-#     total_count: int
-#     has_more: bool
+    human_message_content: str
+    ai_response_content: str
 
 
 ################################################################################################################

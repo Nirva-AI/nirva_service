@@ -1,21 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status
 from app_services.app_service_server import AppserviceServerInstance
 from models_v_0_0_1 import (
     ChatActionRequest,
     ChatActionResponse,
-    # CheckSessionResponse,
-    # FetchChatHistoryResponse,
 )
 from loguru import logger
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langgraph_services.langgraph_request_task import (
     LanggraphRequestTask,
 )
-from typing import cast
+from typing import List, cast
 from app_services.oauth_user import get_authenticated_user
-import db.redis_user_session
 import db.redis_user
-import app_services.user_session
 import prompt.builtin as builtin_prompt
 from langgraph_services.langgraph_models import (
     RequestTaskMessageType,
@@ -35,6 +31,30 @@ from langgraph_services.langgraph_models import (
 
 ###################################################################################################################################################################
 chat_action_router = APIRouter()
+
+
+###################################################################################################################################################################
+def _assemble_chat_messages(
+    messages_type: List[str], messages_content: List[str]
+) -> RequestTaskMessageType:
+    """
+    根据消息类型和内容构建聊天历史消息列表。
+    """
+    assert len(messages_type) == len(messages_content), "消息类型和内容长度不匹配。"
+
+    ret_messages: RequestTaskMessageType = []
+    for message_type, message_content in zip(messages_type, messages_content):
+        if message_type == "system":
+            ret_messages.append(SystemMessage(content=message_content))
+        elif message_type == "human":
+            ret_messages.append(HumanMessage(content=message_content))
+        elif message_type == "ai":
+            ret_messages.append(AIMessage(content=message_content))
+        else:
+            logger.warning(f"Unknown message type: {message_type}")
+            raise ValueError(f"Unknown message type: {message_type}")
+
+    return ret_messages
 
 
 ###################################################################################################################################################################
@@ -61,11 +81,6 @@ async def handle_chat_action(
         assert (
             display_name != ""
         ), f"用户 {authenticated_user} 的显示名称不能为空，请先设置显示名称。"
-        current_user_session = (
-            app_services.user_session.retrieve_or_initialize_user_session(
-                authenticated_user
-            )
-        )
 
         prompt = builtin_prompt.user_session_chat_message(
             username=authenticated_user,
@@ -83,12 +98,17 @@ async def handle_chat_action(
             ),
         ]
 
+        chat_history = _assemble_chat_messages(
+            messages_type=request_data.chat_history_types,
+            messages_content=request_data.chat_history_contents,
+        )
+
         request_task = LanggraphRequestTask(
             username=authenticated_user,
             prompt=prompt,
             chat_history=cast(
                 RequestTaskMessageType,
-                system_messages + current_user_session.chat_history,
+                system_messages + chat_history,
             ),
         )
 
@@ -101,28 +121,22 @@ async def handle_chat_action(
             )
 
         # 准备添加消息
-        messages = [
+        messages: RequestTaskMessageType = [
             HumanMessage(content=prompt),
             AIMessage(content=request_task.last_response_message_content),
         ]
 
         # 将消息添加到会话中
-        current_user_session.chat_history.extend(messages)
-
-        # 更新用户会话到 Redis
-        db.redis_user_session.append_messages_to_session(
-            user_session=current_user_session,
-            new_messages=messages,
-        )
+        chat_history.extend(messages)
 
         # 打印聊天记录
-        for msg in system_messages + current_user_session.chat_history:
+        for msg in system_messages + chat_history:
             logger.warning(msg.content)
 
         # 返回响应
         return ChatActionResponse(
-            message=request_task.last_response_message_content,
-            highest_sequence=len(current_user_session.chat_history),
+            human_message_content=prompt,
+            ai_response_content=request_task.last_response_message_content,
         )
 
     except Exception as e:
@@ -131,96 +145,6 @@ async def handle_chat_action(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"处理请求失败: {e}",
         )
-
-
-###################################################################################################################################################################
-###################################################################################################################################################################
-###################################################################################################################################################################
-# @chat_action_router.get(
-#     path="/action/fetch_chat_history/v1/", response_model=FetchChatHistoryResponse
-# )
-# async def handle_fetch_chat_history(
-#     index: int = Query(0, ge=0, description="获取历史记录的起始索引"),
-#     length: int = Query(10, gt=0, le=100, description="要获取的消息数量"),
-#     authenticated_user: str = Depends(get_authenticated_user),
-# ) -> FetchChatHistoryResponse:
-#     """
-#     获取用户聊天历史的指定范围内容
-
-#     参数:
-#     - index: 起始索引，从0开始
-#     - length: 要获取的消息数量，最大100条
-#     """
-#     logger.info(f"/action/fetch_chat_history/v1/: index={index}, length={length}")
-
-#     try:
-#         # 获取用户会话
-#         current_user_session = (
-#             app_services.user_session.retrieve_or_initialize_user_session(
-#                 authenticated_user
-#             )
-#         )
-
-#         # 获取聊天历史总长度
-#         total_count = len(current_user_session.chat_history)
-
-#         # 检查索引是否有效
-#         if index >= total_count:
-#             # 索引超出范围，返回空结果
-#             return FetchChatHistoryResponse(
-#                 messages=[], total_count=total_count, has_more=False
-#             )
-
-#         # 计算实际结束索引（考虑边界）
-#         end_index = min(index + length, total_count)
-
-#         # 获取指定范围的消息
-#         messages_slice = current_user_session.chat_history[index:end_index]
-
-#         # 构建响应
-#         return FetchChatHistoryResponse(
-#             messages=messages_slice,
-#             total_count=total_count,
-#             has_more=(end_index < total_count),
-#         )
-
-#     except Exception as e:
-#         logger.error(f"获取聊天历史失败: {e}")
-#         raise HTTPException(
-#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#             detail=f"获取聊天历史失败: {e}",
-#         )
-
-
-# ###################################################################################################################################################################
-# ###################################################################################################################################################################
-# ###################################################################################################################################################################
-# @chat_action_router.get(
-#     path="/action/check_session/v1/", response_model=CheckSessionResponse
-# )
-# async def handle_check_session(
-#     authenticated_user: str = Depends(get_authenticated_user),
-# ) -> CheckSessionResponse:
-#     logger.info(f"/action/check_session/v1/: {authenticated_user}")
-#     try:
-#         # 获取用户会话
-#         current_user_session = (
-#             app_services.user_session.retrieve_or_initialize_user_session(
-#                 authenticated_user
-#             )
-#         )
-
-#         # 返回会话的最高序列号
-#         return CheckSessionResponse(
-#             highest_sequence=len(current_user_session.chat_history),
-#         )
-
-#     except Exception as e:
-#         logger.error(f"检查会话失败: {e}")
-#         raise HTTPException(
-#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#             detail=f"检查会话失败: {e}",
-#         )
 
 
 ###################################################################################################################################################################
