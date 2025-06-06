@@ -36,7 +36,7 @@ class MessageRole(IntEnum):
 @register_base_model_class
 class ChatMessage(BaseModel):
     id: str
-    role: int  # MessageRole 0: system, 1: human, 2: ai
+    role: MessageRole  # MessageRole 0: system, 1: human, 2: ai
     content: str
     time_stamp: str
     tags: Optional[List[str]] = None
@@ -46,7 +46,7 @@ class ChatMessage(BaseModel):
 @register_base_model_class
 class ChatActionRequest(BaseModel):
     human_message: ChatMessage
-    chat_history: List[ChatMessage] = []
+    chat_history: List[ChatMessage]
 
 
 @final

@@ -39,8 +39,8 @@ def _assemble_chat_messages(
             ret_messages.append(HumanMessage(content=msg.content))
         elif msg.role == MessageRole.AI:
             ret_messages.append(AIMessage(content=msg.content))
-        else:
-            logger.warning(f"Unknown message role: {msg.role}")
+        # else:
+        #     logger.warning(f"Unknown message role: {msg.role}")
 
     return ret_messages
 
