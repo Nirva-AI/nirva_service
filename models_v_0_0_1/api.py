@@ -38,19 +38,19 @@ class ChatActionResponse(BaseModel):
     highest_sequence: int = 0
 
 
-@final
-@register_base_model_class
-class CheckSessionResponse(BaseModel):
-    highest_sequence: int = 0
+# @final
+# @register_base_model_class
+# class CheckSessionResponse(BaseModel):
+#     highest_sequence: int = 0
 
 
-@final
-@register_base_model_class
-class FetchChatHistoryResponse(BaseModel):
+# @final
+# @register_base_model_class
+# class FetchChatHistoryResponse(BaseModel):
 
-    messages: List[BaseMessage]
-    total_count: int
-    has_more: bool
+#     messages: List[BaseMessage]
+#     total_count: int
+#     has_more: bool
 
 
 ################################################################################################################

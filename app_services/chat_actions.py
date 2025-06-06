@@ -3,8 +3,8 @@ from app_services.app_service_server import AppserviceServerInstance
 from models_v_0_0_1 import (
     ChatActionRequest,
     ChatActionResponse,
-    CheckSessionResponse,
-    FetchChatHistoryResponse,
+    # CheckSessionResponse,
+    # FetchChatHistoryResponse,
 )
 from loguru import logger
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
@@ -136,91 +136,91 @@ async def handle_chat_action(
 ###################################################################################################################################################################
 ###################################################################################################################################################################
 ###################################################################################################################################################################
-@chat_action_router.get(
-    path="/action/fetch_chat_history/v1/", response_model=FetchChatHistoryResponse
-)
-async def handle_fetch_chat_history(
-    index: int = Query(0, ge=0, description="获取历史记录的起始索引"),
-    length: int = Query(10, gt=0, le=100, description="要获取的消息数量"),
-    authenticated_user: str = Depends(get_authenticated_user),
-) -> FetchChatHistoryResponse:
-    """
-    获取用户聊天历史的指定范围内容
+# @chat_action_router.get(
+#     path="/action/fetch_chat_history/v1/", response_model=FetchChatHistoryResponse
+# )
+# async def handle_fetch_chat_history(
+#     index: int = Query(0, ge=0, description="获取历史记录的起始索引"),
+#     length: int = Query(10, gt=0, le=100, description="要获取的消息数量"),
+#     authenticated_user: str = Depends(get_authenticated_user),
+# ) -> FetchChatHistoryResponse:
+#     """
+#     获取用户聊天历史的指定范围内容
 
-    参数:
-    - index: 起始索引，从0开始
-    - length: 要获取的消息数量，最大100条
-    """
-    logger.info(f"/action/fetch_chat_history/v1/: index={index}, length={length}")
+#     参数:
+#     - index: 起始索引，从0开始
+#     - length: 要获取的消息数量，最大100条
+#     """
+#     logger.info(f"/action/fetch_chat_history/v1/: index={index}, length={length}")
 
-    try:
-        # 获取用户会话
-        current_user_session = (
-            app_services.user_session.retrieve_or_initialize_user_session(
-                authenticated_user
-            )
-        )
+#     try:
+#         # 获取用户会话
+#         current_user_session = (
+#             app_services.user_session.retrieve_or_initialize_user_session(
+#                 authenticated_user
+#             )
+#         )
 
-        # 获取聊天历史总长度
-        total_count = len(current_user_session.chat_history)
+#         # 获取聊天历史总长度
+#         total_count = len(current_user_session.chat_history)
 
-        # 检查索引是否有效
-        if index >= total_count:
-            # 索引超出范围，返回空结果
-            return FetchChatHistoryResponse(
-                messages=[], total_count=total_count, has_more=False
-            )
+#         # 检查索引是否有效
+#         if index >= total_count:
+#             # 索引超出范围，返回空结果
+#             return FetchChatHistoryResponse(
+#                 messages=[], total_count=total_count, has_more=False
+#             )
 
-        # 计算实际结束索引（考虑边界）
-        end_index = min(index + length, total_count)
+#         # 计算实际结束索引（考虑边界）
+#         end_index = min(index + length, total_count)
 
-        # 获取指定范围的消息
-        messages_slice = current_user_session.chat_history[index:end_index]
+#         # 获取指定范围的消息
+#         messages_slice = current_user_session.chat_history[index:end_index]
 
-        # 构建响应
-        return FetchChatHistoryResponse(
-            messages=messages_slice,
-            total_count=total_count,
-            has_more=(end_index < total_count),
-        )
+#         # 构建响应
+#         return FetchChatHistoryResponse(
+#             messages=messages_slice,
+#             total_count=total_count,
+#             has_more=(end_index < total_count),
+#         )
 
-    except Exception as e:
-        logger.error(f"获取聊天历史失败: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"获取聊天历史失败: {e}",
-        )
+#     except Exception as e:
+#         logger.error(f"获取聊天历史失败: {e}")
+#         raise HTTPException(
+#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             detail=f"获取聊天历史失败: {e}",
+#         )
 
 
-###################################################################################################################################################################
-###################################################################################################################################################################
-###################################################################################################################################################################
-@chat_action_router.get(
-    path="/action/check_session/v1/", response_model=CheckSessionResponse
-)
-async def handle_check_session(
-    authenticated_user: str = Depends(get_authenticated_user),
-) -> CheckSessionResponse:
-    logger.info(f"/action/check_session/v1/: {authenticated_user}")
-    try:
-        # 获取用户会话
-        current_user_session = (
-            app_services.user_session.retrieve_or_initialize_user_session(
-                authenticated_user
-            )
-        )
+# ###################################################################################################################################################################
+# ###################################################################################################################################################################
+# ###################################################################################################################################################################
+# @chat_action_router.get(
+#     path="/action/check_session/v1/", response_model=CheckSessionResponse
+# )
+# async def handle_check_session(
+#     authenticated_user: str = Depends(get_authenticated_user),
+# ) -> CheckSessionResponse:
+#     logger.info(f"/action/check_session/v1/: {authenticated_user}")
+#     try:
+#         # 获取用户会话
+#         current_user_session = (
+#             app_services.user_session.retrieve_or_initialize_user_session(
+#                 authenticated_user
+#             )
+#         )
 
-        # 返回会话的最高序列号
-        return CheckSessionResponse(
-            highest_sequence=len(current_user_session.chat_history),
-        )
+#         # 返回会话的最高序列号
+#         return CheckSessionResponse(
+#             highest_sequence=len(current_user_session.chat_history),
+#         )
 
-    except Exception as e:
-        logger.error(f"检查会话失败: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"检查会话失败: {e}",
-        )
+#     except Exception as e:
+#         logger.error(f"检查会话失败: {e}")
+#         raise HTTPException(
+#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             detail=f"检查会话失败: {e}",
+#         )
 
 
 ###################################################################################################################################################################
