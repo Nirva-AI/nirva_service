@@ -77,6 +77,7 @@ async def handle_chat_action(
             username=authenticated_user,
             display_name=display_name,
             content=request_data.human_message.content,
+            date_time=request_data.human_message.time_stamp,
         )
 
         # 系统提示词。
@@ -91,6 +92,9 @@ async def handle_chat_action(
         chat_history = _assemble_chat_messages(request_data.chat_history)
 
         # 构建请求任务
+        # 后续如果面临 chat_history 特别大的情况，可以开新的api，将 chat_history 分批处理，缓存到redis中, 加超时机制。这样可以减小客户端上传的负担。
+        # 目前先不做，太早了。再一个，本身LLM的上下文窗口就有限制，chat_history即使能传输很大，也不一定能处理。
+        # 目前策略: 服务器不存客户端的任何对话历史，客户端只上传当前对话的内容和历史。
         request_task = LanggraphRequestTask(
             username=authenticated_user,
             prompt=prompt,
@@ -125,7 +129,7 @@ async def handle_chat_action(
             + [HumanMessage(content=prompt)]
             + request_task._response.messages
         ):
-            logger.warning(msg.content)
+            logger.info(msg.content)
 
         # 返回响应
         return ChatActionResponse(
