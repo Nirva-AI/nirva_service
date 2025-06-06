@@ -29,6 +29,8 @@ async def get_url_config(
             "refresh": base + "refresh/v1/",
             "logout": base + "logout/v1/",
             "chat": base + "action/chat/v1/",
+            "check_session": base + "action/check_session/v1/",
+            "fetch_chat_history": base + "action/fetch_chat_history/v1/",
             "analyze": base + "action/analyze/v1/",
             "upload_transcript": base + "action/upload_transcript/v1/",
         },

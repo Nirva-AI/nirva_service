@@ -5,7 +5,7 @@ from datetime import datetime
 
 
 ###############################################################################################################################################
-def get_or_create_user_session(username: str) -> UserSession:
+def retrieve_or_initialize_user_session(username: str) -> UserSession:
     """获取用户会话，如果不存在则创建新的会话"""
     assert username != "", "username cannot be an empty string."
 

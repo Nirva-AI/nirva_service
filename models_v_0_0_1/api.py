@@ -1,9 +1,10 @@
 # import datetime
-from typing import final
+from typing import final, List
 from pydantic import BaseModel
 from .registry import register_base_model_class
 from .prompt import LabelExtractionResponse, ReflectionResponse
 from datetime import datetime
+from langchain_core.messages import BaseMessage
 
 ################################################################################################################
 ################################################################################################################
@@ -34,6 +35,22 @@ class ChatActionRequest(BaseModel):
 @register_base_model_class
 class ChatActionResponse(BaseModel):
     message: str = ""
+    highest_sequence: int = 0
+
+
+@final
+@register_base_model_class
+class CheckSessionResponse(BaseModel):
+    highest_sequence: int = 0
+
+
+@final
+@register_base_model_class
+class FetchChatHistoryResponse(BaseModel):
+
+    messages: List[BaseMessage]
+    total_count: int
+    has_more: bool
 
 
 ################################################################################################################
