@@ -4,7 +4,7 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, Base
 import db.redis_client
 import json
 from loguru import logger
-from uuid import UUID
+from datetime import datetime
 
 
 ###############################################################################################################################################
@@ -66,6 +66,7 @@ def get_user_session(username: str) -> UserSession:
         return UserSession(
             username="",
             chat_history=[],
+            update_at=datetime.now().isoformat(),
         )
 
     # 获取对话历史
@@ -81,6 +82,7 @@ def get_user_session(username: str) -> UserSession:
     return UserSession(
         username=username,
         chat_history=chat_history,
+        update_at=user_session_data.get("update_at", datetime.now().isoformat()),
     )
 
 
@@ -99,6 +101,7 @@ def set_user_session(user_session: UserSession) -> None:
         user_session_key,
         {
             "username": user_session.username,
+            "update_at": user_session.update_at,
         },
     )
 
@@ -127,11 +130,21 @@ def delete_user_session(username: str) -> None:
 
 
 ###############################################################################################################################################
-def update_user_session(
+def append_messages_to_session(
     user_session: UserSession,
     new_messages: List[BaseMessage],
 ) -> None:
-    """向用户会话添加新消息"""
+
+    user_session_key = _user_session_key(user_session.username)
+    # 更新用户基本信息
+    db.redis_client.redis_hset(
+        user_session_key,
+        {
+            "username": user_session.username,
+            "update_at": user_session.update_at,
+        },
+    )
+
     # 更新Redis中的聊天历史
     history_key = _user_history_key(user_session.username)
     for message in new_messages:

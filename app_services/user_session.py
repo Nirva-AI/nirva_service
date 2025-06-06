@@ -3,6 +3,7 @@ from models_v_0_0_1.session import UserSession
 import db.redis_user_session
 from loguru import logger
 import prompt.builtin as builtin_prompt
+from datetime import datetime
 
 
 ###############################################################################################################################################
@@ -32,6 +33,7 @@ def get_or_create_user_session(username: str, display_name: str) -> UserSession:
                 )
             ),
         ],
+        update_at=datetime.now().isoformat(),
     )
 
     logger.info(

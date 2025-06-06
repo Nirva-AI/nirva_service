@@ -10,9 +10,10 @@ def save_user(username: str, hashed_password: str, display_name: str) -> UserDB:
     参数:
         username: 用户名
         hashed_password: 哈希后的密码
+        display_name: 显示名称
 
     返回:
-        UserDB 对象
+        UserDB 对象，包含创建时间和更新时间
     """
     db = SessionLocal()
     try:
@@ -20,6 +21,7 @@ def save_user(username: str, hashed_password: str, display_name: str) -> UserDB:
             username=username,
             hashed_password=hashed_password,
             display_name=display_name,
+            # created_at 和 updated_at 会自动处理
         )
         db.add(user)
         db.commit()

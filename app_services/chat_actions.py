@@ -92,7 +92,7 @@ async def handle_chat_action(
         current_user_session.chat_history.extend(messages)
 
         # 更新用户会话到 Redis 和 PostgreSQL
-        db.redis_user_session.update_user_session(
+        db.redis_user_session.append_messages_to_session(
             user_session=current_user_session,
             new_messages=messages,
         )
