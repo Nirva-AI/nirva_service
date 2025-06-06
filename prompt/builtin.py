@@ -16,7 +16,7 @@ def user_session_chat_message(username: str, display_name: str, content: str) ->
     """生成用户会话的聊天消息"""
 
     return f"""# This is a conversation message from {display_name}
-    Content: {content}"""
+Content: {content}"""
 
 
 ###############################################################################################################################################

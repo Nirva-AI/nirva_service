@@ -5,21 +5,31 @@ from models_v_0_0_1 import (
     ChatActionResponse,
 )
 from loguru import logger
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langgraph_services.langgraph_request_task import (
     LanggraphRequestTask,
 )
 from typing import cast
 from app_services.oauth_user import get_authenticated_user
 import db.redis_user_session
-
-# import db.pgsql_user_session
 import db.redis_user
 import app_services.user_session
 import prompt.builtin as builtin_prompt
 from langgraph_services.langgraph_models import (
     RequestTaskMessageType,
 )
+
+
+# 测试健康检查。
+# services_health = (
+#     await appservice_server.langgraph_service.check_services_health()
+# )
+
+# 测试。
+# if request_data.content != "":
+#     return ChatActionResponse(
+#         message=f"收到: {request_data.content}",
+#     )
 
 ###################################################################################################################################################################
 chat_action_router = APIRouter()
@@ -39,23 +49,12 @@ async def handle_chat_action(
 
     try:
 
-        # 测试健康检查。
-        # services_health = (
-        #     await appservice_server.langgraph_service.check_services_health()
-        # )
-
-        # 测试。
-        # if request_data.content != "":
-        #     return ChatActionResponse(
-        #         message=f"收到: {request_data.content}",
-        #     )
-
         display_name = db.redis_user.get_user_display_name(username=authenticated_user)
         assert (
             display_name != ""
         ), f"用户 {authenticated_user} 的显示名称不能为空，请先设置显示名称。"
         current_user_session = app_services.user_session.get_or_create_user_session(
-            authenticated_user, display_name
+            authenticated_user
         )
 
         prompt = builtin_prompt.user_session_chat_message(
@@ -65,12 +64,21 @@ async def handle_chat_action(
         )
 
         # 组织请求
+        system_messages = [
+            SystemMessage(
+                content=builtin_prompt.user_session_system_message(
+                    authenticated_user,
+                    display_name,
+                )
+            ),
+        ]
+
         request_task = LanggraphRequestTask(
             username=authenticated_user,
             prompt=prompt,
             chat_history=cast(
                 RequestTaskMessageType,
-                current_user_session.chat_history,
+                system_messages + current_user_session.chat_history,
             ),
         )
 
@@ -98,7 +106,7 @@ async def handle_chat_action(
         )
 
         # 打印聊天记录
-        for msg in current_user_session.chat_history:
+        for msg in system_messages + current_user_session.chat_history:
             logger.info(msg.content)
 
         # 返回响应

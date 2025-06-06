@@ -1,13 +1,11 @@
-from langchain_core.messages import SystemMessage
 from models_v_0_0_1.session import UserSession
 import db.redis_user_session
 from loguru import logger
-import prompt.builtin as builtin_prompt
 from datetime import datetime
 
 
 ###############################################################################################################################################
-def get_or_create_user_session(username: str, display_name: str) -> UserSession:
+def get_or_create_user_session(username: str) -> UserSession:
     """获取用户会话，如果不存在则创建新的会话"""
     assert username != "", "username cannot be an empty string."
 
@@ -25,14 +23,7 @@ def get_or_create_user_session(username: str, display_name: str) -> UserSession:
     # 不存在就创建一个新的用户会话
     new_session = UserSession(
         username=username,
-        chat_history=[
-            SystemMessage(
-                content=builtin_prompt.user_session_system_message(
-                    username,
-                    display_name,
-                )
-            ),
-        ],
+        chat_history=[],
         update_at=datetime.now().isoformat(),
     )
 
