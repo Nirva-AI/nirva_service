@@ -369,12 +369,12 @@ async def _post_analyze_action(context: SimulatorContext, user_input: str) -> No
         return
 
     request_data = AnalyzeActionRequest(
-        time_stamp=parse_info[0],
+        time_stamp=parse_info[0].isoformat(),
         file_number=parse_info[1],
     )
     response = _safe_post(
         context.analyze_action_url,
-        data=request_data.model_dump(mode="json"),
+        data=request_data.model_dump(),
         context=context,  # 传递整个context而不仅仅是token
     )
 
@@ -385,7 +385,7 @@ async def _post_analyze_action(context: SimulatorContext, user_input: str) -> No
         # LOGS_DIR
         log_file_path = LOGS_DIR / f"analyze_result_{upload_file}.json"
         log_file_path.write_text(
-            response_model.model_dump_json(),
+            response_model.journal_file.model_dump_json(),
             encoding="utf-8",
         )
 
@@ -410,8 +410,6 @@ def _parse_data_from_filename(
 
         # 创建日期时间对象
         date_time = datetime.datetime(year, month, day)
-        # isof = date_time.isoformat()  # 确保日期时间格式正确
-
         return date_time, file_number, file_suffix
     except ValueError as e:
         logger.error(f"解析文件名时出错: {e}, 文件名: {filename}")
@@ -446,13 +444,13 @@ async def _post_upload_transcript_action(
 
     request_data = UploadTranscriptActionRequest(
         transcript_content=transcript_content,
-        time_stamp=parse_info[0],
+        time_stamp=parse_info[0].isoformat(),
         file_number=parse_info[1],
         file_suffix=parse_info[2],
     )
     response = _safe_post(
         context.upload_transcript_url,
-        data=request_data.model_dump(mode="json"),
+        data=request_data.model_dump(),
         context=context,  # 传递整个context而不仅仅是token
     )
     if response is not None:
@@ -505,10 +503,8 @@ async def _simulator() -> None:
                 await _post_analyze_action(simulator_context, user_input)
 
             elif "/upload_transcript" in user_input:
-
                 # /upload_transcript nirva-2025-04-19-00.txt
                 # /upload_transcript nirva-2025-05-09-00.txt
-
                 copy_user_input = str(user_input)
                 await _post_upload_transcript_action(simulator_context, user_input)
                 copy_user_input = copy_user_input.replace(
@@ -521,7 +517,6 @@ async def _simulator() -> None:
 
         except Exception as e:
             logger.error(f"Exception: {e}")
-            # break
 
     ## 结束了
     logger.info("Simulate client exit!")
@@ -535,8 +530,6 @@ async def main() -> None:
 ###########################################################################################################################
 
 if __name__ == "__main__":
-
-    # _parse_data_from_filename("nirva-2025-04-19-00.txt")
 
     import asyncio
 

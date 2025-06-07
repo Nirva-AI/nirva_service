@@ -1,10 +1,8 @@
-# import datetime
 from typing import Optional, final, List
 from pydantic import BaseModel
 from .registry import register_base_model_class
-from .prompt import LabelExtractionResponse, ReflectionResponse
-from datetime import datetime
 from enum import IntEnum
+from .journal import JournalFile
 
 ################################################################################################################
 ################################################################################################################
@@ -63,18 +61,14 @@ class ChatActionResponse(BaseModel):
 @final
 @register_base_model_class
 class AnalyzeActionRequest(BaseModel):
-    time_stamp: datetime = datetime.now()
-    file_number: int = 0
-
-    model_config = {"json_encoders": {datetime: lambda v: v.isoformat()}}
+    time_stamp: str
+    file_number: int
 
 
 @final
 @register_base_model_class
 class AnalyzeActionResponse(BaseModel):
-    label_extraction: LabelExtractionResponse | None = None
-    reflection: ReflectionResponse | None = None
-    message: str = ""
+    journal_file: JournalFile
 
 
 ################################################################################################################
@@ -85,12 +79,10 @@ class AnalyzeActionResponse(BaseModel):
 @final
 @register_base_model_class
 class UploadTranscriptActionRequest(BaseModel):
-    transcript_content: str = ""
-    time_stamp: datetime = datetime.now()
-    file_number: int = 0
-    file_suffix: str = "txt"
-
-    model_config = {"json_encoders": {datetime: lambda v: v.isoformat()}}
+    transcript_content: str
+    time_stamp: str
+    file_number: int
+    file_suffix: str
 
 
 @final
