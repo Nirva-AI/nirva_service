@@ -24,6 +24,7 @@ from langgraph_services.langgraph_request_task import (
 from typing import List, Optional, cast
 from app_services.oauth_user import get_authenticated_user
 import db.redis_user
+import db.pgsql_journal_file
 import prompt.builtin as builtin_prompt
 import utils.format_string as format_string
 from langgraph_services.langgraph_models import (
@@ -307,10 +308,23 @@ async def handle_analyze_action(
                 detail="转录内容不能为空。",
             )
 
-        # return _gen_test_analyze_action_request(
-        #     authenticated_user=authenticated_user,
-        #     time_stamp=request_data.time_stamp,
-        # )
+        ## 测试的代码！！！！！！!!!!!!!!!!!!
+        ## 测试的代码！！！！！！!!!!!!!!!!!!
+        ## 测试的代码！！！！！！!!!!!!!!!!!!
+        test_response = _gen_test_analyze_action_request(
+            authenticated_user=authenticated_user,
+            time_stamp=request_data.time_stamp,
+        )
+
+        db.pgsql_journal_file.save_or_update_journal_file(
+            username=authenticated_user,
+            journal_file=test_response.journal_file,
+        )
+
+        return test_response
+
+        ## 测试的代码！！！！！！!!!!!!!!!!!!
+        ## 测试的代码！！！！！！!!!!!!!!!!!!
 
         # 正式的步骤。
         analyze_process_context = AnalyzeProcessContext(
