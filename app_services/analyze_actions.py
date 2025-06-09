@@ -34,6 +34,11 @@ import time
 import db.redis_upload_transcript
 from datetime import datetime
 
+from fastapi import BackgroundTasks
+
+# from datetime import datetime
+import db.redis_task as redis_task
+
 
 class AnalyzeProcessContext:
 
@@ -258,6 +263,160 @@ def _gen_test_analyze_action_request(
             ),
         ),
     )
+
+
+###################################################################################################################################################################
+async def process_analyze_action(
+    username: str,
+    task_id: str,
+    request_data: AnalyzeActionRequest,
+    appservice_server: AppserviceServerInstance,
+):
+    """后台处理分析任务"""
+    try:
+        # 更新任务状态为处理中
+        redis_task.update_task_status(
+            username=username, task_id=task_id, status=redis_task.TaskStatus.PROCESSING
+        )
+
+        # 开始计时
+        start_time = time.time()
+
+        # 字符串转换为 datetime 对象
+        timestamp_datetime = datetime.fromisoformat(request_data.time_stamp)
+
+        # 检查是否已存在日记文件
+        journal_file_db = db.pgsql_journal_file.get_journal_file(
+            username=username,
+            time_stamp=request_data.time_stamp,
+        )
+
+        if journal_file_db is not None:
+            # 如果已经存在日记文件，直接返回
+            logger.info(
+                f"已存在日记文件: 用户={username}, 时间戳={request_data.time_stamp}"
+            )
+            journal_file = JournalFile.model_validate_json(journal_file_db.content_json)
+
+            # 更新任务状态为完成并存储结果
+            redis_task.update_task_status(
+                username=username,
+                task_id=task_id,
+                status=redis_task.TaskStatus.COMPLETED,
+                result={"journal_file": journal_file.model_dump()},
+            )
+            return
+
+        # 检查转录内容
+        if not db.redis_upload_transcript.is_transcript_stored(
+            username=username,
+            time_stamp=timestamp_datetime,
+            file_number=request_data.file_number,
+        ):
+            redis_task.update_task_status(
+                username=username,
+                task_id=task_id,
+                status=redis_task.TaskStatus.FAILED,
+                error="转录内容未找到，请先上传转录内容。",
+            )
+            return
+
+        # 获取转录内容
+        transcript_content = db.redis_upload_transcript.get_transcript(
+            username=username,
+            time_stamp=timestamp_datetime,
+            file_number=request_data.file_number,
+        )
+        if transcript_content.strip() == "":
+            redis_task.update_task_status(
+                username=username,
+                task_id=task_id,
+                status=redis_task.TaskStatus.FAILED,
+                error="转录内容不能为空。",
+            )
+            return
+
+        # 正式的分析步骤
+        analyze_process_context = AnalyzeProcessContext(
+            authenticated_user=username,
+            chat_history=[
+                SystemMessage(
+                    content=builtin_prompt.user_session_system_message(
+                        username, db.redis_user.get_user_display_name(username=username)
+                    )
+                ),
+                HumanMessage(content=builtin_prompt.event_segmentation_message()),
+                HumanMessage(
+                    content=builtin_prompt.transcript_message(
+                        formatted_date=request_data.time_stamp,
+                        transcript_content=transcript_content,
+                    )
+                ),
+            ],
+            appservice_server=appservice_server,
+        )
+
+        # 步骤1~2: 标签提取过程
+        _execute_label_extraction(
+            analyze_process_context=analyze_process_context,
+        )
+        if analyze_process_context._label_extraction_response is None:
+            redis_task.update_task_status(
+                username=username,
+                task_id=task_id,
+                status=redis_task.TaskStatus.FAILED,
+                error="标签提取过程未返回有效响应。",
+            )
+            return
+
+        # 步骤3: 反思过程
+        _execute_reflection(
+            analyze_process_context=analyze_process_context,
+        )
+        if analyze_process_context._reflection_response is None:
+            redis_task.update_task_status(
+                username=username,
+                task_id=task_id,
+                status=redis_task.TaskStatus.FAILED,
+                error="反思过程未返回有效响应。",
+            )
+            return
+
+        # 构建数据
+        journal_file = JournalFile(
+            username=username,
+            time_stamp=request_data.time_stamp,
+            events=analyze_process_context._label_extraction_response.events,
+            daily_reflection=analyze_process_context._reflection_response.daily_reflection,
+        )
+
+        # 存储到数据库
+        db.pgsql_journal_file.save_or_update_journal_file(
+            username=username,
+            journal_file=journal_file,
+        )
+
+        # 计算执行时间
+        end_time = time.time()
+        execution_time = end_time - start_time
+        logger.info(f"分析过程总执行时间: {execution_time:.2f} 秒")
+
+        # 更新任务状态为完成
+        redis_task.update_task_status(
+            username=username,
+            task_id=task_id,
+            status=redis_task.TaskStatus.COMPLETED,
+            result={"journal_file": journal_file.model_dump()},
+        )
+
+    except Exception as e:
+        logger.error(f"处理分析任务失败: {e}")
+        redis_task.update_task_status(
+            username=username,
+            task_id=task_id,
+            status=redis_task.TaskStatus.FAILED,
+            error=str(e),
+        )
 
 
 ###################################################################################################################################################################

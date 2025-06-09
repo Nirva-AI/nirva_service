@@ -311,6 +311,27 @@ def redis_get(name: str) -> Optional[str]:
 
 
 ###################################################################################################
+def redis_hmset(name: str, mapping_data: Mapping[str, RedisValueType]) -> None:
+    """
+    设置Redis哈希表的多个字段。
+
+    参数:
+        name: 键名
+        mapping_data: 要设置的字段-值映射
+
+    抛出:
+        redis.RedisError: 当Redis操作失败时
+    """
+    try:
+        redis_client = _get_redis_instance()
+        # 直接使用mapping_data，不需要转换
+        redis_client.hmset(name=name, mapping=mapping_data)  # type: ignore[arg-type]
+    except redis.RedisError as e:
+        logger.error(f"Redis error while setting data for {name}: {e}")
+        raise e
+
+
+###################################################################################################
 # 要清空 Redis 中的所有数据，您可以使用以下命令：
 
 # 方法一：使用 Redis CLI 命令行工具
