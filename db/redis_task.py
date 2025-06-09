@@ -1,6 +1,7 @@
 import json
-from typing import Dict, Any, final
-#from enum import StrEnum
+from typing import Dict, Any, Optional, final
+
+# from enum import StrEnum
 from enum import StrEnum, unique
 from datetime import datetime
 import db.redis_client
@@ -30,8 +31,8 @@ def create_task(username: str, task_type: str) -> str:
         "status": TaskStatus.PENDING,
         "task_type": task_type,
         "created_at": json.dumps(datetime.now(), default=str),
-        "result": None,
-        "error": None,
+        "result": "",  # 确保是字符串而非 None
+        "error": "",  # 确保是字符串而非 None
     }
 
     db.redis_client.redis_hmset(task_key, task_data)
@@ -44,13 +45,18 @@ def create_task(username: str, task_type: str) -> str:
 
 ###############################################################################################################################################
 def update_task_status(
-    username: str, task_id: str, status: TaskStatus, result=None, error=None
-):
+    username: str,
+    task_id: str,
+    status: TaskStatus,
+    result: Any = None,
+    error: Optional[str] = None,
+) -> None:
     """更新任务状态"""
 
     task_key = f"task:{username}:{task_id}"
 
-    updates = {"status": status}
+    # status 已经是 TaskStatus 类型，不需要修改
+    updates: Dict[str, Any] = {"status": status}
 
     if result is not None:
         updates["result"] = json.dumps(result)
@@ -62,7 +68,7 @@ def update_task_status(
 
 
 ###############################################################################################################################################
-def get_task_status(username: str, task_id: str) -> Dict[str, Any]:
+def get_task_status(username: str, task_id: str) -> Dict[str, Any] | None:
     """获取任务状态和结果"""
 
     task_key = f"task:{username}:{task_id}"
@@ -70,7 +76,7 @@ def get_task_status(username: str, task_id: str) -> Dict[str, Any]:
     task_data = db.redis_client.redis_hgetall(task_key)
 
     if not task_data:
-        return None
+        return None  # 现在返回类型是 Dict[str, Any] | None
 
     if "result" in task_data and task_data["result"]:
         task_data["result"] = json.loads(task_data["result"])

@@ -271,7 +271,7 @@ async def process_analyze_action(
     task_id: str,
     request_data: AnalyzeActionRequest,
     appservice_server: AppserviceServerInstance,
-):
+) -> None:
     """后台处理分析任务"""
     try:
         # 更新任务状态为处理中
