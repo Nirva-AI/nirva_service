@@ -65,7 +65,7 @@ def _execute_label_extraction(
             chat_history=cast(
                 RequestTaskMessageListType, analyze_process_context._chat_history
             ),
-            timeout=60,
+            timeout=60 * 5,
         )
 
         # 处理请求
@@ -129,7 +129,7 @@ def _execute_reflection(
             chat_history=cast(
                 RequestTaskMessageListType, analyze_process_context._chat_history
             ),
-            timeout=60,
+            timeout=60 * 5,
         )
 
         # 处理请求
@@ -311,17 +311,17 @@ async def handle_analyze_action(
         ## 测试的代码！！！！！！!!!!!!!!!!!!
         ## 测试的代码！！！！！！!!!!!!!!!!!!
         ## 测试的代码！！！！！！!!!!!!!!!!!!
-        test_response = _gen_test_analyze_action_request(
-            authenticated_user=authenticated_user,
-            time_stamp=request_data.time_stamp,
-        )
+        # test_response = _gen_test_analyze_action_request(
+        #     authenticated_user=authenticated_user,
+        #     time_stamp=request_data.time_stamp,
+        # )
 
-        db.pgsql_journal_file.save_or_update_journal_file(
-            username=authenticated_user,
-            journal_file=test_response.journal_file,
-        )
+        # db.pgsql_journal_file.save_or_update_journal_file(
+        #     username=authenticated_user,
+        #     journal_file=test_response.journal_file,
+        # )
 
-        return test_response
+        # return test_response
 
         ## 测试的代码！！！！！！!!!!!!!!!!!!
         ## 测试的代码！！！！！！!!!!!!!!!!!!
@@ -371,6 +371,20 @@ async def handle_analyze_action(
                 detail="反思过程未返回有效响应。",
             )
 
+        # 成功并构建数据
+        journal_file = JournalFile(
+            username=authenticated_user,
+            time_stamp=request_data.time_stamp,
+            events=analyze_process_context._label_extraction_response.events,
+            daily_reflection=analyze_process_context._reflection_response.daily_reflection,
+        )
+
+        # 存储一下！
+        db.pgsql_journal_file.save_or_update_journal_file(
+            username=authenticated_user,
+            journal_file=journal_file,
+        )
+
         # 计算执行时间并记录
         end_time = time.time()
         execution_time = end_time - start_time
@@ -378,12 +392,7 @@ async def handle_analyze_action(
 
         # 返回分析结果
         return AnalyzeActionResponse(
-            journal_file=JournalFile(
-                username=authenticated_user,
-                time_stamp=request_data.time_stamp,
-                events=analyze_process_context._label_extraction_response.events,
-                daily_reflection=analyze_process_context._reflection_response.daily_reflection,
-            ),
+            journal_file=journal_file,
         )
 
     except Exception as e:
@@ -403,7 +412,6 @@ async def handle_analyze_action(
 )
 async def handle_upload_transcript_action(
     request_data: UploadTranscriptActionRequest,
-    # appservice_server: AppserviceServerInstance,
     authenticated_user: str = Depends(get_authenticated_user),
 ) -> UploadTranscriptActionResponse:
 
@@ -425,9 +433,8 @@ async def handle_upload_transcript_action(
             time_stamp=timestamp_datetime,
             file_number=request_data.file_number,
         ):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="该转录内容已存在，请勿重复上传。",
+            return UploadTranscriptActionResponse(
+                message=f"该转录内容已存在: 用户={authenticated_user}, 时间戳={request_data.time_stamp}, 文件编号={request_data.file_number}",
             )
 
         # 存储转录内容到 Redis

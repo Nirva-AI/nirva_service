@@ -38,7 +38,7 @@ class LanggraphRequestTask:
     @property
     def last_response_message_content(self) -> str:
         if len(self._response.messages) == 0:
-            logger.warning(f"{self._username} response is empty.")
+            # logger.warning(f"{self._username} response is empty.")
             return ""
         return cast(str, self._response.messages[-1].content)
 

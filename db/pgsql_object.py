@@ -86,9 +86,11 @@ class JournalFileDB(UUIDBase):
     user: Mapped["UserDB"] = relationship("UserDB", back_populates="journal_files")
 
 
-# SELECT * FROM journal_files WHERE username = 'weilyupku@gmail.com';
+"""
+SELECT * FROM journal_files WHERE username = 'weilyupku@gmail.com';
 
-# SELECT jf.* 
-# FROM journal_files jf
-# JOIN users u ON jf.user_id = u.id
-# WHERE u.username = 'weilyupku@gmail.com';
+SELECT jf.*
+FROM journal_files jf
+JOIN users u ON jf.user_id = u.id
+WHERE u.username = 'weilyupku@gmail.com';
+"""

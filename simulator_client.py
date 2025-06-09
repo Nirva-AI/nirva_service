@@ -363,7 +363,7 @@ async def _post_analyze_action(context: SimulatorContext, user_input: str) -> No
     transcript_content = invisible_path.read_text(encoding="utf-8").strip()
     assert transcript_content != "", "转录内容不能为空"
 
-    parse_info = _parse_data_from_filename(upload_file)
+    parse_info = _parse_data_from_special_filename(upload_file)
     if parse_info is None:
         logger.error(f"无法从文件名 {upload_file} 中解析出日期时间、文件编号或后缀。")
         return
@@ -391,7 +391,7 @@ async def _post_analyze_action(context: SimulatorContext, user_input: str) -> No
 
 
 ###########################################################################################################################
-def _parse_data_from_filename(
+def _parse_data_from_special_filename(
     filename: str,
 ) -> Optional[Tuple[datetime.datetime, int, str]]:
     """从文件名中提取日期时间字符串、文件编号和后缀"""
@@ -401,6 +401,12 @@ def _parse_data_from_filename(
     if len(parts) < 5:
         logger.error(f"文件名格式不正确: {filename}")
         return None
+
+    # 检查文件名的前缀是否为 "nirva"
+    if parts[0] != "nirva":
+        logger.error(f"文件名不符合预期格式: {filename}")
+        return None
+
     try:
         year = int(parts[1])
         month = int(parts[2])
@@ -437,7 +443,7 @@ async def _post_upload_transcript_action(
     transcript_content = invisible_path.read_text(encoding="utf-8").strip()
     assert transcript_content != "", "转录内容不能为空"
 
-    parse_info = _parse_data_from_filename(upload_file)
+    parse_info = _parse_data_from_special_filename(upload_file)
     if parse_info is None:
         logger.error(f"无法从文件名 {upload_file} 中解析出日期时间、文件编号或后缀。")
         return
