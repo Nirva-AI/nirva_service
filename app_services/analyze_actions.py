@@ -264,6 +264,13 @@ def _gen_test_analyze_action_request(
 analyze_action_router = APIRouter()
 
 
+# 如果您需要确保分析任务即使在客户端断开连接后也能完成，建议将分析流程改为后台任务处理模式。
+# 使用Celery或其他任务队列
+# @analyze_action_router.post(path="/action/analyze/v1/")
+# async def handle_analyze_action(...):
+#     # 接收请求并立即返回
+#     task_id = background_tasks.add_task(process_analyze_action, ...)
+#     return {"task_id": task_id}
 ###################################################################################################################################################################
 ###################################################################################################################################################################
 ###################################################################################################################################################################
@@ -285,32 +292,25 @@ async def handle_analyze_action(
         # 字符串转换为 datetime 对象
         timestamp_datetime = datetime.fromisoformat(request_data.time_stamp)
 
-        if not db.redis_upload_transcript.is_transcript_stored(
+        ## 测试的代码！！！！！！!!!!!!!!!!!!
+        ## 测试的代码！！！！！！!!!!!!!!!!!!
+        ## 测试的代码！！！！！！!!!!!!!!!!!!
+        journal_file_db = db.pgsql_journal_file.get_journal_file(
             username=authenticated_user,
-            time_stamp=timestamp_datetime,
-            file_number=request_data.file_number,
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="转录内容未找到，请先上传转录内容。",
-            )
-
-        #
-        transcript_content = db.redis_upload_transcript.get_transcript(
-            username=authenticated_user,
-            time_stamp=timestamp_datetime,
-            file_number=request_data.file_number,
+            time_stamp=request_data.time_stamp,
         )
-        assert transcript_content != "", "转录内容不能为空"
-        if transcript_content == "":
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="转录内容不能为空。",
+
+        if journal_file_db is not None:
+            # 如果已经存在日记文件，则直接返回。
+            logger.info(
+                f"已存在日记文件: 用户={authenticated_user}, 时间戳={request_data.time_stamp}"
+            )
+            return AnalyzeActionResponse(
+                journal_file=JournalFile.model_validate_json(
+                    journal_file_db.content_json
+                )
             )
 
-        ## 测试的代码！！！！！！!!!!!!!!!!!!
-        ## 测试的代码！！！！！！!!!!!!!!!!!!
-        ## 测试的代码！！！！！！!!!!!!!!!!!!
         # test_response = _gen_test_analyze_action_request(
         #     authenticated_user=authenticated_user,
         #     time_stamp=request_data.time_stamp,
@@ -323,8 +323,28 @@ async def handle_analyze_action(
 
         # return test_response
 
-        ## 测试的代码！！！！！！!!!!!!!!!!!!
-        ## 测试的代码！！！！！！!!!!!!!!!!!!
+        # 如果没有提前存储转录内容，就不可以进行分析。
+        if not db.redis_upload_transcript.is_transcript_stored(
+            username=authenticated_user,
+            time_stamp=timestamp_datetime,
+            file_number=request_data.file_number,
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="转录内容未找到，请先上传转录内容。",
+            )
+
+        # 获取转录内容
+        transcript_content = db.redis_upload_transcript.get_transcript(
+            username=authenticated_user,
+            time_stamp=timestamp_datetime,
+            file_number=request_data.file_number,
+        )
+        if transcript_content.strip() == "":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="转录内容不能为空。",
+            )
 
         # 正式的步骤。
         analyze_process_context = AnalyzeProcessContext(
@@ -419,15 +439,17 @@ async def handle_upload_transcript_action(
 
     try:
 
-        # assert request_data.transcript_content.strip() != "", "转录内容不能为空"
+        # 内容不能为空！
         if request_data.transcript_content.strip() == "":
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="转录内容不能为空。",
             )
 
+        # 转换时间戳字符串为 datetime 对象
         timestamp_datetime = datetime.fromisoformat(request_data.time_stamp)
 
+        # 检查转录内容是否已存在，存在了就不需要再存储了。
         if db.redis_upload_transcript.is_transcript_stored(
             username=authenticated_user,
             time_stamp=timestamp_datetime,
@@ -445,10 +467,13 @@ async def handle_upload_transcript_action(
             transcript_content=request_data.transcript_content,
             # expiration_time=60 * 60,  # 设置过期时间为1小时
         )
+
+        # 记录日志
         logger.info(
             f"转录内容已存储: 用户={authenticated_user}, 时间戳={request_data.time_stamp}, 文件编号={request_data.file_number}"
         )
 
+        # 返回成功响应
         return UploadTranscriptActionResponse(
             message=f"转录内容已存储: 用户={authenticated_user}, 时间戳={request_data.time_stamp}, 文件编号={request_data.file_number}",
         )

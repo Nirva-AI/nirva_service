@@ -10,6 +10,15 @@ from pathlib import Path
 ##################################################################################################################
 # 启动一个服务的配置
 @final
+class AppserviceServerConfig(BaseModel):
+    server_ip_address: str = "0.0.0.0"
+    server_port: int = 8000
+    local_network_ip: str = "192.168.2.70"
+
+
+##################################################################################################################
+# 启动一个服务的配置
+@final
 class ChatServerConfig(BaseModel):
     port: int = 8500
     temperature: float = 0.7
@@ -31,15 +40,6 @@ class AnalyzerServerConfig(BaseModel):
     fast_api_title: str = "analyzer_service"
     fast_api_version: str = "0.0.1"
     fast_api_description: str = ""
-
-
-##################################################################################################################
-# 启动一个服务的配置
-@final
-class AppserviceServerConfig(BaseModel):
-    server_ip_address: str = "0.0.0.0"
-    server_port: int = 8000
-    local_network_ip: str = "192.168.22.108"
 
 
 ##################################################################################################################
