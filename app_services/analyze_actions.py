@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException, status
 from app_services.app_service_server import AppserviceServerInstance
 from models_v_0_0_1 import (
@@ -284,8 +285,9 @@ async def process_analyze_action(
             time_stamp=request_data.time_stamp,
         )
 
-        # 这里写一段代码，故意等待10秒
-        time.sleep(5)  # 模拟处理时间，实际应用中可以去掉
+        
+        #time.sleep(30)  # 模拟处理时间，实际应用中可以去掉
+        await asyncio.sleep(30) 
 
         if journal_file_db is not None:
             # 如果已经存在日记文件，直接返回

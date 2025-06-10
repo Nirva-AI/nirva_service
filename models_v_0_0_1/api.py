@@ -2,7 +2,6 @@ from typing import Optional, final, List
 from pydantic import BaseModel
 from .registry import register_base_model_class
 from enum import IntEnum
-from .journal import JournalFile
 
 ################################################################################################################
 ################################################################################################################
@@ -63,13 +62,6 @@ class ChatActionResponse(BaseModel):
 class AnalyzeActionRequest(BaseModel):
     time_stamp: str
     file_number: int
-
-
-# @final
-# @register_base_model_class
-# class AnalyzeActionResponse(BaseModel):
-#     journal_file: JournalFile
-
 
 ################################################################################################################
 ################################################################################################################
