@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app_services.app_service_server import AppserviceServerInstance
 from models_v_0_0_1 import (
     AnalyzeActionRequest,
-    AnalyzeActionResponse,
+    # AnalyzeActionResponse,
     UploadTranscriptActionRequest,
     UploadTranscriptActionResponse,
     LabelExtractionResponse,
@@ -15,13 +15,14 @@ from models_v_0_0_1 import (
     LearningAndInsights,
     ConnectionsAndRelationships,
     LookingForward,
+    BackgroundTaskResponse,
 )
 from loguru import logger
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
 from langgraph_services.langgraph_request_task import (
     LanggraphRequestTask,
 )
-from typing import List, Optional, cast
+from typing import Any, Dict, List, Optional, cast
 from app_services.oauth_user import get_authenticated_user
 import db.redis_user
 import db.pgsql_journal_file
@@ -33,10 +34,7 @@ from langgraph_services.langgraph_models import (
 import time
 import db.redis_upload_transcript
 from datetime import datetime
-
 from fastapi import BackgroundTasks
-
-# from datetime import datetime
 import db.redis_task as redis_task
 
 
@@ -183,83 +181,82 @@ def _execute_reflection(
 
 
 ###################################################################################################################################################################
-def _gen_test_analyze_action_request(
+def _gen_fake_journal_file(
     authenticated_user: str,
     time_stamp: str,
-) -> AnalyzeActionResponse:
+) -> JournalFile:
     # 直接返回测试数据。
-    return AnalyzeActionResponse(
-        journal_file=JournalFile(
-            username=authenticated_user,
-            time_stamp=time_stamp,
-            events=[
-                EventAnalysis(
-                    event_id="event_01",
-                    event_title="Coffee shop work meeting",
-                    time_range="09:00-10:30",
-                    duration_minutes=90,
-                    location="Blue Bottle Coffee",
-                    mood_labels=["focused", "engaged", "energized"],
-                    mood_score=7,
-                    stress_level=4,
-                    energy_level=8,
-                    activity_type="work",
-                    people_involved=["Mark Zhang", "Howard Li"],
-                    interaction_dynamic="collaborative",
-                    inferred_impact_on_user_name="energizing",
-                    topic_labels=["project planning", "deadlines"],
-                    one_sentence_summary="Discussed project progress and next steps with team members at the coffee shop, with a positive and efficient atmosphere.",
-                    first_person_narrative="Met with Mark and Howard at Blue Bottle Coffee this morning to discuss our project progress. We went through the current task list and established several key deadlines. I suggested some improvements to the project workflow, which they seemed to agree with. The entire meeting went smoothly, more efficiently than I had expected. I felt my ideas were well received, which gave me a sense of accomplishment.",
-                    action_item="Prepare initial project proposal draft before next Monday",
-                )
-            ],
-            daily_reflection=DailyReflection(
-                reflection_summary="A fulfilling and balanced day with successful work and time to relax",
-                gratitude=Gratitude(
-                    gratitude_summary=[
-                        "Team members' support and constructive feedback",
-                        "Time to enjoy lunch and short breaks",
-                        "Completion of important project milestone",
-                    ],
-                    gratitude_details="Grateful for the collaborative spirit of team members, especially the constructive suggestions raised during discussions",
-                    win_summary=[
-                        "Successfully facilitated an efficient project meeting",
-                        "Solved a technical issue that had been blocking progress",
-                        "Maintained a good balance between work and rest",
-                    ],
-                    win_details="The biggest success today was solving the technical obstacle that had been troubling the team for a week, finding an elegant solution",
-                    feel_alive_moments="The creative collision of ideas while working with the team made me feel particularly energetic",
-                ),
-                challenges_and_growth=ChallengesAndGrowth(
-                    growth_summary=[
-                        "Need to improve time management efficiency",
-                        "Staying calm when facing unexpected situations",
-                        "Better articulation of complex ideas",
-                    ],
-                    obstacles_faced="Unexpected technical issues and time pressure in the middle of the project",
-                    unfinished_intentions="Did not complete the planned documentation update work",
-                    contributing_factors="Extended meeting time disrupted the original plan; attention was sometimes scattered",
-                ),
-                learning_and_insights=LearningAndInsights(
-                    new_knowledge="Learned new project management techniques and some technical solutions",
-                    self_discovery="Discovered that I can maintain creative thinking even under pressure",
-                    insights_about_others="Noticed Mark's diplomatic skills in handling conflicts, which is worth learning",
-                    broader_lessons="In team collaboration, clear communication and shared goals are more important than individual skills",
-                ),
-                connections_and_relationships=ConnectionsAndRelationships(
-                    meaningful_interactions="The in-depth technical discussion with Mark was particularly valuable, helping me broaden my thinking",
-                    notable_about_people="Howard showed unexpected innovative thinking and problem-solving abilities today",
-                    follow_up_needed="Need to ask Mark about the relevant article he mentioned; thank Howard for his support",
-                ),
-                looking_forward=LookingForward(
-                    do_differently_tomorrow="Control meeting time more strictly, leave more time for focused work",
-                    continue_what_worked="Maintain the habit of handling the most important tasks first thing in the morning",
-                    top_3_priorities_tomorrow=[
-                        "Complete initial draft of the project proposal",
-                        "Reply to all pending emails",
-                        "Prepare agenda for next week's team meeting",
-                    ],
-                ),
+    # return AnalyzeActionResponse(
+    return JournalFile(
+        username=authenticated_user,
+        time_stamp=time_stamp,
+        events=[
+            EventAnalysis(
+                event_id="event_01",
+                event_title="Coffee shop work meeting",
+                time_range="09:00-10:30",
+                duration_minutes=90,
+                location="Blue Bottle Coffee",
+                mood_labels=["focused", "engaged", "energized"],
+                mood_score=7,
+                stress_level=4,
+                energy_level=8,
+                activity_type="work",
+                people_involved=["Mark Zhang", "Howard Li"],
+                interaction_dynamic="collaborative",
+                inferred_impact_on_user_name="energizing",
+                topic_labels=["project planning", "deadlines"],
+                one_sentence_summary="Discussed project progress and next steps with team members at the coffee shop, with a positive and efficient atmosphere.",
+                first_person_narrative="Met with Mark and Howard at Blue Bottle Coffee this morning to discuss our project progress. We went through the current task list and established several key deadlines. I suggested some improvements to the project workflow, which they seemed to agree with. The entire meeting went smoothly, more efficiently than I had expected. I felt my ideas were well received, which gave me a sense of accomplishment.",
+                action_item="Prepare initial project proposal draft before next Monday",
+            )
+        ],
+        daily_reflection=DailyReflection(
+            reflection_summary="A fulfilling and balanced day with successful work and time to relax",
+            gratitude=Gratitude(
+                gratitude_summary=[
+                    "Team members' support and constructive feedback",
+                    "Time to enjoy lunch and short breaks",
+                    "Completion of important project milestone",
+                ],
+                gratitude_details="Grateful for the collaborative spirit of team members, especially the constructive suggestions raised during discussions",
+                win_summary=[
+                    "Successfully facilitated an efficient project meeting",
+                    "Solved a technical issue that had been blocking progress",
+                    "Maintained a good balance between work and rest",
+                ],
+                win_details="The biggest success today was solving the technical obstacle that had been troubling the team for a week, finding an elegant solution",
+                feel_alive_moments="The creative collision of ideas while working with the team made me feel particularly energetic",
+            ),
+            challenges_and_growth=ChallengesAndGrowth(
+                growth_summary=[
+                    "Need to improve time management efficiency",
+                    "Staying calm when facing unexpected situations",
+                    "Better articulation of complex ideas",
+                ],
+                obstacles_faced="Unexpected technical issues and time pressure in the middle of the project",
+                unfinished_intentions="Did not complete the planned documentation update work",
+                contributing_factors="Extended meeting time disrupted the original plan; attention was sometimes scattered",
+            ),
+            learning_and_insights=LearningAndInsights(
+                new_knowledge="Learned new project management techniques and some technical solutions",
+                self_discovery="Discovered that I can maintain creative thinking even under pressure",
+                insights_about_others="Noticed Mark's diplomatic skills in handling conflicts, which is worth learning",
+                broader_lessons="In team collaboration, clear communication and shared goals are more important than individual skills",
+            ),
+            connections_and_relationships=ConnectionsAndRelationships(
+                meaningful_interactions="The in-depth technical discussion with Mark was particularly valuable, helping me broaden my thinking",
+                notable_about_people="Howard showed unexpected innovative thinking and problem-solving abilities today",
+                follow_up_needed="Need to ask Mark about the relevant article he mentioned; thank Howard for his support",
+            ),
+            looking_forward=LookingForward(
+                do_differently_tomorrow="Control meeting time more strictly, leave more time for focused work",
+                continue_what_worked="Maintain the habit of handling the most important tasks first thing in the morning",
+                top_3_priorities_tomorrow=[
+                    "Complete initial draft of the project proposal",
+                    "Reply to all pending emails",
+                    "Prepare agenda for next week's team meeting",
+                ],
             ),
         ),
     )
@@ -290,6 +287,9 @@ async def process_analyze_action(
             username=username,
             time_stamp=request_data.time_stamp,
         )
+
+        # 这里写一段代码，故意等待10秒
+        time.sleep(5)  # 模拟处理时间，实际应用中可以去掉
 
         if journal_file_db is not None:
             # 如果已经存在日记文件，直接返回
@@ -423,161 +423,112 @@ async def process_analyze_action(
 analyze_action_router = APIRouter()
 
 
-# 如果您需要确保分析任务即使在客户端断开连接后也能完成，建议将分析流程改为后台任务处理模式。
-# 使用Celery或其他任务队列
-# @analyze_action_router.post(path="/action/analyze/v1/")
-# async def handle_analyze_action(...):
-#     # 接收请求并立即返回
-#     task_id = background_tasks.add_task(process_analyze_action, ...)
-#     return {"task_id": task_id}
 ###################################################################################################################################################################
 ###################################################################################################################################################################
 ###################################################################################################################################################################
 @analyze_action_router.post(
-    path="/action/analyze/v1/", response_model=AnalyzeActionResponse
+    path="/action/analyze/v1/", response_model=BackgroundTaskResponse
 )
 async def handle_analyze_action(
     request_data: AnalyzeActionRequest,
+    background_tasks: BackgroundTasks,
     appservice_server: AppserviceServerInstance,
     authenticated_user: str = Depends(get_authenticated_user),
-) -> AnalyzeActionResponse:
+) -> BackgroundTaskResponse:
+    """创建分析任务并在后台执行"""
 
     logger.info(f"/action/analyze/v1/: {request_data.model_dump_json()}")
 
     try:
-        # 开始计时
-        start_time = time.time()
-
-        # 字符串转换为 datetime 对象
-        timestamp_datetime = datetime.fromisoformat(request_data.time_stamp)
-
-        ## 测试的代码！！！！！！!!!!!!!!!!!!
-        ## 测试的代码！！！！！！!!!!!!!!!!!!
-        ## 测试的代码！！！！！！!!!!!!!!!!!!
-        journal_file_db = db.pgsql_journal_file.get_journal_file(
-            username=authenticated_user,
-            time_stamp=request_data.time_stamp,
+        # 创建任务并获取任务ID
+        task_id = redis_task.create_task(
+            username=authenticated_user, task_type="analyze_action"
         )
 
-        if journal_file_db is not None:
-            # 如果已经存在日记文件，则直接返回。
-            logger.info(
-                f"已存在日记文件: 用户={authenticated_user}, 时间戳={request_data.time_stamp}"
-            )
-            return AnalyzeActionResponse(
-                journal_file=JournalFile.model_validate_json(
-                    journal_file_db.content_json
-                )
-            )
-
-        # test_response = _gen_test_analyze_action_request(
-        #     authenticated_user=authenticated_user,
-        #     time_stamp=request_data.time_stamp,
-        # )
-
-        # db.pgsql_journal_file.save_or_update_journal_file(
-        #     username=authenticated_user,
-        #     journal_file=test_response.journal_file,
-        # )
-
-        # return test_response
-
-        # 如果没有提前存储转录内容，就不可以进行分析。
-        if not db.redis_upload_transcript.is_transcript_stored(
+        # 将实际处理作为后台任务
+        background_tasks.add_task(
+            process_analyze_action,
             username=authenticated_user,
-            time_stamp=timestamp_datetime,
-            file_number=request_data.file_number,
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="转录内容未找到，请先上传转录内容。",
-            )
-
-        # 获取转录内容
-        transcript_content = db.redis_upload_transcript.get_transcript(
-            username=authenticated_user,
-            time_stamp=timestamp_datetime,
-            file_number=request_data.file_number,
-        )
-        if transcript_content.strip() == "":
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="转录内容不能为空。",
-            )
-
-        # 正式的步骤。
-        analyze_process_context = AnalyzeProcessContext(
-            authenticated_user=authenticated_user,
-            chat_history=[
-                SystemMessage(
-                    content=builtin_prompt.user_session_system_message(
-                        authenticated_user,
-                        db.redis_user.get_user_display_name(
-                            username=authenticated_user
-                        ),
-                    )
-                ),
-                HumanMessage(content=builtin_prompt.event_segmentation_message()),
-                HumanMessage(
-                    content=builtin_prompt.transcript_message(
-                        formatted_date=request_data.time_stamp,
-                        transcript_content=transcript_content,
-                    )
-                ),
-            ],
+            task_id=task_id,
+            request_data=request_data,
             appservice_server=appservice_server,
         )
 
-        # 步骤1~2: 标签提取过程
-        _execute_label_extraction(
-            analyze_process_context=analyze_process_context,
+        # 立即返回任务ID，不等待处理完成
+        # return {
+        #     "task_id": task_id,
+        #     "message": "分析任务已创建，请使用任务ID查询状态和结果",
+        # }
+        return BackgroundTaskResponse(
+            task_id=task_id,
+            message="分析任务已创建，请使用任务ID查询状态和结果",
         )
-        # 如果标签提取过程未返回有效响应，则抛出异常
-        if analyze_process_context._label_extraction_response is None:
+
+    except Exception as e:
+        logger.error(f"创建分析任务失败: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"创建分析任务失败: {e}",
+        )
+
+
+###################################################################################################################################################################
+###################################################################################################################################################################
+###################################################################################################################################################################
+
+
+@analyze_action_router.get(
+    path="/action/task/status/v1/{task_id}/", response_model=Dict[str, Any]
+)
+async def get_task_status_endpoint(
+    task_id: str,
+    authenticated_user: str = Depends(get_authenticated_user),
+) -> Dict[str, Any]:
+    """查询任务状态和结果"""
+
+    task_data = redis_task.get_task_status(username=authenticated_user, task_id=task_id)
+
+    if not task_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="任务不存在或已过期"
+        )
+
+    return task_data
+
+
+###################################################################################################################################################################
+###################################################################################################################################################################
+###################################################################################################################################################################
+@analyze_action_router.get(
+    path="/action/get_journal_file/v1/{time_stamp}/", response_model=JournalFile
+)
+async def get_get_journal_file(
+    time_stamp: str,
+    authenticated_user: str = Depends(get_authenticated_user),
+) -> JournalFile:
+    """获取用户的日记文件"""
+
+    logger.info(f"/action/get_journal_file/v1/{time_stamp}/")
+
+    try:
+        # 从数据库获取日记文件
+        journal_file_db = db.pgsql_journal_file.get_journal_file(
+            username=authenticated_user, time_stamp=time_stamp
+        )
+
+        if journal_file_db is None:
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="标签提取过程未返回有效响应。",
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"日记文件未找到: 用户={authenticated_user}, 时间戳={time_stamp}",
             )
 
-        # 步骤3: 反思过程
-        _execute_reflection(
-            analyze_process_context=analyze_process_context,
-        )
-        # 如果反思过程未返回有效响应，则抛出异常
-        if analyze_process_context._reflection_response is None:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="反思过程未返回有效响应。",
-            )
-
-        # 成功并构建数据
-        journal_file = JournalFile(
-            username=authenticated_user,
-            time_stamp=request_data.time_stamp,
-            events=analyze_process_context._label_extraction_response.events,
-            daily_reflection=analyze_process_context._reflection_response.daily_reflection,
-        )
-
-        # 存储一下！
-        db.pgsql_journal_file.save_or_update_journal_file(
-            username=authenticated_user,
-            journal_file=journal_file,
-        )
-
-        # 计算执行时间并记录
-        end_time = time.time()
-        execution_time = end_time - start_time
-        logger.info(f"分析过程总执行时间: {execution_time:.2f} 秒")
-
-        # 返回分析结果
-        return AnalyzeActionResponse(
-            journal_file=journal_file,
-        )
+        # 返回实际的日记文件
+        return JournalFile.model_validate_json(journal_file_db.content_json)
 
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"处理请求失败: {e}",
+            detail=f"获取日记文件失败: {e}",
         )
 
 

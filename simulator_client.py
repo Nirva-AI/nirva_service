@@ -9,7 +9,7 @@ from models_v_0_0_1 import (
     ChatActionRequest,
     ChatActionResponse,
     AnalyzeActionRequest,  # 添加这行
-    AnalyzeActionResponse,  # 添加这行
+    BackgroundTaskResponse,  # 添加这行
     UploadTranscriptActionRequest,
     UploadTranscriptActionResponse,
     MessageRole,
@@ -26,6 +26,9 @@ from config.configuration import (
 
 from config.account import FAKE_USER
 from db.jwt import UserToken
+import time
+
+from models_v_0_0_1.journal import JournalFile
 
 
 ###########################################################################################################################
@@ -106,6 +109,35 @@ class SimulatorContext:
     @property
     def upload_transcript_url(self) -> str:
         return self._url_configuration.endpoints["upload_transcript"]
+
+    ###########################################################################################################################
+    def task_status_url(self, task_id: str) -> str:
+        """获取任务状态的URL
+
+        Args:
+            task_id: 任务ID
+
+        Returns:
+            str: 任务状态的URL
+        """
+        return self._url_configuration.endpoints["task_status"].format(task_id=task_id)
+
+    ###########################################################################################################################
+    def get_journal_file_url(self, time_stamp: datetime.datetime) -> str:
+        """获取日记文件的URL
+
+        Args:
+            time_stamp: 日记文件的时间戳
+
+        Returns:
+            str: 日记文件的URL
+        """
+        isoformat_time = time_stamp.isoformat()
+        url = self._url_configuration.endpoints["get_journal_file"].format(
+            time_stamp=isoformat_time
+        )
+        logger.debug(f"url = {url}")
+        return url
 
     ###########################################################################################################################
 
@@ -379,13 +411,79 @@ async def _post_analyze_action(context: SimulatorContext, user_input: str) -> No
     )
 
     if response is not None:
-        response_model = AnalyzeActionResponse.model_validate(response)
+        response_model = BackgroundTaskResponse.model_validate(response)
+        logger.info(f"_handle_analyze_action: {response_model.model_dump_json()}")
+
+        # 需要轮询服务器的任务状态
+        # 轮询服务器的任务状态
+        task_id = response_model.task_id
+        max_retries = 30  # 最大重试次数
+        retry_interval = 1  # 轮询间隔(秒)
+
+        logger.info(f"开始轮询任务状态，任务ID: {task_id}")
+
+        for attempt in range(max_retries):
+            # 等待指定的间隔时间
+            time.sleep(retry_interval)
+
+            # 获取任务状态
+            status_response = _safe_get(
+                url=context.task_status_url(task_id), context=context
+            )
+
+            if status_response is None:
+                logger.error(f"获取任务状态失败，重试中... ({attempt+1}/{max_retries})")
+                continue
+
+            # 提取任务状态
+            task_status = status_response.get("status")
+            logger.info(f"任务状态: {task_status} ({attempt+1}/{max_retries})")
+
+            # 根据状态决定是否继续轮询
+            if task_status == "completed":
+                # 任务完成，处理结果
+                logger.info("任务已完成！")
+
+                await _get_journal_file(context, parse_info[0])
+                break
+
+            elif task_status == "failed":
+                # 任务失败
+                error_message = status_response.get("error", "未知错误")
+                logger.error(f"任务执行失败: {error_message}")
+                break
+
+            elif task_status == "pending" or task_status == "processing":
+                # 任务仍在进行中，继续轮询
+                logger.info(f"任务进行中，继续等待... ({attempt+1}/{max_retries})")
+                continue
+
+            else:
+                # 未知状态
+                logger.warning(f"未知任务状态: {task_status}")
+                break
+
+        else:
+            # 超过最大重试次数
+            logger.error(f"达到最大重试次数 ({max_retries})，停止轮询")
+
+
+###########################################################################################################################
+async def _get_journal_file(
+    context: SimulatorContext, time_stamp: datetime.datetime
+) -> None:
+    """处理分析请求，发送到服务器进行分析"""
+
+    response = _safe_get(url=context.get_journal_file_url(time_stamp), context=context)
+
+    if response is not None:
+        response_model = JournalFile.model_validate(response)
         logger.info(f"_handle_analyze_action: {response_model.model_dump_json()}")
 
         # LOGS_DIR
-        log_file_path = LOGS_DIR / f"analyze_result_{upload_file}.json"
+        log_file_path = LOGS_DIR / f"analyze_result_{time_stamp.isoformat()}.json"
         log_file_path.write_text(
-            response_model.journal_file.model_dump_json(),
+            response_model.model_dump_json(),
             encoding="utf-8",
         )
 

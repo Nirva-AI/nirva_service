@@ -34,7 +34,7 @@ class MessageRole(IntEnum):
 @register_base_model_class
 class ChatMessage(BaseModel):
     id: str
-    role: MessageRole  # MessageRole 0: system, 1: human, 2: ai
+    role: MessageRole
     content: str
     time_stamp: str
     tags: Optional[List[str]] = None
@@ -65,10 +65,10 @@ class AnalyzeActionRequest(BaseModel):
     file_number: int
 
 
-@final
-@register_base_model_class
-class AnalyzeActionResponse(BaseModel):
-    journal_file: JournalFile
+# @final
+# @register_base_model_class
+# class AnalyzeActionResponse(BaseModel):
+#     journal_file: JournalFile
 
 
 ################################################################################################################
@@ -94,3 +94,10 @@ class UploadTranscriptActionResponse(BaseModel):
 ################################################################################################################
 ################################################################################################################
 ################################################################################################################
+
+
+@final
+@register_base_model_class
+class BackgroundTaskResponse(BaseModel):
+    task_id: str
+    message: str

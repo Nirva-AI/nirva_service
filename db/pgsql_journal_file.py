@@ -2,7 +2,7 @@ from db.pgsql_object import JournalFileDB
 from db.pgsql_client import SessionLocal
 from models_v_0_0_1 import JournalFile
 from .pgsql_user import get_user
-from typing import Optional
+from typing import List, Optional
 
 
 ############################################################################################################
@@ -129,7 +129,7 @@ def journal_file_db_to_model(journal_file_db: JournalFileDB) -> JournalFile:
 
 
 ############################################################################################################
-def get_user_journal_files(username: str) -> list[JournalFileDB]:
+def get_user_journal_files(username: str) -> List[JournalFileDB]:
     """获取用户的所有日记"""
     db = SessionLocal()
     try:
