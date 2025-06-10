@@ -1,7 +1,5 @@
 from typing import Optional
 import db.redis_client
-from datetime import datetime
-
 
 # Redis 存储大型 JSON 数据的考虑因素
 # Redis 确实可以用于存储较大的 JSON 文件或字符串，但有一些重要的考虑因素：
@@ -53,17 +51,15 @@ from datetime import datetime
 
 
 ###############################################################################################################################################
-def _upload_transcript_key(
-    username: str, time_stamp: datetime, file_number: int
-) -> str:
-    return f"upload_transcript:{username}:{time_stamp.isoformat()}:{file_number}"
+def _upload_transcript_key(username: str, time_stamp: str, file_number: int) -> str:
+    return f"upload_transcript:{username}:{time_stamp}:{file_number}"
 
 
 ###############################################################################################################################################
 # 存个几M的，就先这样，后续等必要时候再换正规的。
 def store_transcript(
     username: str,
-    time_stamp: datetime,
+    time_stamp: str,
     file_number: int,
     transcript_content: str,
     expiration_time: Optional[int] = None,
@@ -88,7 +84,7 @@ def store_transcript(
 
 
 ###############################################################################################################################################
-def get_transcript(username: str, time_stamp: datetime, file_number: int) -> str:
+def get_transcript(username: str, time_stamp: str, file_number: int) -> str:
     """
     获取用户的转录内容
 
@@ -106,7 +102,7 @@ def get_transcript(username: str, time_stamp: datetime, file_number: int) -> str
 
 
 ###############################################################################################################################################
-def is_transcript_stored(username: str, time_stamp: datetime, file_number: int) -> bool:
+def is_transcript_stored(username: str, time_stamp: str, file_number: int) -> bool:
     """
     检查用户的转录内容是否已存储
 
@@ -123,7 +119,7 @@ def is_transcript_stored(username: str, time_stamp: datetime, file_number: int) 
 
 
 ###############################################################################################################################################
-def remove_transcript(username: str, time_stamp: datetime, file_number: int) -> None:
+def remove_transcript(username: str, time_stamp: str, file_number: int) -> None:
     """
     从Redis中删除用户的转录内容
 

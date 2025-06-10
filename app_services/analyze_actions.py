@@ -33,7 +33,6 @@ from langgraph_services.langgraph_models import (
 )
 import time
 import db.redis_upload_transcript
-from datetime import datetime
 from fastapi import BackgroundTasks
 import db.redis_task as redis_task
 
@@ -279,9 +278,6 @@ async def process_analyze_action(
         # 开始计时
         start_time = time.time()
 
-        # 字符串转换为 datetime 对象
-        timestamp_datetime = datetime.fromisoformat(request_data.time_stamp)
-
         # 检查是否已存在日记文件
         journal_file_db = db.pgsql_journal_file.get_journal_file(
             username=username,
@@ -310,7 +306,7 @@ async def process_analyze_action(
         # 检查转录内容
         if not db.redis_upload_transcript.is_transcript_stored(
             username=username,
-            time_stamp=timestamp_datetime,
+            time_stamp=request_data.time_stamp,
             file_number=request_data.file_number,
         ):
             redis_task.update_task_status(
@@ -324,7 +320,7 @@ async def process_analyze_action(
         # 获取转录内容
         transcript_content = db.redis_upload_transcript.get_transcript(
             username=username,
-            time_stamp=timestamp_datetime,
+            time_stamp=request_data.time_stamp,
             file_number=request_data.file_number,
         )
         if transcript_content.strip() == "":
@@ -556,13 +552,10 @@ async def handle_upload_transcript_action(
                 detail="转录内容不能为空。",
             )
 
-        # 转换时间戳字符串为 datetime 对象
-        timestamp_datetime = datetime.fromisoformat(request_data.time_stamp)
-
         # 检查转录内容是否已存在，存在了就不需要再存储了。
         if db.redis_upload_transcript.is_transcript_stored(
             username=authenticated_user,
-            time_stamp=timestamp_datetime,
+            time_stamp=request_data.time_stamp,
             file_number=request_data.file_number,
         ):
             return UploadTranscriptActionResponse(
@@ -572,7 +565,7 @@ async def handle_upload_transcript_action(
         # 存储转录内容到 Redis
         db.redis_upload_transcript.store_transcript(
             username=authenticated_user,
-            time_stamp=timestamp_datetime,
+            time_stamp=request_data.time_stamp,
             file_number=request_data.file_number,
             transcript_content=request_data.transcript_content,
             # expiration_time=60 * 60,  # 设置过期时间为1小时
