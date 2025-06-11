@@ -1,9 +1,8 @@
-import asyncio
+# import asyncio
 from fastapi import APIRouter, Depends, HTTPException, status
 from app_services.app_service_server import AppserviceServerInstance
 from models_v_0_0_1 import (
     AnalyzeActionRequest,
-    # AnalyzeActionResponse,
     UploadTranscriptActionRequest,
     UploadTranscriptActionResponse,
     LabelExtractionResponse,
@@ -36,6 +35,7 @@ import time
 import db.redis_upload_transcript
 from fastapi import BackgroundTasks
 import db.redis_task as redis_task
+import uuid
 
 
 class AnalyzeProcessContext:
@@ -192,7 +192,7 @@ def _gen_fake_journal_file(
         time_stamp=time_stamp,
         events=[
             EventAnalysis(
-                event_id="event_01",
+                event_id=str(uuid.uuid4()),
                 event_title="Coffee shop work meeting",
                 time_range="09:00-10:30",
                 duration_minutes=90,
@@ -285,9 +285,8 @@ async def process_analyze_action(
             time_stamp=request_data.time_stamp,
         )
 
-        
-        #time.sleep(30)  # 模拟处理时间，实际应用中可以去掉
-        await asyncio.sleep(30) 
+        # time.sleep(30)  # 模拟处理时间，实际应用中可以去掉
+        # await asyncio.sleep(30)
 
         if journal_file_db is not None:
             # 如果已经存在日记文件，直接返回
@@ -387,6 +386,10 @@ async def process_analyze_action(
             events=analyze_process_context._label_extraction_response.events,
             daily_reflection=analyze_process_context._reflection_response.daily_reflection,
         )
+
+        for event in journal_file.events:
+            # 放弃LLM生成的id，自己全部重新赋值。
+            event.event_id = str(uuid.uuid4())
 
         # 存储到数据库
         db.pgsql_journal_file.save_or_update_journal_file(
