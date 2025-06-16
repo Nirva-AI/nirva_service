@@ -23,7 +23,6 @@ pip install bcrypt==3.2.2  # 已知兼容 passlib 1.7.4 的版本
 
 ```shell
 mypy --strict run_appservice_server.py simulator_client.py run_chat_server.py run_analyzer_server.py run_dev_clear_db.py
-mypy --strict  jwt_server_test.py jwt_client_test.py
 ```
 
 ## 用pm2 批量启动 chat_server + appservice_server
@@ -44,11 +43,6 @@ pip show langchain langchain_core langserve langchain_openai langchain-community
 ```shell
 conda install pytest
 ```
-
-## 简单授权/身份验证 + JWT 的 demo
-
-- jwt_client_test.py
-- jwt_server_test.py
 
 ## 安装 redis 和 fastapi-redis-cache
 
