@@ -62,3 +62,4 @@ conda install pytest
 - Redis
 - PostgreSQL
 - pm2
+- mkcert
