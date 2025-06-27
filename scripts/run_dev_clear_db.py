@@ -11,9 +11,11 @@ def main() -> None:
 
     from nirva_service.config.account import FAKE_USER
     from nirva_service.db.pgsql_client import reset_database
+
     from nirva_service.db.pgsql_journal_file import save_or_update_journal_file
     from nirva_service.db.pgsql_user import has_user, save_user
     from nirva_service.db.redis_client import redis_flushall
+
     from nirva_service.models import JournalFile
 
     # 清空 Redis 数据库

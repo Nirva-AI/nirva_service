@@ -97,13 +97,12 @@ class LanggraphService:
         self._chat_service_request_distribution_index += len(request_handlers)
 
     ################################################################################################################################################################################
-    def analyze(self, request_handlers: List[LanggraphRequestTask]) -> None:
-        self._handle(
+    async def analyze(self, request_handlers: List[LanggraphRequestTask]) -> None:
+        # 使用非阻塞的。
+        await self.gather(
             request_handlers=request_handlers,
             urls=self._analyzer_service_localhost_urls,
-            request_distribution_index=self._analyzer_service_request_distribution_index,
         )
-        self._analyzer_service_request_distribution_index += len(request_handlers)
 
     ################################################################################################################################################################################
     async def check_services_health(self) -> Dict[str, List[Dict[str, Any]]]:

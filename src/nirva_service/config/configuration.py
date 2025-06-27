@@ -14,7 +14,7 @@ from pydantic import BaseModel
 class AppserviceServerConfig(BaseModel):
     server_ip_address: str = "0.0.0.0"
     server_port: int = 8001
-    local_network_ip: str = "192.168.192.105"
+    local_network_ip: str = "192.168.2.74"
 
 
 ##################################################################################################################

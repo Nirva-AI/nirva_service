@@ -1,4 +1,3 @@
-# import asyncio
 import time
 import uuid
 from typing import Any, Dict, List, Optional, cast
@@ -46,7 +45,7 @@ class AnalyzeProcessor:
         self._label_extraction_response: Optional[LabelExtractionResponse] = None
         self._reflection_response: Optional[ReflectionResponse] = None
 
-    def execute_label_extraction(self) -> None:
+    async def execute_label_extraction(self) -> None:
         """执行标签提取过程"""
         try:
             # 构建 LanggraphRequestTask 请求
@@ -58,7 +57,7 @@ class AnalyzeProcessor:
             )
 
             # 处理请求
-            self._appservice_server.langgraph_service.analyze(
+            await self._appservice_server.langgraph_service.analyze(
                 request_handlers=[step1_2_request]
             )
 
@@ -103,7 +102,7 @@ class AnalyzeProcessor:
             logger.error("Failed to execute label extraction:", e)
             raise e
 
-    def execute_reflection(self) -> None:
+    async def execute_reflection(self) -> None:
         """执行反思过程"""
         try:
             # 构建 LanggraphRequestTask 请求
@@ -115,7 +114,7 @@ class AnalyzeProcessor:
             )
 
             # 处理请求
-            self._appservice_server.langgraph_service.analyze(
+            await self._appservice_server.langgraph_service.analyze(
                 request_handlers=[step3_request]
             )
             if len(step3_request._response.messages) == 0:
@@ -181,9 +180,6 @@ async def _analyze_task(
             username=username,
             time_stamp=request_data.time_stamp,
         )
-
-        # import asyncio
-        # await asyncio.sleep(30)  # 模拟处理时间，实际应用中可以去掉
 
         if journal_file_db is not None:
             # 如果已经存在日记文件，直接返回
@@ -254,7 +250,7 @@ async def _analyze_task(
         )
 
         # 步骤1~2: 标签提取过程
-        analyze_process_context.execute_label_extraction()
+        await analyze_process_context.execute_label_extraction()
         if analyze_process_context._label_extraction_response is None:
             redis_task.update_task_status(
                 username=username,
@@ -265,7 +261,7 @@ async def _analyze_task(
             return
 
         # 步骤3: 反思过程
-        analyze_process_context.execute_reflection()
+        await analyze_process_context.execute_reflection()
         if analyze_process_context._reflection_response is None:
             redis_task.update_task_status(
                 username=username,
