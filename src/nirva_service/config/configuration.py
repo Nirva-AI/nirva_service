@@ -91,15 +91,17 @@ REDIS_CONFIG_PATH.write_text(
 )
 
 # mkcert 根证书路径, 后续可以改成环境变量
-MKCERT_ROOT_CA: Final[
-    str
-] = r"/Users/yanghang/Library/Application Support/mkcert/rootCA.pem"
+MKCERT_ROOT_CA: Final[str] = (
+    r"/Users/yanghang/Library/Application Support/mkcert/rootCA.pem"
+)
 
 # 是否使用 HTTPS，默认是 False
 LOCAL_HTTPS_ENABLED: Final[bool] = False  # 是否模拟使用 HTTPS，默认是 False
 
 # JWT 相关配置
-JWT_SIGNING_KEY: Final[str] = "your-secret-key-here-please-change-it"  # 生产环境要用更复杂的密钥
+JWT_SIGNING_KEY: Final[str] = (
+    "your-secret-key-here-please-change-it"  # 生产环境要用更复杂的密钥
+)
 JWT_SIGNING_ALGORITHM: Final[str] = "HS256"
 REFRESH_TOKEN_EXPIRE_DAYS: Final[int] = 7
 ACCESS_TOKEN_EXPIRE_MINUTES: Final[int] = 30  # 访问令牌的过期时间，单位为分钟
@@ -107,9 +109,9 @@ ACCESS_TOKEN_EXPIRE_MINUTES: Final[int] = 30  # 访问令牌的过期时间，�
 
 # 数据库配置
 postgres_password: Final[str] = "123456"
-POSTGRES_DATABASE_URL: Final[
-    str
-] = f"postgresql://fastapi_user:{postgres_password}@localhost/my_fastapi_db"
+POSTGRES_DATABASE_URL: Final[str] = (
+    f"postgresql://fastapi_user:{postgres_password}@localhost/my_fastapi_db"
+)
 
 
 """

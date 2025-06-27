@@ -48,7 +48,9 @@ def create_refresh_token(
     if expires_delta:
         expire = datetime.now() + expires_delta
     else:
-        expire = datetime.now() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)  # 默认 7 天有效期
+        expire = datetime.now() + timedelta(
+            days=REFRESH_TOKEN_EXPIRE_DAYS
+        )  # 默认 7 天有效期
     to_encode.update({"exp": expire})
     encoded_jwt = _encode_jwt(to_encode)
     return encoded_jwt

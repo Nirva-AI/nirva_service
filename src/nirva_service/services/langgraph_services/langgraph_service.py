@@ -22,22 +22,22 @@ class LanggraphService:
         self._async_client: Final[httpx.AsyncClient] = httpx.AsyncClient()
 
         # 聊天服务的 URL
-        self._chat_service_localhost_urls: Final[
-            List[str]
-        ] = chat_service_localhost_urls
+        self._chat_service_localhost_urls: Final[List[str]] = (
+            chat_service_localhost_urls
+        )
         self._chat_service_request_distribution_index: int = 0
         # 聊天服务的测试 GET URL
         self._chat_service_test_get_urls: Final[List[str]] = chat_service_test_get_urls
 
         # 分析服务的 URL
-        self._analyzer_service_localhost_urls: Final[
-            List[str]
-        ] = analyzer_service_localhost_urls
+        self._analyzer_service_localhost_urls: Final[List[str]] = (
+            analyzer_service_localhost_urls
+        )
         self._analyzer_service_request_distribution_index: int = 0
         # 分析服务的测试 GET URL
-        self._analyzer_service_test_get_urls: Final[
-            List[str]
-        ] = analyzer_service_test_get_urls
+        self._analyzer_service_test_get_urls: Final[List[str]] = (
+            analyzer_service_test_get_urls
+        )
 
     ################################################################################################################################################################################
     async def gather(

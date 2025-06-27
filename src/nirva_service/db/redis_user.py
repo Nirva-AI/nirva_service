@@ -28,7 +28,9 @@ def assign_user_access_token(username: str, token: UserToken) -> None:
     user_token_key = _user_access_token_key(username)
     nirva_service.db.redis_client.redis_delete(user_token_key)
     nirva_service.db.redis_client.redis_hset(user_token_key, token.model_dump())
-    nirva_service.db.redis_client.redis_expire(user_token_key, seconds=60)  # 设置过期时间为1小时
+    nirva_service.db.redis_client.redis_expire(
+        user_token_key, seconds=60
+    )  # 设置过期时间为1小时
 
 
 ###############################################################################################################################################

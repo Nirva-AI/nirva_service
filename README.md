@@ -127,39 +127,32 @@ make clean             # Clean up build artifacts
 make help              # Show all available commands
 ```
 
-### Pre-commit Issues
+### Pre-commit Hooks (Currently Disabled)
 
-If you encounter pre-commit hook failures during git commits, try these quick fixes:
+**Note**: Pre-commit hooks are currently disabled for easier development. The configuration is preserved in `.pre-commit-config.yaml.disabled`.
+
+To re-enable pre-commit hooks in the future:
 
 ```shell
-# Run automatic fixes for most common issues
-python scripts/fix_precommit_issues.py
+# Restore configuration
+mv .pre-commit-config.yaml.disabled .pre-commit-config.yaml
 
-# Or run individual fixes
-make format                    # Fix code formatting
-make sync-requirements        # Fix requirements.txt sync
+# Install hooks
+pre-commit install
 
-# Skip problematic hooks temporarily
-SKIP=flake8,mypy,bandit,pydocstyle git commit -m "your message"
+# Test hooks
+pre-commit run --all-files
 ```
 
-**Common Issues and Solutions:**
+**Manual Code Quality Checks:**
 
-1. **Test file naming**: Test files must end with `_test.py`
-2. **Code formatting**: Run `make format` to auto-fix
-3. **Line length**: Use black's default 88 characters - most E501 errors will be auto-fixed
-4. **Import sorting**: Handled automatically by isort
-5. **Requirements sync**: Run `make sync-requirements` after conda changes
-6. **Complex linting**: flake8, mypy, bandit, pydocstyle may need manual fixes
-
-**Development Workflow:**
-
-1. Make code changes
-2. Run `python scripts/fix_precommit_issues.py`
-3. If still failing, use `SKIP=` to temporarily bypass problematic hooks
-4. Address remaining issues incrementally
-
-**Note**: The project uses strict type checking and comprehensive linting. Some hooks may require manual intervention for complex issues like:
+```shell
+# Format code manually when needed
+make format                    # Run black and isort
+make lint                     # Check code quality  
+make type-check               # Run type checking
+make sync-requirements        # Sync requirements.txt
+```
 
 ---
 

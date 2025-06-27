@@ -69,7 +69,9 @@ async def handle_chat_action(
         display_name = nirva_service.db.redis_user.get_user_display_name(
             username=authenticated_user
         )
-        assert display_name != "", f"用户 {authenticated_user} 的显示名称不能为空，请先设置显示名称。"
+        assert (
+            display_name != ""
+        ), f"用户 {authenticated_user} 的显示名称不能为空，请先设置显示名称。"
 
         # 构建提示词。
         prompt = builtin_prompt.user_session_chat_message(
@@ -113,7 +115,9 @@ async def handle_chat_action(
 
         # 检查最后一条消息是否为 AI 消息
         if request_task._response.messages[-1].type != "ai":
-            logger.error(f"处理请求时最后一条消息不是 AI 消息: {request_task._response.messages[-1]}")
+            logger.error(
+                f"处理请求时最后一条消息不是 AI 消息: {request_task._response.messages[-1]}"
+            )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="处理请求时最后一条消息不是 AI 消息",

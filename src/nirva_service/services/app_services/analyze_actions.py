@@ -187,7 +187,9 @@ async def _analyze_task(
 
         if journal_file_db is not None:
             # 如果已经存在日记文件，直接返回
-            logger.info(f"已存在日记文件: 用户={username}, 时间戳={request_data.time_stamp}")
+            logger.info(
+                f"已存在日记文件: 用户={username}, 时间戳={request_data.time_stamp}"
+            )
             journal_file = JournalFile.model_validate_json(journal_file_db.content_json)
 
             # 更新任务状态为完成并存储结果
@@ -379,7 +381,9 @@ async def get_task_status(
     task_data = redis_task.get_task_status(username=authenticated_user, task_id=task_id)
 
     if not task_data:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="任务不存在或已过期")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="任务不存在或已过期"
+        )
 
     return task_data
 
