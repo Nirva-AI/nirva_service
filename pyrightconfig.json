@@ -1,0 +1,18 @@
+{
+    "include": [
+        "src",
+        "scripts",
+        "tests"
+    ],
+    "extraPaths": [
+        "src"
+    ],
+    "venvPath": ".",
+    "venv": "venv",
+    "pythonVersion": "3.12",
+    "typeCheckingMode": "basic",
+    "useLibraryCodeForTypes": true,
+    "autoImportCompletions": true,
+    "reportMissingImports": "warning",
+    "reportMissingTypeStubs": false
+}

@@ -5,5 +5,11 @@
         "--ignore-missing-imports",
         "--follow-imports=silent",
         "--show-column-numbers"
-    ]
+    ],
+    "python.analysis.extraPaths": [
+        "./src"
+    ],
+    "python.defaultInterpreterPath": "./venv/bin/python",
+    "python.analysis.autoImportCompletions": true,
+    "python.analysis.typeCheckingMode": "basic"
 }
