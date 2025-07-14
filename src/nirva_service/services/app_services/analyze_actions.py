@@ -1,3 +1,4 @@
+import asyncio
 import time
 import uuid
 from typing import Any, Dict, List, Optional, cast
@@ -21,6 +22,7 @@ from nirva_service.models import (
     UploadTranscriptActionRequest,
     UploadTranscriptActionResponse,
 )
+from nirva_service.models.journal import gen_fake_journal_file
 from nirva_service.services.langgraph_services.langgraph_models import (
     RequestTaskMessageListType,
 )
@@ -226,62 +228,85 @@ async def _analyze_task(
             )
             return
 
-        # 正式的分析步骤
-        analyze_process_context = AnalyzeProcessor(
-            authenticated_user=username,
-            chat_history=[
-                SystemMessage(
-                    content=builtin_prompt.user_session_system_message(
-                        username,
-                        nirva_service.db.redis_user.get_user_display_name(
-                            username=username
-                        ),
-                    )
-                ),
-                HumanMessage(content=builtin_prompt.event_segmentation_message()),
-                HumanMessage(
-                    content=builtin_prompt.transcript_message(
-                        formatted_date=request_data.time_stamp,
-                        transcript_content=transcript_content,
-                    )
-                ),
-            ],
-            appservice_server=appservice_server,
-        )
+        # TODO: 使用测试数据模式，模拟真实流程延迟
+        USE_FAKE_DATA = True  # 设置为False时使用真实处理流程
 
-        # 步骤1~2: 标签提取过程
-        await analyze_process_context.execute_label_extraction()
-        if analyze_process_context._label_extraction_response is None:
-            redis_task.update_task_status(
-                username=username,
-                task_id=task_id,
-                status=redis_task.TaskStatus.FAILED,
-                error="标签提取过程未返回有效响应。",
+        if USE_FAKE_DATA:
+            logger.info("使用测试数据模式，模拟处理流程延迟")
+
+            # 模拟步骤1~2: 标签提取过程的延迟 (通常2-3秒)
+            logger.info("开始执行标签提取过程...")
+            await asyncio.sleep(2.5)
+            logger.info("标签提取过程完成")
+
+            # 模拟步骤3: 反思过程的延迟 (通常3-4秒)
+            logger.info("开始执行反思过程...")
+            await asyncio.sleep(3.5)
+            logger.info("反思过程完成")
+
+            # 生成测试数据
+            journal_file = gen_fake_journal_file(
+                authenticated_user=username,
+                time_stamp=request_data.time_stamp,
             )
-            return
 
-        # 步骤3: 反思过程
-        await analyze_process_context.execute_reflection()
-        if analyze_process_context._reflection_response is None:
-            redis_task.update_task_status(
-                username=username,
-                task_id=task_id,
-                status=redis_task.TaskStatus.FAILED,
-                error="反思过程未返回有效响应。",
+        else:
+            # 正式的分析步骤
+            analyze_process_context = AnalyzeProcessor(
+                authenticated_user=username,
+                chat_history=[
+                    SystemMessage(
+                        content=builtin_prompt.user_session_system_message(
+                            username,
+                            nirva_service.db.redis_user.get_user_display_name(
+                                username=username
+                            ),
+                        )
+                    ),
+                    HumanMessage(content=builtin_prompt.event_segmentation_message()),
+                    HumanMessage(
+                        content=builtin_prompt.transcript_message(
+                            formatted_date=request_data.time_stamp,
+                            transcript_content=transcript_content,
+                        )
+                    ),
+                ],
+                appservice_server=appservice_server,
             )
-            return
 
-        # 构建数据
-        journal_file = JournalFile(
-            username=username,
-            time_stamp=request_data.time_stamp,
-            events=analyze_process_context._label_extraction_response.events,
-            daily_reflection=analyze_process_context._reflection_response.daily_reflection,
-        )
+            # 步骤1~2: 标签提取过程
+            await analyze_process_context.execute_label_extraction()
+            if analyze_process_context._label_extraction_response is None:
+                redis_task.update_task_status(
+                    username=username,
+                    task_id=task_id,
+                    status=redis_task.TaskStatus.FAILED,
+                    error="标签提取过程未返回有效响应。",
+                )
+                return
 
-        for event in journal_file.events:
-            # 放弃LLM生成的id，自己全部重新赋值。
-            event.event_id = str(uuid.uuid4())
+            # 步骤3: 反思过程
+            await analyze_process_context.execute_reflection()
+            if analyze_process_context._reflection_response is None:
+                redis_task.update_task_status(
+                    username=username,
+                    task_id=task_id,
+                    status=redis_task.TaskStatus.FAILED,
+                    error="反思过程未返回有效响应。",
+                )
+                return
+
+            # 构建数据
+            journal_file = JournalFile(
+                username=username,
+                time_stamp=request_data.time_stamp,
+                events=analyze_process_context._label_extraction_response.events,
+                daily_reflection=analyze_process_context._reflection_response.daily_reflection,
+            )
+
+            for event in journal_file.events:
+                # 放弃LLM生成的id，自己全部重新赋值。
+                event.event_id = str(uuid.uuid4())
 
         # 存储到数据库
         nirva_service.db.pgsql_journal_file.save_or_update_journal_file(
