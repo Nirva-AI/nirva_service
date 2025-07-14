@@ -73,6 +73,19 @@ async def handle_chat_action(
             display_name != ""
         ), f"用户 {authenticated_user} 的显示名称不能为空，请先设置显示名称。"
 
+        # 测试的返回。
+        is_test_return = False
+        if is_test_return:
+            # 直接将用户说的话返回给客户端
+            return ChatActionResponse(
+                ai_message=ChatMessage(
+                    id=str(uuid.uuid4()),
+                    role=MessageRole.AI,
+                    content=request_data.human_message.content,
+                    time_stamp=datetime.datetime.now().isoformat(),
+                ),
+            )
+
         # 构建提示词。
         prompt = builtin_prompt.user_session_chat_message(
             username=authenticated_user,
