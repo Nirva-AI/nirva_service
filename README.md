@@ -180,8 +180,13 @@ make test-cov
   - redis-cli --version
   - redis-cli 8.0.1
 - PostgreSQL
+  - psql --version
+  - psql (PostgreSQL) 14.18 (Homebrew)
 - pm2
+  - pm2 --version
+  - 5.3.1
 - mkcert
+  - local CA!
 - conda 23.7.4
   - conda --version
   - conda 23.7.4
