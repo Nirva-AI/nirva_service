@@ -74,7 +74,7 @@ This project uses MyPy strict mode to enhance long-term maintainability and stab
 
 ```shell
 # Type check specific files (as before)
-mypy --strict scripts/run_appservice_server.py scripts/run_chat_server.py scripts/run_analyzer_server.py scripts/run_dev_clear_db.py
+mypy --strict scripts/run_appservice_server.py scripts/run_chat_server.py scripts/run_analyzer_server.py scripts/run_dev_clear_db.py scripts/run_sample_app.py scripts/run_sample_internal_service.py
 
 # Or use the Makefile command
 make type-check

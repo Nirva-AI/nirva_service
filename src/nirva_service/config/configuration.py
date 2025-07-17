@@ -13,7 +13,7 @@ from pydantic import BaseModel
 @final
 class AppserviceServerConfig(BaseModel):
     server_ip_address: str = "0.0.0.0"
-    server_port: int = 8001
+    server_port: int = 8000
     local_network_ip: str = "192.168.192.122"
 
 
@@ -21,7 +21,7 @@ class AppserviceServerConfig(BaseModel):
 # 启动一个服务的配置
 @final
 class ChatServerConfig(BaseModel):
-    port: int = 8500
+    port: int = 8100
     temperature: float = 0.7
     chat_service_api: str = "/chat/v1/"
     test_get_api: str = "/chat/test/get/v1/"
@@ -34,7 +34,7 @@ class ChatServerConfig(BaseModel):
 # 启动一个服务的配置
 @final
 class AnalyzerServerConfig(BaseModel):
-    port: int = 8600
+    port: int = 8200
     temperature: float = 0.7
     analyze_service_api: str = "/analyze/v1/"
     test_get_api: str = "/analyze/test/get/v1/"
