@@ -180,3 +180,4 @@ make test-cov
 - PostgreSQL
 - pm2
 - mkcert
+- conda 23.7.4
