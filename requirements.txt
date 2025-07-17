@@ -1,19 +1,19 @@
-# This file is synchronized with environment.yml conda environment
+# This file is synchronized with environment-linux.yml conda environment
 # The main dependencies are defined in pyproject.toml
 # To install, use: pip install -e .
 # For development: pip install -e ".[dev]"
 
-# Core dependencies (with versions from environment.yml)
+# Core dependencies (with versions from environment-linux.yml)
 fastapi==0.110.0
-uvicorn==0.27.1
+uvicorn[standard]==0.27.1
 pydantic==2.10.3
 sqlalchemy==2.0.41
 alembic==1.16.2
-redis
-psycopg2-binary
+redis==6.2.0
+psycopg2-binary==2.9.10
 loguru==0.7.2
-python-jose==3.4.0
-passlib==1.7.4
+python-jose[cryptography]==3.4.0
+passlib[bcrypt]==1.7.4
 python-multipart==0.0.20
 requests==2.31.0
 langchain==0.3.11

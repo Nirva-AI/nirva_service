@@ -3,36 +3,33 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  # Core conda packages (removed build strings for cross-platform compatibility)
   - python=3.12
   - pip
+  # Core conda packages (removed build strings for cross-platform compatibility)
   - asyncpg=0.29.0
   - bzip2=1.0.8
   - ca-certificates
-  - cyrus-sasl=2.1.28
-  - expat=2.5.0
   - greenlet=3.1.1
-  - iniconfig=1.1.1
   - krb5=1.20.1
   - libffi=3.4.4
   - ncurses=6.4
-  - openldap=2.6.4
   - openssl=3.0.16
-  - pluggy=1.5.0
   - psycopg2=2.9.10
-  - pyhumps=3.8.0
-  - pytest=8.3.4
-  - readline=8.2
   - redis=3.5.3
   - setuptools
   - sqlite=3.41.2
   - tk=8.6.12
-  - typing-extensions=4.12.2
   - wheel
   - xz=5.4.6
   - zlib=1.2.13
+  # Testing packages
+  - pytest=8.3.4
+  - pluggy=1.5.0
+  - iniconfig=1.1.1
+  # Type packages
+  - typing-extensions=4.12.2
   - pip:
-      # Core FastAPI dependencies (synchronized with requirements.txt)
+      # Core FastAPI dependencies (versions synchronized with requirements.txt)
       - fastapi==0.110.0
       - uvicorn[standard]==0.27.1
       - pydantic==2.10.3
@@ -65,19 +62,18 @@ dependencies:
       - tiktoken==0.8.0
       - faiss-cpu==1.8.0
       
-      # Web and networking
+      # Core web dependencies
       - aiohttp==3.9.3
       - aiosignal==1.3.1
       - anyio==4.3.0
       - starlette==0.36.3
+      - uvloop==0.21.0
       - httpx==0.27.0
       - httpcore==1.0.4
       - httptools==0.6.4
-      - httpx-sse==0.4.0
-      - h11==0.14.0
-      - uvloop==0.21.0
-      - watchfiles==1.1.0
       - websockets==15.0.1
+      - watchfiles==1.1.0
+      - h11==0.14.0
       
       # Data processing
       - numpy==1.26.4
@@ -92,7 +88,7 @@ dependencies:
       - jsonschema==4.22.0
       - jsonschema-specifications==2023.12.1
       
-      # Security and authentication
+      # Security and auth
       - cryptography==44.0.3
       - bcrypt==3.2.2
       - ecdsa==0.19.1
@@ -116,7 +112,7 @@ dependencies:
       - platformdirs==4.2.2
       - pathspec==0.12.1
       
-      # Network protocols
+      # Network and HTTP
       - certifi==2024.2.2
       - charset-normalizer==3.3.2
       - urllib3==2.2.1
@@ -127,22 +123,23 @@ dependencies:
       - yarl==1.9.4
       - frozenlist==1.4.1
       
-      # Type system
+      # Type annotations and validation
       - annotated-types==0.6.0
       - pydantic-core==2.27.1
       - pydantic-settings==2.6.1
       - typing-inspect==0.9.0
+      - typing-extensions==4.12.2
       
-      # Async support
+      # Async and concurrency
       - greenlet==3.1.1
       - sse-starlette==2.0.0
       
-      # gRPC and Protocol Buffers
+      # Protocol buffers and gRPC
       - protobuf==5.29.4
       - grpcio==1.71.0
       - grpcio-tools==1.71.0
       
-      # Text processing
+      # Misc
       - regex==2023.12.25
       - markupsafe==2.1.5
       - marshmallow==3.21.0
@@ -158,8 +155,9 @@ dependencies:
       - cffi==1.17.1
       - pycparser==2.22
       - distro==1.9.0
+      - httpx-sse==0.4.0
       
-      # Development tools
+      # Development dependencies (optional)
       - black==24.8.0
       - mypy==1.15.0
       - mypy-extensions==1.0.0
@@ -195,5 +193,5 @@ dependencies:
       - types-setuptools==80.8.0.20250521
       - types-urllib3==1.26.25.13
       
-      # Project package
+      # Project itself
       - nirva-service==0.1.0
