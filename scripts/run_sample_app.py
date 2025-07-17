@@ -91,4 +91,3 @@ async def forward_to_internal(request: ForwardRequest) -> Dict[str, str]:
 # 运行配置
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
-

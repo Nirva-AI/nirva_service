@@ -177,7 +177,11 @@ make test-cov
 ## Required External Software
 
 - Redis
+  - redis-cli --version
+  - redis-cli 8.0.1
 - PostgreSQL
 - pm2
 - mkcert
 - conda 23.7.4
+  - conda --version
+  - conda 23.7.4

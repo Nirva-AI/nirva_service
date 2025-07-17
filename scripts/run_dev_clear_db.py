@@ -5,6 +5,56 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 
+def test_redis() -> None:
+    """
+    测试 Redis 连接和基本操作
+
+    使用简单的 set/get 操作验证 Redis 连接的可用性
+    """
+    from loguru import logger
+    from nirva_service.db.redis_client import redis_set, redis_get, redis_delete
+
+    test_key = "test_redis_connection"
+    test_value = "hello_redis_2025"
+
+    try:
+        logger.info("🔍 开始测试 Redis 连接...")
+
+        # 测试 SET 操作
+        logger.info(f"📝 设置测试键值: {test_key} = {test_value}")
+        redis_set(test_key, test_value)
+
+        # 测试 GET 操作
+        logger.info(f"📖 读取测试键值: {test_key}")
+        retrieved_value = redis_get(test_key)
+
+        # 验证结果
+        if retrieved_value == test_value:
+            logger.success(f"✅ Redis 连接测试成功! 读取到的值: {retrieved_value}")
+        else:
+            logger.error(
+                f"❌ Redis 连接测试失败! 期望值: {test_value}, 实际值: {retrieved_value}"
+            )
+            return
+
+        # 清理测试数据
+        logger.info(f"🧹 清理测试数据: {test_key}")
+        redis_delete(test_key)
+
+        # 验证删除
+        deleted_value = redis_get(test_key)
+        if deleted_value is None:
+            logger.success("✅ 测试数据清理成功!")
+        else:
+            logger.warning(f"⚠️ 测试数据清理异常，键值仍然存在: {deleted_value}")
+
+        logger.success("🎉 Redis 连接和基本操作测试全部通过!")
+
+    except Exception as e:
+        logger.error(f"❌ Redis 连接测试失败: {e}")
+        raise
+
+
 # Clear database development utility
 def main() -> None:
     from loguru import logger
@@ -17,6 +67,10 @@ def main() -> None:
     from nirva_service.db.redis_client import redis_flushall
 
     from nirva_service.models import JournalFile
+
+    # 首先测试 Redis 连接
+    logger.info("🚀 开始数据库清理和初始化...")
+    test_redis()
 
     # 清空 Redis 数据库
     redis_flushall()
