@@ -91,6 +91,4 @@ async def forward_to_internal(request: ForwardRequest) -> Dict[str, str]:
 # 运行配置
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
-# 主页: http://192.168.192.104:8000
-# GET测试: http://192.168.192.104:8000/hello/张三
-# API文档: http://192.168.192.104:8000/docs（可以测试POST方法）
+

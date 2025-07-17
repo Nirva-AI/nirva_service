@@ -44,6 +44,3 @@ async def internal_root() -> Dict[str, str]:
 # 运行配置
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8100)
-
-# 内部服务地址: http://192.168.192.104:8100
-# API文档: http://192.168.192.104:8100/docs
