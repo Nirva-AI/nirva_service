@@ -98,3 +98,4 @@ dump.rdb
 # Temporary files
 *.tmp
 *.temp
+.env
