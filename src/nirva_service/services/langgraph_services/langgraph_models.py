@@ -1,4 +1,4 @@
-from typing import List, Union, final
+from typing import List, final
 
 from langchain.schema import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from pydantic import BaseModel

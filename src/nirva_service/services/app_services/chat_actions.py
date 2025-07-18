@@ -74,7 +74,7 @@ async def handle_chat_action(
         ), f"用户 {authenticated_user} 的显示名称不能为空，请先设置显示名称。"
 
         # 测试的返回。
-        is_test_return = True
+        is_test_return = False
         if is_test_return:
             # 直接将用户说的话返回给客户端
             return ChatActionResponse(
