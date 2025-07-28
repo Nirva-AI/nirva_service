@@ -10,9 +10,9 @@ This module provides:
 
 from typing import List
 
-from .analyzer_azure_openai_gpt_4o_graph import *
+from .analyzer_llm_graph import *
 from .analyzer_server_fastapi import *
-from .chat_azure_openai_gpt_4o_graph import *
+from .chat_llm_graph import *
 from .chat_server_fastapi import *
 from .langgraph_models import *
 from .langgraph_request_task import *

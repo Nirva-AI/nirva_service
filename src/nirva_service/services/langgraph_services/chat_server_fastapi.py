@@ -3,7 +3,7 @@ from typing import Dict
 from fastapi import FastAPI, HTTPException, status
 
 from ...config.configuration import ChatServerConfig
-from .chat_azure_openai_gpt_4o_graph import (
+from .chat_llm_graph import (
     State,
     create_compiled_stage_graph,
     stream_graph_updates,
@@ -21,7 +21,7 @@ app = FastAPI(
 ############################################################################################################
 # 创建状态图
 compiled_state_graph = create_compiled_stage_graph(
-    "openai_chat_chatbot_node", chat_server_config.temperature
+    "chat_llm_node", chat_server_config.temperature
 )
 
 

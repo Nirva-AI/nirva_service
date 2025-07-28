@@ -33,24 +33,24 @@ def create_compiled_stage_graph(
         temperature=temperature,
     )
 
-    def invoke_openai_chat_llm_action(
+    def invoke_llm_action(
         state: State,
     ) -> Dict[str, List[BaseMessage]]:
         try:
             return {"messages": [llm.invoke(state["messages"])]}
         except Exception as e:
             # 1) 打印异常信息本身
-            print(f"invoke_openai_chat_llm_action, An error occurred: {e}")
+            print(f"invoke_llm_action, An error occurred: {e}")
 
             # 2) 打印完整堆栈信息，方便进一步排查
             traceback.print_exc()
 
-            # 当出现 OpenAI 内容过滤的情况，或者其他类型异常时，视需求可在此返回空字符串或者自定义提示。
+            # 当出现 LLM 内容过滤的情况，或者其他类型异常时，视需求可在此返回空字符串或者自定义提示。
             # return {"messages": [AIMessage(content="")]}
             raise e
 
     graph_builder = StateGraph(State)
-    graph_builder.add_node(node_name, invoke_openai_chat_llm_action)
+    graph_builder.add_node(node_name, invoke_llm_action)
     graph_builder.set_entry_point(node_name)
     graph_builder.set_finish_point(node_name)
     return graph_builder.compile()
@@ -84,7 +84,7 @@ def main() -> None:
 
     # 生成聊天机器人状态图
     compiled_stage_graph = create_compiled_stage_graph(
-        "openai_chat_chatbot_node", 0.7
+        "chat_llm_node", 0.7
     )
 
     while True:
