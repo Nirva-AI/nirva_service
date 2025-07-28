@@ -83,6 +83,9 @@ invisible/
 .VSCodeCounter/
 old_structure_backup/
 
+# Credentials and sensitive files
+credentials/
+
 # SSL certificates
 *.pem
 *.key

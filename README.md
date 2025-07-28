@@ -27,7 +27,60 @@ make install-dev
 pip install -e ".[dev]"
 ```
 
-### 3. Setup development environment (optional)
+### 3. Install Required External Software
+
+The project requires several external services. Install them using Homebrew (macOS):
+
+```shell
+# Install Redis and PostgreSQL
+brew install redis postgresql@14
+
+# Install pm2 (Node.js process manager)
+npm install -g pm2
+
+# Install mkcert for local HTTPS development
+brew install mkcert
+
+# Start the services
+brew services start redis
+brew services start postgresql@14
+
+# Set up mkcert for local HTTPS
+mkcert -install
+```
+
+### 4. Database Setup
+
+The application requires a PostgreSQL database with specific user and database:
+
+```shell
+# Create the database user
+psql -d postgres -c "CREATE USER fastapi_user WITH PASSWORD '123456';"
+
+# Create the database
+psql -d postgres -c "CREATE DATABASE my_fastapi_db OWNER fastapi_user;"
+
+# Grant privileges
+psql -d postgres -c "GRANT ALL PRIVILEGES ON DATABASE my_fastapi_db TO fastapi_user;"
+```
+
+### 5. Verify Database Connection
+
+Test that the database setup is working:
+
+```shell
+# Run the database test script
+python scripts/run_dev_clear_db.py
+```
+
+This script will:
+- Test Redis connection
+- Test PostgreSQL connection
+- Create test data
+- Clean up test data
+- Create a default test user
+
+### 6. Setup development environment (optional)
 
 ```shell
 # Setup pre-commit hooks and development tools
@@ -190,3 +243,45 @@ make test-cov
 - conda 23.7.4
   - conda --version
   - conda 23.7.4
+
+---
+
+## Configuration
+
+### Database Configuration
+
+The application uses the following database configuration (defined in `src/nirva_service/config/configuration.py`):
+
+```python
+postgres_password: Final[str] = "123456"
+POSTGRES_DATABASE_URL: Final[str] = (
+    f"postgresql://fastapi_user:{postgres_password}@localhost/my_fastapi_db"
+)
+```
+
+### Redis Configuration
+
+```python
+@final
+class RedisConfig(BaseModel):
+    host: str = "localhost"
+    port: int = 6379
+    db: int = 0
+```
+
+### Service Ports
+
+```python
+@final
+class AppserviceServerConfig(BaseModel):
+    server_ip_address: str = "0.0.0.0"
+    server_port: int = 8000
+
+@final
+class ChatServerConfig(BaseModel):
+    port: int = 8100
+
+@final
+class AnalyzerServerConfig(BaseModel):
+    port: int = 8200
+```
