@@ -8,7 +8,7 @@ from typing import Annotated, Dict, List
 
 from langchain.schema import HumanMessage
 from langchain_core.messages import BaseMessage
-from langchain_openai import AzureChatOpenAI
+from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.graph.state import CompiledStateGraph
@@ -27,32 +27,30 @@ def create_compiled_stage_graph(
 ) -> CompiledStateGraph:
     assert node_name != "", "node_name is empty"
 
-    llm = AzureChatOpenAI(
-        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-        api_key=SecretStr(str(os.getenv("AZURE_OPENAI_API_KEY"))),
-        azure_deployment="gpt-4o",
-        api_version="2024-02-01",
+    llm = ChatOpenAI(
+        model="gpt-4o-mini",
+        api_key=SecretStr(str(os.getenv("OPENAI_API_KEY"))),
         temperature=temperature,
     )
 
-    def invoke_azure_chat_openai_llm_action(
+    def invoke_openai_chat_llm_action(
         state: State,
     ) -> Dict[str, List[BaseMessage]]:
         try:
             return {"messages": [llm.invoke(state["messages"])]}
         except Exception as e:
             # 1) 打印异常信息本身
-            print(f"invoke_azure_chat_openai_llm_action, An error occurred: {e}")
+            print(f"invoke_openai_chat_llm_action, An error occurred: {e}")
 
             # 2) 打印完整堆栈信息，方便进一步排查
             traceback.print_exc()
 
-            # 当出现 Azure 内容过滤的情况，或者其他类型异常时，视需求可在此返回空字符串或者自定义提示。
+            # 当出现 OpenAI 内容过滤的情况，或者其他类型异常时，视需求可在此返回空字符串或者自定义提示。
             # return {"messages": [AIMessage(content="")]}
             raise e
 
     graph_builder = StateGraph(State)
-    graph_builder.add_node(node_name, invoke_azure_chat_openai_llm_action)
+    graph_builder.add_node(node_name, invoke_openai_chat_llm_action)
     graph_builder.set_entry_point(node_name)
     graph_builder.set_finish_point(node_name)
     return graph_builder.compile()
@@ -86,7 +84,7 @@ def main() -> None:
 
     # 生成聊天机器人状态图
     compiled_stage_graph = create_compiled_stage_graph(
-        "azure_chat_openai_chatbot_node", 0.7
+        "openai_chat_chatbot_node", 0.7
     )
 
     while True:

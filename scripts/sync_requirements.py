@@ -50,7 +50,6 @@ def generate_requirements_from_env() -> None:
         "langchain-core",
         "langchain-openai",
         "langgraph",
-        "azure-identity",
         "openai",
     ]
 
@@ -106,23 +105,23 @@ def generate_requirements_from_env() -> None:
                         content += f"{core_dep}\n"
                 except (subprocess.SubprocessError, ImportError, OSError):
                     content += f"{core_dep}\n"
-            elif base_name == "azure-identity":
-                # Try to get azure-identity version
-                try:
-                    result = subprocess.run(
-                        ["pip", "show", "azure-identity"],
-                        capture_output=True,
-                        text=True,
-                    )
-                    for line in result.stdout.split("\n"):
-                        if line.startswith("Version:"):
-                            version = line.split(": ")[1]
-                            content += f"azure-identity=={version}\n"
-                            break
-                    else:
-                        content += f"{core_dep}\n"
-                except (subprocess.SubprocessError, ImportError, OSError):
-                    content += f"{core_dep}\n"
+            # elif base_name == "azure-identity":
+            #     # Try to get azure-identity version
+            #     try:
+            #         result = subprocess.run(
+            #             ["pip", "show", "azure-identity"],
+            #             capture_output=True,
+            #             text=True,
+            #         )
+            #         for line in result.stdout.split("\n"):
+            #             if line.startswith("Version:"):
+            #                 version = line.split(": ")[1]
+            #                 content += f"azure-identity=={version}\n"
+            #                 break
+            #         else:
+            #             content += f"{core_dep}\n"
+            #     except (subprocess.SubprocessError, ImportError, OSError):
+            #         content += f"{core_dep}\n"
             else:
                 content += f"{core_dep}\n"
 

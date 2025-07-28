@@ -36,7 +36,6 @@ dependencies = [
     "langchain-core",
     "langchain-openai",
     "langgraph",
-    "azure-identity",
     "openai",
 ]
 

@@ -80,7 +80,18 @@ This script will:
 - Clean up test data
 - Create a default test user
 
-### 6. Setup development environment (optional)
+### 6. Setup OpenAI API Key
+
+```shell
+# Edit the .env file with your actual OpenAI API key
+# Replace "your-actual-openai-api-key-here" with your real API key
+nano .env
+
+# Load the environment variables
+source scripts/load_env.sh
+```
+
+### 7. Setup development environment (optional)
 
 ```shell
 # Setup pre-commit hooks and development tools
@@ -284,4 +295,16 @@ class ChatServerConfig(BaseModel):
 @final
 class AnalyzerServerConfig(BaseModel):
     port: int = 8200
+```
+
+### AI Model Configuration
+
+The application uses OpenAI's gpt-4o-mini model through the public OpenAI API. The model configuration is set in the LangGraph service files:
+
+```python
+llm = ChatOpenAI(
+    model="gpt-4o-mini",
+    api_key=SecretStr(str(os.getenv("OPENAI_API_KEY"))),
+    temperature=temperature,
+)
 ```

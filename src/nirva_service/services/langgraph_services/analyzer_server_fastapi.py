@@ -21,7 +21,7 @@ app = FastAPI(
 ############################################################################################################
 # 创建状态图
 compiled_state_graph = create_compiled_stage_graph(
-    "azure_chat_openai_chatbot_node", analyzer_server_config.temperature
+    "openai_chat_chatbot_node", analyzer_server_config.temperature
 )
 
 

@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Annotated, Dict, List, cast
 
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
-from langchain_openai import AzureChatOpenAI
+from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.graph.state import CompiledStateGraph
@@ -37,29 +37,27 @@ def create_compiled_stage_graph(
 ) -> CompiledStateGraph:
     assert node_name != "", "node_name is empty"
 
-    llm = AzureChatOpenAI(
-        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-        api_key=SecretStr(str(os.getenv("AZURE_OPENAI_API_KEY"))),
-        azure_deployment="gpt-4o",
-        api_version="2024-02-01",
+    llm = ChatOpenAI(
+        model="gpt-4o-mini",
+        api_key=SecretStr(str(os.getenv("OPENAI_API_KEY"))),
         temperature=temperature,
     )
 
-    def invoke_azure_chat_openai_llm_action(
+    def invoke_openai_chat_llm_action(
         state: State,
     ) -> Dict[str, List[BaseMessage]]:
         try:
             return {"messages": [llm.invoke(state["messages"])]}
         except Exception as e:
             # 1) 打印异常信息本身
-            logger.error(f"invoke_azure_chat_openai_llm_action, An error occurred: {e}")
+            logger.error(f"invoke_openai_chat_llm_action, An error occurred: {e}")
 
             # 2) 打印完整堆栈信息，方便进一步排查
             traceback.print_exc()
             raise e  # 重新抛出异常，确保调用者知道发生了错误
 
     graph_builder = StateGraph(State)
-    graph_builder.add_node(node_name, invoke_azure_chat_openai_llm_action)
+    graph_builder.add_node(node_name, invoke_openai_chat_llm_action)
     graph_builder.set_entry_point(node_name)
     graph_builder.set_finish_point(node_name)
     return graph_builder.compile()
@@ -119,7 +117,7 @@ def main() -> None:
 
     # 生成聊天机器人状态图
     compiled_stage_graph = create_compiled_stage_graph(
-        "azure_chat_openai_chatbot_node", 0.7
+        "openai_chat_chatbot_node", 0.7
     )
 
     step1_finished = False
@@ -240,6 +238,18 @@ def main() -> None:
                             logger.error(f"Failed to parse JSON: {e}")
                     else:
                         logger.warning("No JSON content found in the last message.")
+
+            else:
+                user_input_state = {"messages": [HumanMessage(content=user_input)]}
+
+                update_messages = stream_graph_updates(
+                    state_compiled_graph=compiled_stage_graph,
+                    chat_history_state=chat_history_state,
+                    user_input_state=user_input_state,
+                )
+
+                chat_history_state["messages"].extend(user_input_state["messages"])
+                chat_history_state["messages"].extend(update_messages)
 
         except Exception as e:
             assert False, f"Error in processing user input = {e}"

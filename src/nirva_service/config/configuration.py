@@ -70,7 +70,7 @@ assert GEN_CONFIGS_DIR.exists(), f"找不到目录: {GEN_CONFIGS_DIR}"
 LLM_SERVER_CONFIG_PATH = GEN_CONFIGS_DIR / "llm_server_config.json"
 llm_server_config = ChatServerConfig()
 LLM_SERVER_CONFIG_PATH.write_text(
-    llm_server_config.model_dump_json(),
+    llm_server_config.model_dump_json(indent=2),
     encoding="utf-8",
 )
 
@@ -78,7 +78,7 @@ LLM_SERVER_CONFIG_PATH.write_text(
 USER_SESSION_SERVER_CONFIG_PATH = GEN_CONFIGS_DIR / "user_session_server_config.json"
 user_session_server_config = AppserviceServerConfig()
 USER_SESSION_SERVER_CONFIG_PATH.write_text(
-    user_session_server_config.model_dump_json(),
+    user_session_server_config.model_dump_json(indent=2),
     encoding="utf-8",
 )
 
@@ -86,7 +86,7 @@ USER_SESSION_SERVER_CONFIG_PATH.write_text(
 REDIS_CONFIG_PATH = GEN_CONFIGS_DIR / "redis_config.json"
 redis_config = RedisConfig()
 REDIS_CONFIG_PATH.write_text(
-    redis_config.model_dump_json(),
+    redis_config.model_dump_json(indent=2),
     encoding="utf-8",
 )
 
