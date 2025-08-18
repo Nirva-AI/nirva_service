@@ -22,6 +22,12 @@ from nirva_service.models import (
     UploadTranscriptActionRequest,
     UploadTranscriptActionResponse,
 )
+from nirva_service.models.api import (
+    IncrementalAnalyzeRequest,
+    IncrementalAnalyzeResponse,
+    GetEventsRequest,
+    GetEventsResponse,
+)
 from nirva_service.models.journal import gen_fake_journal_file
 from nirva_service.services.langgraph_services.langgraph_models import (
     RequestTaskMessageListType,
@@ -339,6 +345,96 @@ async def _analyze_task(
 
 ###################################################################################################################################################################
 analyze_action_router = APIRouter()
+
+
+###################################################################################################################################################################
+# 增量分析API
+###################################################################################################################################################################
+
+@analyze_action_router.post(
+    path="/action/analyze/incremental/v1/", response_model=IncrementalAnalyzeResponse
+)
+async def handle_incremental_analyze(
+    request_data: IncrementalAnalyzeRequest,
+    appservice_server: AppserviceServerInstance,
+    authenticated_user: str = Depends(get_authenticated_user),
+) -> IncrementalAnalyzeResponse:
+    """处理增量转录分析"""
+
+    logger.info(f"/action/analyze/incremental/v1/: {request_data.model_dump_json()}")
+
+    try:
+        # 导入增量分析器
+        from .incremental_analyzer import IncrementalAnalyzer
+        
+        # 创建增量分析器
+        analyzer = IncrementalAnalyzer(appservice_server.langgraph_service)
+        
+        # 处理增量转录
+        result = await analyzer.process_incremental_transcript(
+            username=authenticated_user,
+            time_stamp=request_data.time_stamp,
+            new_transcript=request_data.new_transcript
+        )
+        
+        logger.info(f"增量分析完成: {result.message}")
+        return result
+
+    except Exception as e:
+        logger.error(f"增量分析失败: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"增量分析失败: {e}",
+        )
+
+
+###################################################################################################################################################################
+@analyze_action_router.post(
+    path="/action/analyze/events/get/v1/", response_model=GetEventsResponse
+)
+async def handle_get_events(
+    request_data: GetEventsRequest,
+    authenticated_user: str = Depends(get_authenticated_user),
+) -> GetEventsResponse:
+    """获取指定日期的所有事件"""
+
+    logger.info(f"/action/analyze/events/get/v1/: {request_data.model_dump_json()}")
+
+    try:
+        # 从数据库获取JournalFile
+        journal_db = nirva_service.db.pgsql_journal_file.get_journal_file(
+            username=authenticated_user,
+            time_stamp=request_data.time_stamp
+        )
+        
+        if not journal_db:
+            # 如果没有找到，返回空的事件列表
+            return GetEventsResponse(
+                time_stamp=request_data.time_stamp,
+                events=[],
+                total_count=0,
+                last_updated="未找到数据"
+            )
+        
+        # 解析JournalFile内容
+        import json
+        journal_data = json.loads(journal_db.content_json)
+        journal_file = JournalFile.model_validate(journal_data)
+        
+        # 返回事件列表
+        return GetEventsResponse(
+            time_stamp=request_data.time_stamp,
+            events=journal_file.events,
+            total_count=len(journal_file.events),
+            last_updated=journal_db.updated_at.isoformat() if journal_db.updated_at else "未知"
+        )
+
+    except Exception as e:
+        logger.error(f"获取事件列表失败: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取事件列表失败: {e}",
+        )
 
 
 ###################################################################################################################################################################
