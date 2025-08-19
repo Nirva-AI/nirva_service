@@ -98,6 +98,31 @@ source scripts/load_env.sh
 make setup-dev
 ```
 
+## 📚 API Documentation
+
+For client developers integrating with the Nirva Service API:
+
+### Quick Start Guide
+- **[Client Integration Guide](docs/CLIENT_INTEGRATION_GUIDE.md)** - Get started in 5 minutes with common use cases and examples
+
+### Complete API Reference
+- **[API Endpoints Reference](docs/API_ENDPOINTS_REFERENCE.md)** - Comprehensive documentation of all available endpoints
+
+### Interactive API Testing
+- **AppService Server**: http://localhost:8000/docs (Swagger UI)
+- **Analyzer Server**: http://localhost:8100/docs (Swagger UI)
+- **Chat Server**: http://localhost:8200/docs (Swagger UI)
+
+### Key Features
+- **Authentication**: JWT-based authentication system
+- **Analysis**: Transcript analysis with event extraction and daily reflection
+- **Incremental Processing**: Real-time analysis of new content
+- **Chat**: AI-powered conversational interface
+- **Background Tasks**: Asynchronous processing with task monitoring
+
+### Working Examples
+- **[Client Examples](examples/)** - Ready-to-run Python examples demonstrating API integration
+
 For VSCode debugging, set the Python interpreter to the `nirva` environment.
 
 ---

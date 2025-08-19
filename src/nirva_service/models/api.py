@@ -1,12 +1,11 @@
 from enum import IntEnum
-from typing import List, Optional, TYPE_CHECKING, final
+from typing import List, Optional, TYPE_CHECKING, final, Dict, Any
 
 from pydantic import BaseModel, Field
 
 from .registry import register_base_model_class
 
-if TYPE_CHECKING:
-    from .prompt import EventAnalysis
+from .prompt import EventAnalysis
 
 ################################################################################################################
 ################################################################################################################
@@ -77,15 +76,13 @@ class AnalyzeActionRequest(BaseModel):
 @final
 @register_base_model_class
 class UploadTranscriptActionRequest(BaseModel):
-    transcript_content: str
-    time_stamp: str
-    file_number: int
-    file_suffix: str
+    transcripts: List[Dict[str, Any]]  # List of transcript objects with content and time_stamp only
 
 
 @final
 @register_base_model_class
 class UploadTranscriptActionResponse(BaseModel):
+    results: List[Dict[str, Any]] = []  # List of results for each transcript
     message: str = ""
 
 

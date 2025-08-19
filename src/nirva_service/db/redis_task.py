@@ -1,6 +1,13 @@
 import json
 from datetime import datetime
-from enum import StrEnum, unique
+from enum import Enum, unique
+
+# Python 3.10 compatibility: StrEnum was introduced in Python 3.11
+try:
+    from enum import StrEnum  # type: ignore
+except ImportError:
+    class StrEnum(str, Enum):
+        pass
 from typing import Any, Dict, Optional, final
 
 import nirva_service.db.redis_client

@@ -544,11 +544,14 @@ async def _post_upload_transcript_action(
         logger.error(f"无法从文件名 {upload_file} 中解析出日期时间、文件编号或后缀。")
         return
 
+    # Create a single transcript in the new format
+    transcript = {
+        "transcript_content": transcript_content,
+        "time_stamp": parse_info[0].isoformat(),
+    }
+
     request_data = UploadTranscriptActionRequest(
-        transcript_content=transcript_content,
-        time_stamp=parse_info[0].isoformat(),
-        file_number=parse_info[1],
-        file_suffix=parse_info[2],
+        transcripts=[transcript]
     )
     response = _safe_post(
         context.upload_transcript_url,

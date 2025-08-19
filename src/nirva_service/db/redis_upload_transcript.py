@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
 import nirva_service.db.redis_client
 
@@ -52,8 +52,8 @@ import nirva_service.db.redis_client
 
 
 ###############################################################################################################################################
-def _upload_transcript_key(username: str, time_stamp: str, file_number: int) -> str:
-    return f"upload_transcript:{username}:{time_stamp}:{file_number}"
+def _upload_transcript_key(username: str, time_stamp: str) -> str:
+    return f"upload_transcript:{username}:{time_stamp}"
 
 
 ###############################################################################################################################################
@@ -61,7 +61,6 @@ def _upload_transcript_key(username: str, time_stamp: str, file_number: int) -> 
 def store_transcript(
     username: str,
     time_stamp: str,
-    file_number: int,
     transcript_content: str,
     expiration_time: Optional[int] = None,
 ) -> None:
@@ -71,66 +70,139 @@ def store_transcript(
     参数:
         username: 用户名
         time_stamp: 时间戳
-        file_number: 文件编号
         transcript_content: 转录内容
         expiration_time: 可选的过期时间（秒），如果为None或小于等于0，则默认为60秒
     """
     expire_seconds = (
         expiration_time if expiration_time is not None and expiration_time > 0 else 60
     )
-    upload_transcript_key = _upload_transcript_key(username, time_stamp, file_number)
+    upload_transcript_key = _upload_transcript_key(username, time_stamp)
     nirva_service.db.redis_client.redis_setex(
         upload_transcript_key, expire_seconds, transcript_content
     )
 
 
 ###############################################################################################################################################
-def get_transcript(username: str, time_stamp: str, file_number: int) -> str:
+def get_transcript(username: str, time_stamp: str) -> str:
     """
     获取用户的转录内容
 
     参数:
         username: 用户名
         time_stamp: 时间戳
-        file_number: 文件编号
 
     返回:
         str: 转录内容，如果不存在则返回空字符串
     """
-    upload_transcript_key = _upload_transcript_key(username, time_stamp, file_number)
+    upload_transcript_key = _upload_transcript_key(username, time_stamp)
     transcript_content = nirva_service.db.redis_client.redis_get(upload_transcript_key)
     return transcript_content if transcript_content is not None else ""
 
 
 ###############################################################################################################################################
-def is_transcript_stored(username: str, time_stamp: str, file_number: int) -> bool:
+def is_transcript_stored(username: str, time_stamp: str) -> bool:
     """
     检查用户的转录内容是否已存储
 
     参数:
         username: 用户名
         time_stamp: 时间戳
-        file_number: 文件编号
 
     返回:
         bool: 如果转录内容已存储则返回True，否则返回False
     """
-    upload_transcript_key = _upload_transcript_key(username, time_stamp, file_number)
+    upload_transcript_key = _upload_transcript_key(username, time_stamp)
     return nirva_service.db.redis_client.redis_exists(upload_transcript_key)
 
 
 ###############################################################################################################################################
-def remove_transcript(username: str, time_stamp: str, file_number: int) -> None:
+def remove_transcript(username: str, time_stamp: str) -> None:
     """
     从Redis中删除用户的转录内容
 
     参数:
         username: 用户名
         time_stamp: 时间戳
-        file_number: 文件编号
     """
-    upload_transcript_key = _upload_transcript_key(username, time_stamp, file_number)
+    upload_transcript_key = _upload_transcript_key(username, time_stamp)
     nirva_service.db.redis_client.redis_delete(upload_transcript_key)
+
+
+###############################################################################################################################################
+def store_transcripts_batch(
+    username: str,
+    transcripts: List[Dict[str, Any]],
+    expiration_time: Optional[int] = None,
+) -> List[Dict[str, Any]]:
+    """
+    批量存储用户的转录内容到Redis
+
+    参数:
+        username: 用户名
+        transcripts: 转录内容列表，每个元素包含 transcript_content, time_stamp
+        expiration_time: 可选的过期时间（秒），如果为None或小于等于0，则默认为60秒
+
+    返回:
+        List[Dict[str, Any]]: 处理结果列表，每个元素包含 success, message, time_stamp
+    """
+    results = []
+    expire_seconds = (
+        expiration_time if expiration_time is not None and expiration_time > 0 else 60
+    )
+    
+    for transcript in transcripts:
+        try:
+            transcript_content = transcript.get("transcript_content", "")
+            time_stamp = transcript.get("time_stamp", "")
+            
+            # 验证必要字段
+            if not transcript_content.strip():
+                results.append({
+                    "success": False,
+                    "message": "转录内容不能为空",
+                    "time_stamp": time_stamp
+                })
+                continue
+                
+            if not time_stamp:
+                results.append({
+                    "success": False,
+                    "message": "时间戳不能为空",
+                    "time_stamp": time_stamp
+                })
+                continue
+            
+            # 检查是否已存在
+            if is_transcript_stored(username, time_stamp):
+                results.append({
+                    "success": True,
+                    "message": f"该转录内容已存在: 用户={username}, 时间戳={time_stamp}",
+                    "time_stamp": time_stamp
+                })
+                continue
+            
+            # 存储转录内容
+            store_transcript(
+                username=username,
+                time_stamp=time_stamp,
+                transcript_content=transcript_content,
+                expiration_time=expire_seconds
+            )
+            
+            results.append({
+                "success": True,
+                "message": f"转录内容已存储: 用户={username}, 时间戳={time_stamp}",
+                "time_stamp": time_stamp
+            })
+            
+        except Exception as e:
+            results.append({
+                "success": False,
+                "message": f"存储失败: {str(e)}",
+                "time_stamp": transcript.get("time_stamp", "")
+            })
+    
+    return results
 
 
 ###############################################################################################################################################

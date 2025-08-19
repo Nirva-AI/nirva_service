@@ -22,6 +22,7 @@ from nirva_service.models import (
     UploadTranscriptActionRequest,
     UploadTranscriptActionResponse,
 )
+# EventAnalysis is imported via models/__init__.py
 from nirva_service.models.api import (
     IncrementalAnalyzeRequest,
     IncrementalAnalyzeResponse,
@@ -101,10 +102,11 @@ class AnalyzeProcessor:
             self._chat_history.extend(messages)
 
             # 记录标签提取响应
-            logger.info(
-                "Label extraction response:",
-                self._label_extraction_response.model_dump_json(),
-            )
+            if self._label_extraction_response:
+                logger.info(
+                    "Label extraction response:",
+                    self._label_extraction_response.model_dump_json(),
+                )
 
         except Exception as e:
             logger.error("Failed to execute label extraction:", e)
@@ -156,10 +158,11 @@ class AnalyzeProcessor:
             self._chat_history.extend(messages)
 
             # 记录反思响应
-            logger.info(
-                "Reflection response:",
-                self._reflection_response.model_dump_json(),
-            )
+            if self._reflection_response:
+                logger.info(
+                    "Reflection response:",
+                    self._reflection_response.model_dump_json(),
+                )
 
         except Exception as e:
             logger.error("Failed to execute reflection:", e)
@@ -209,7 +212,6 @@ async def _analyze_task(
         if not nirva_service.db.redis_upload_transcript.is_transcript_stored(
             username=username,
             time_stamp=request_data.time_stamp,
-            file_number=request_data.file_number,
         ):
             redis_task.update_task_status(
                 username=username,
@@ -223,7 +225,6 @@ async def _analyze_task(
         transcript_content = nirva_service.db.redis_upload_transcript.get_transcript(
             username=username,
             time_stamp=request_data.time_stamp,
-            file_number=request_data.file_number,
         )
         if transcript_content.strip() == "":
             redis_task.update_task_status(
@@ -556,40 +557,29 @@ async def handle_upload_transcript(
     logger.info(f"/action/upload_transcript/v1/: {request_data.model_dump_json()}")
 
     try:
-        # 内容不能为空！
-        if request_data.transcript_content.strip() == "":
+        # 验证转录列表不能为空
+        if not request_data.transcripts:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="转录内容不能为空。",
+                detail="转录列表不能为空。",
             )
 
-        # 检查转录内容是否已存在，存在了就不需要再存储了。
-        if nirva_service.db.redis_upload_transcript.is_transcript_stored(
+        # 批量存储转录内容到 Redis
+        results = nirva_service.db.redis_upload_transcript.store_transcripts_batch(
             username=authenticated_user,
-            time_stamp=request_data.time_stamp,
-            file_number=request_data.file_number,
-        ):
-            return UploadTranscriptActionResponse(
-                message=f"该转录内容已存在: 用户={authenticated_user}, 时间戳={request_data.time_stamp}, 文件编号={request_data.file_number}",
-            )
-
-        # 存储转录内容到 Redis
-        nirva_service.db.redis_upload_transcript.store_transcript(
-            username=authenticated_user,
-            time_stamp=request_data.time_stamp,
-            file_number=request_data.file_number,
-            transcript_content=request_data.transcript_content,
+            transcripts=request_data.transcripts,
             # expiration_time=60 * 60,  # 设置过期时间为1小时
         )
 
         # 记录日志
         logger.info(
-            f"转录内容已存储: 用户={authenticated_user}, 时间戳={request_data.time_stamp}, 文件编号={request_data.file_number}"
+            f"批量转录内容处理完成: 用户={authenticated_user}, 处理数量={len(results)}"
         )
 
         # 返回成功响应
         return UploadTranscriptActionResponse(
-            message=f"转录内容已存储: 用户={authenticated_user}, 时间戳={request_data.time_stamp}, 文件编号={request_data.file_number}",
+            results=results,
+            message=f"批量转录内容处理完成: 用户={authenticated_user}, 处理数量={len(results)}",
         )
 
     except Exception as e:
