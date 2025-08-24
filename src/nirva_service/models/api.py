@@ -137,3 +137,20 @@ class GetEventsResponse(BaseModel):
 
 
 ###################################################################################################################################################################
+
+
+@final
+@register_base_model_class
+class S3UploadTokenResponse(BaseModel):
+    """Response containing temporary AWS credentials for S3 upload."""
+    access_key_id: str = Field(description="Temporary AWS access key ID")
+    secret_access_key: str = Field(description="Temporary AWS secret access key")
+    session_token: str = Field(description="Temporary AWS session token")
+    expiration: str = Field(description="Token expiration timestamp (ISO format)")
+    bucket: str = Field(description="S3 bucket name")
+    prefix: str = Field(description="User-specific S3 prefix")
+    region: str = Field(description="AWS region")
+    duration_seconds: int = Field(description="Token validity duration in seconds")
+
+
+###################################################################################################################################################################

@@ -9,7 +9,7 @@ import nirva_service.db.redis_user
 from nirva_service.db.jwt import UserToken, decode_jwt
 
 # 获取当前用户
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login/v1/")
 
 
 async def get_authenticated_user(token: str = Depends(oauth2_scheme)) -> str:

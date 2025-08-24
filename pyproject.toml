@@ -37,6 +37,8 @@ dependencies = [
     "langchain-openai",
     "langgraph",
     "openai",
+    "boto3",
+    "python-dotenv",
 ]
 
 [project.optional-dependencies]
