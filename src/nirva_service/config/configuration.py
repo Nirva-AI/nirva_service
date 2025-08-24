@@ -44,6 +44,20 @@ class AnalyzerServerConfig(BaseModel):
 
 
 ##################################################################################################################
+# Audio Processing Server configuration
+@final
+class AudioProcessorServerConfig(BaseModel):
+    port: int = 8300
+    sqs_queue_url: str = ""  # Will be set from environment
+    poll_interval_seconds: int = 5
+    max_messages_per_poll: int = 10
+    visibility_timeout: int = 300  # 5 minutes to process each message
+    fast_api_title: str = "audio_processor_service"
+    fast_api_version: str = "0.0.1"
+    fast_api_description: str = "Audio file processing and transcription service"
+
+
+##################################################################################################################
 # redis的配置
 @final
 class RedisConfig(BaseModel):

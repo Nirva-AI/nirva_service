@@ -82,6 +82,52 @@ class JournalFileDB(UUIDBase):
     user: Mapped["UserDB"] = relationship("UserDB", back_populates="journal_files")
 
 
+# Audio file tracking
+class AudioFileDB(UUIDBase):
+    __tablename__ = "audio_files"
+    
+    # User association
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id"), nullable=False, index=True
+    )
+    username: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    
+    # S3 location
+    s3_bucket: Mapped[str] = mapped_column(String(100), nullable=False)
+    s3_key: Mapped[str] = mapped_column(String(500), nullable=False)
+    
+    # File metadata
+    file_size: Mapped[Optional[int]] = mapped_column(nullable=True)
+    duration_seconds: Mapped[Optional[float]] = mapped_column(nullable=True)
+    format: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    
+    # Processing status
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="uploaded"
+    )  # uploaded, processing, transcribed, failed
+    
+    # Transcription result
+    transcription_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    transcription_service: Mapped[Optional[str]] = mapped_column(
+        String(20), nullable=True
+    )  # aws, deepgram, etc
+    
+    # Timestamps
+    uploaded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    processed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    
+    # Error tracking
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    retry_count: Mapped[int] = mapped_column(default=0)
+    
+    # Relationships
+    user: Mapped["UserDB"] = relationship("UserDB", backref="audio_files")
+
+
 """
 SELECT * FROM journal_files WHERE username = 'weilyupku@gmail.com';
 

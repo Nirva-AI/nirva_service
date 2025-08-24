@@ -47,6 +47,8 @@ cover/
 
 # Environments
 .env
+.env.*
+.env.audio_processor
 .venv
 env/
 venv/

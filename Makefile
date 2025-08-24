@@ -58,11 +58,26 @@ run-chat: ## Start the chat server
 run-analyzer: ## Start the analyzer server
 	python scripts/run_analyzer_server.py
 
+run-audio-processor: ## Start the audio processor server
+	python scripts/run_audio_processor_server.py
+
 clear-db: ## Clear database (development only)
 	python scripts/run_dev_clear_db.py
 
 run-all: ## Start all services using pm2
 	./scripts/run_pm2script.sh
+
+pm2-reload: ## Reload PM2 services without downtime
+	pm2 reload ecosystem.config.js
+
+pm2-stop: ## Stop all PM2 services
+	pm2 stop all
+
+pm2-status: ## Show PM2 service status
+	pm2 status
+
+pm2-logs: ## Show PM2 logs
+	pm2 logs
 
 # Database
 db-upgrade: ## Run database migrations
