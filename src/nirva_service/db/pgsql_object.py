@@ -87,10 +87,10 @@ class AudioFileDB(UUIDBase):
     __tablename__ = "audio_files"
     
     # User association
-    user_id: Mapped[UUID] = mapped_column(
-        ForeignKey("users.id"), nullable=False, index=True
+    user_id: Mapped[Optional[UUID]] = mapped_column(
+        ForeignKey("users.id"), nullable=True, index=True  # Nullable for native-audio uploads
     )
-    username: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    username: Mapped[str] = mapped_column(String(100), nullable=False, index=True)  # Stores session ID/hash
     
     # S3 location
     s3_bucket: Mapped[str] = mapped_column(String(100), nullable=False)

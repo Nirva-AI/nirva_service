@@ -99,13 +99,26 @@ async def process_s3_event(message: dict, s3_client) -> None:
         return
     
     # Extract user information from the S3 key
-    # Expected format: users/{user_id}/...
+    # Expected format: native-audio/{encoded_user_id}/segment_*.wav
     key_parts = key.split('/')
-    if len(key_parts) < 2 or key_parts[0] != 'users':
+    if len(key_parts) < 3 or key_parts[0] != 'native-audio':
         logger.warning(f"Unexpected S3 key format: {key}")
         return
     
-    user_id = key_parts[1]
+    # The second part is likely a JWT token or encoded user identifier
+    # This appears to be part of a JWT token (starts with eyJhbGci which decodes to {"alg")
+    encoded_user_id = key_parts[1]
+    filename = key_parts[2]
+    
+    # For now, use a hash of the encoded ID as a consistent user identifier
+    # This ensures we can track files from the same user session
+    import hashlib
+    user_id_hash = hashlib.sha256(encoded_user_id.encode()).hexdigest()[:12]
+    
+    # Use the hash for database storage (keeps it consistent and shorter)
+    user_id = user_id_hash
+    
+    logger.info(f"Processing audio file: {filename} for user session: {user_id}")
     
     # Get file metadata from S3
     try:
@@ -141,8 +154,8 @@ async def process_s3_event(message: dict, s3_client) -> None:
         else:
             # Create new audio file record
             audio_file = AudioFileDB(
-                user_id=user_id,
-                username="",  # Will need to look up from user_id later
+                user_id=None,  # No direct user mapping for native-audio uploads
+                username=user_id,  # Using the hash as session identifier
                 s3_bucket=bucket,
                 s3_key=key,
                 file_size=file_size,
