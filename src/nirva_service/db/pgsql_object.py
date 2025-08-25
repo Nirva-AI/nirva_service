@@ -101,6 +101,16 @@ class AudioFileDB(UUIDBase):
     duration_seconds: Mapped[Optional[float]] = mapped_column(nullable=True)
     format: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     
+    # VAD (Voice Activity Detection) results
+    speech_segments: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True
+    )  # JSON array of [start, end] timestamps
+    num_speech_segments: Mapped[Optional[int]] = mapped_column(nullable=True)
+    total_speech_duration: Mapped[Optional[float]] = mapped_column(nullable=True)
+    speech_ratio: Mapped[Optional[float]] = mapped_column(
+        nullable=True
+    )  # Ratio of speech to total duration
+    
     # Processing status
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, default="uploaded"
@@ -115,6 +125,9 @@ class AudioFileDB(UUIDBase):
     # Timestamps
     uploaded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    vad_processed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
     processed_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True

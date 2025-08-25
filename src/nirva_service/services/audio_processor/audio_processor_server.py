@@ -4,8 +4,9 @@ Audio Processor Server - Polls SQS for S3 upload events and processes audio file
 
 import asyncio
 import os
+import tempfile
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Dict, Any
 from datetime import datetime
 import json
 
@@ -15,6 +16,7 @@ import boto3
 from sqlalchemy.orm import Session
 
 from nirva_service.services.storage.sqs_service import get_sqs_service
+from nirva_service.services.audio_processing import get_vad_service
 from nirva_service.db.pgsql_client import SessionLocal
 from nirva_service.db.pgsql_object import AudioFileDB
 from nirva_service.config.configuration import AudioProcessorServerConfig
@@ -77,6 +79,90 @@ async def process_sqs_messages():
         except Exception as e:
             logger.error(f"Error in SQS polling loop: {e}")
             await asyncio.sleep(10)  # Wait before retrying
+
+
+async def apply_vad_processing(audio_file_id: str, bucket: str, key: str) -> None:
+    """
+    Apply Voice Activity Detection to an audio file.
+    
+    Args:
+        audio_file_id: Database ID of the audio file
+        bucket: S3 bucket name
+        key: S3 object key
+    """
+    logger.info(f"Starting VAD processing for {audio_file_id}")
+    
+    # Initialize services
+    s3_client = boto3.client('s3')
+    vad_service = get_vad_service()
+    db: Session = SessionLocal()
+    
+    try:
+        # Download audio file from S3
+        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp_file:
+            temp_path = tmp_file.name
+            
+        logger.info(f"Downloading audio from s3://{bucket}/{key}")
+        s3_client.download_file(bucket, key, temp_path)
+        
+        # Apply VAD
+        logger.info(f"Applying VAD to {temp_path}")
+        vad_result = vad_service.process_audio_file(
+            temp_path,
+            return_seconds=True,
+            min_speech_duration_ms=250,  # Minimum 250ms speech
+            min_silence_duration_ms=100,  # Minimum 100ms silence to split
+            threshold=0.5,
+            speech_pad_ms=30
+        )
+        
+        # Update database with VAD results
+        audio_file = db.query(AudioFileDB).filter_by(id=audio_file_id).first()
+        if audio_file:
+            audio_file.speech_segments = json.dumps(vad_result['segments'])
+            audio_file.num_speech_segments = vad_result['num_segments']
+            audio_file.total_speech_duration = vad_result['speech_duration']
+            audio_file.speech_ratio = vad_result['speech_ratio']
+            audio_file.duration_seconds = vad_result['total_duration']
+            audio_file.vad_processed_at = datetime.utcnow()
+            audio_file.status = 'vad_complete'
+            
+            db.commit()
+            
+            logger.info(
+                f"VAD complete for {audio_file_id}: "
+                f"{vad_result['num_segments']} segments, "
+                f"{vad_result['speech_duration']:.1f}s speech / "
+                f"{vad_result['total_duration']:.1f}s total "
+                f"({vad_result['speech_ratio']*100:.1f}%)"
+            )
+            
+            # If there's speech, mark ready for transcription
+            if vad_result['num_segments'] > 0:
+                logger.info(f"Audio file {audio_file_id} ready for transcription")
+            else:
+                logger.warning(f"No speech detected in {audio_file_id}, skipping transcription")
+                audio_file.status = 'no_speech'
+                db.commit()
+        
+    except Exception as e:
+        logger.error(f"Error in VAD processing for {audio_file_id}: {e}")
+        # Update status to failed
+        try:
+            audio_file = db.query(AudioFileDB).filter_by(id=audio_file_id).first()
+            if audio_file:
+                audio_file.status = 'vad_failed'
+                audio_file.error_message = str(e)
+                db.commit()
+        except:
+            pass
+    
+    finally:
+        # Clean up
+        db.close()
+        if 'temp_path' in locals() and os.path.exists(temp_path):
+            os.remove(temp_path)
+            logger.debug(f"Cleaned up temp file: {temp_path}")
 
 
 async def process_s3_event(message: dict, s3_client) -> None:
@@ -170,9 +256,8 @@ async def process_s3_event(message: dict, s3_client) -> None:
             
             logger.info(f"Created audio file record: {audio_file.id} for s3://{bucket}/{key}")
             
-            # TODO: Queue for transcription processing
-            # For now, just log that it's ready for processing
-            logger.info(f"Audio file {audio_file.id} ready for transcription")
+            # Apply VAD processing
+            asyncio.create_task(apply_vad_processing(audio_file.id, bucket, key))
     
     except Exception as e:
         logger.error(f"Database error: {e}")
