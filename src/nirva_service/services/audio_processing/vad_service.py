@@ -171,6 +171,82 @@ class VADService:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
     
+    def extract_and_concat_speech(
+        self,
+        audio_files_with_vad: List[Tuple[str, Dict[str, Any]]],
+        output_sample_rate: int = 16000
+    ) -> Optional[bytes]:
+        """
+        Extract and concatenate speech segments from multiple audio files.
+        
+        Args:
+            audio_files_with_vad: List of tuples (audio_path, vad_result)
+            output_sample_rate: Sample rate for output audio
+            
+        Returns:
+            Concatenated speech audio as WAV bytes, or None if no speech
+        """
+        try:
+            all_speech_segments = []
+            
+            for audio_path, vad_result in audio_files_with_vad:
+                if not vad_result.get('segments'):
+                    logger.debug(f"No speech in {audio_path}, skipping")
+                    continue
+                
+                # Read audio file
+                wav = read_audio(audio_path, sampling_rate=self.sample_rate)
+                
+                # Extract speech segments (vad_result segments are in samples if return_seconds=False)
+                for start, end in vad_result['segments']:
+                    # If segments are in seconds, convert to samples
+                    if isinstance(start, float):
+                        start_sample = int(start * self.sample_rate)
+                        end_sample = int(end * self.sample_rate)
+                    else:
+                        start_sample = start
+                        end_sample = end
+                    
+                    speech_segment = wav[start_sample:end_sample]
+                    all_speech_segments.append(speech_segment)
+            
+            if not all_speech_segments:
+                logger.warning("No speech segments found in any audio files")
+                return None
+            
+            # Concatenate all speech segments
+            concatenated = torch.cat(all_speech_segments)
+            
+            # Convert to numpy for saving
+            audio_numpy = concatenated.numpy()
+            
+            # Save to temporary WAV file and read back as bytes
+            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp_file:
+                temp_path = tmp_file.name
+            
+            try:
+                # Save using soundfile for proper WAV format
+                import soundfile as sf
+                sf.write(temp_path, audio_numpy, output_sample_rate)
+                
+                # Read back as bytes
+                with open(temp_path, 'rb') as f:
+                    wav_bytes = f.read()
+                
+                total_duration = len(concatenated) / self.sample_rate
+                logger.info(f"Extracted {total_duration:.1f}s of speech from {len(audio_files_with_vad)} files")
+                
+                return wav_bytes
+                
+            finally:
+                # Clean up temp file
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+                    
+        except Exception as e:
+            logger.error(f"Error extracting and concatenating speech: {e}")
+            return None
+    
     def filter_silence(
         self,
         audio_path: str,

@@ -7,7 +7,7 @@ import os
 import tempfile
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Dict, Any
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 
 from fastapi import FastAPI, HTTPException
@@ -16,9 +16,10 @@ import boto3
 from sqlalchemy.orm import Session
 
 from nirva_service.services.storage.sqs_service import get_sqs_service
-from nirva_service.services.audio_processing import get_vad_service
+from nirva_service.services.audio_processing import get_vad_service, get_deepgram_service
+from nirva_service.services.audio_processor.batch_manager import get_batch_manager
 from nirva_service.db.pgsql_client import SessionLocal
-from nirva_service.db.pgsql_object import AudioFileDB
+from nirva_service.db.pgsql_object import AudioFileDB, AudioBatchDB, TranscriptionResultDB
 from nirva_service.config.configuration import AudioProcessorServerConfig
 
 
@@ -27,6 +28,170 @@ config = AudioProcessorServerConfig()
 
 # Background task reference
 background_task = None
+
+
+async def process_batch_transcription(batch_id: str) -> None:
+    """
+    Process a batch of audio segments for transcription.
+    
+    Args:
+        batch_id: ID of the batch to process
+    """
+    logger.info(f"Starting transcription for batch {batch_id}")
+    
+    db: Session = SessionLocal()
+    vad_service = get_vad_service()
+    deepgram_service = get_deepgram_service()
+    s3_client = boto3.client('s3')
+    batch_manager = get_batch_manager()
+    
+    try:
+        # Get batch and its segments
+        batch = db.query(AudioBatchDB).filter_by(id=batch_id).first()
+        if not batch:
+            logger.error(f"Batch {batch_id} not found")
+            return
+        
+        # Mark as processing
+        batch_manager.mark_batch_processing(batch, db)
+        
+        # Get all segments in the batch
+        segments = batch_manager.get_batch_segments(batch, db)
+        
+        if not segments:
+            logger.warning(f"No segments found for batch {batch_id}")
+            batch_manager.mark_batch_completed(batch, db)
+            return
+        
+        logger.info(f"Processing {len(segments)} segments for batch {batch_id}")
+        
+        # Download audio files and get VAD results
+        audio_files_with_vad = []
+        temp_files = []
+        
+        for segment in segments:
+            try:
+                # Download audio from S3
+                with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp_file:
+                    temp_path = tmp_file.name
+                    temp_files.append(temp_path)
+                
+                s3_client.download_file(segment.s3_bucket, segment.s3_key, temp_path)
+                
+                # Parse VAD results
+                vad_result = {
+                    'segments': json.loads(segment.speech_segments) if segment.speech_segments else [],
+                    'speech_duration': segment.total_speech_duration or 0
+                }
+                
+                audio_files_with_vad.append((temp_path, vad_result))
+                
+            except Exception as e:
+                logger.error(f"Error downloading segment {segment.id}: {e}")
+                continue
+        
+        if not audio_files_with_vad:
+            logger.error(f"No audio files could be downloaded for batch {batch_id}")
+            batch_manager.mark_batch_completed(batch, db)
+            return
+        
+        # Extract and concatenate speech segments
+        logger.info(f"Extracting speech from {len(audio_files_with_vad)} files")
+        speech_audio = vad_service.extract_and_concat_speech(audio_files_with_vad)
+        
+        if not speech_audio:
+            logger.warning(f"No speech extracted from batch {batch_id}")
+            batch_manager.mark_batch_completed(batch, db)
+            return
+        
+        # Transcribe with Deepgram
+        logger.info(f"Sending {len(speech_audio)} bytes to Deepgram for transcription")
+        transcription_result = await deepgram_service.transcribe_audio(speech_audio)
+        
+        # Calculate time range
+        first_segment = segments[0]
+        last_segment = segments[-1]
+        start_time = first_segment.uploaded_at
+        end_time = last_segment.uploaded_at + timedelta(seconds=last_segment.duration_seconds or 30)
+        
+        # Store transcription result
+        transcription = TranscriptionResultDB(
+            username=batch.username,
+            batch_id=batch_id,
+            start_time=start_time,
+            end_time=end_time,
+            transcription_text=transcription_result['transcription'],
+            transcription_confidence=transcription_result['confidence'],
+            transcription_service='deepgram',
+            num_segments=len(segments)
+        )
+        
+        db.add(transcription)
+        db.commit()
+        
+        # Update segment statuses
+        for segment in segments:
+            segment.status = 'transcribed'
+            segment.processed_at = datetime.utcnow()
+        
+        # Mark batch as completed
+        batch_manager.mark_batch_completed(batch, db)
+        
+        logger.info(
+            f"Batch {batch_id} transcription complete: "
+            f"{len(transcription_result['transcription'])} chars, "
+            f"confidence: {transcription_result['confidence']:.2f}"
+        )
+        
+    except Exception as e:
+        logger.error(f"Error processing batch {batch_id}: {e}")
+        try:
+            batch = db.query(AudioBatchDB).filter_by(id=batch_id).first()
+            if batch:
+                batch.status = 'failed'
+                db.commit()
+        except:
+            pass
+    
+    finally:
+        # Clean up temp files
+        if 'temp_files' in locals():
+            for temp_file in temp_files:
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
+        
+        db.close()
+
+
+async def batch_monitor_task():
+    """
+    Background task that monitors batches for timeout and triggers transcription.
+    """
+    batch_manager = get_batch_manager()
+    
+    logger.info("Starting batch monitor background task...")
+    
+    while True:
+        try:
+            db: Session = SessionLocal()
+            
+            try:
+                # Get batches ready for processing (exceeded timeout)
+                ready_batches = batch_manager.get_batches_ready_for_processing(db)
+                
+                for batch in ready_batches:
+                    logger.info(f"Processing batch {batch.id} due to timeout")
+                    asyncio.create_task(process_batch_transcription(str(batch.id)))
+                
+            finally:
+                db.close()
+            
+            # Check every 10 seconds
+            await asyncio.sleep(10)
+            
+        except Exception as e:
+            logger.error(f"Error in batch monitor task: {e}")
+            await asyncio.sleep(10)
 
 
 async def process_sqs_messages():
@@ -83,7 +248,7 @@ async def process_sqs_messages():
 
 async def apply_vad_processing(audio_file_id: str, bucket: str, key: str) -> None:
     """
-    Apply Voice Activity Detection to an audio file.
+    Apply Voice Activity Detection to an audio file and add to batch.
     
     Args:
         audio_file_id: Database ID of the audio file
@@ -95,6 +260,7 @@ async def apply_vad_processing(audio_file_id: str, bucket: str, key: str) -> Non
     # Initialize services
     s3_client = boto3.client('s3')
     vad_service = get_vad_service()
+    batch_manager = get_batch_manager()
     db: Session = SessionLocal()
     
     try:
@@ -127,7 +293,28 @@ async def apply_vad_processing(audio_file_id: str, bucket: str, key: str) -> Non
             audio_file.vad_processed_at = datetime.utcnow()
             audio_file.status = 'vad_complete'
             
-            db.commit()
+            # If there's speech, add to batch for transcription
+            if vad_result['num_segments'] > 0:
+                logger.info(f"Audio file {audio_file_id} has speech, adding to batch")
+                
+                # Get or create batch for this user session
+                batch = batch_manager.get_or_create_batch(
+                    audio_file.username,
+                    audio_file.uploaded_at,
+                    db
+                )
+                
+                # Add segment to batch
+                batch_manager.add_segment_to_batch(
+                    batch,
+                    audio_file,
+                    vad_result['speech_duration'],
+                    db
+                )
+            else:
+                logger.warning(f"No speech detected in {audio_file_id}, skipping transcription")
+                audio_file.status = 'no_speech'
+                db.commit()
             
             logger.info(
                 f"VAD complete for {audio_file_id}: "
@@ -136,14 +323,6 @@ async def apply_vad_processing(audio_file_id: str, bucket: str, key: str) -> Non
                 f"{vad_result['total_duration']:.1f}s total "
                 f"({vad_result['speech_ratio']*100:.1f}%)"
             )
-            
-            # If there's speech, mark ready for transcription
-            if vad_result['num_segments'] > 0:
-                logger.info(f"Audio file {audio_file_id} ready for transcription")
-            else:
-                logger.warning(f"No speech detected in {audio_file_id}, skipping transcription")
-                audio_file.status = 'no_speech'
-                db.commit()
         
     except Exception as e:
         logger.error(f"Error in VAD processing for {audio_file_id}: {e}")
@@ -158,7 +337,7 @@ async def apply_vad_processing(audio_file_id: str, bucket: str, key: str) -> Non
             pass
     
     finally:
-        # Clean up
+        # Clean up but keep temp file for now (will be cleaned up later)
         db.close()
         if 'temp_path' in locals() and os.path.exists(temp_path):
             os.remove(temp_path)
@@ -271,6 +450,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Manage application lifecycle - start/stop background tasks."""
     global background_task
     
+    background_tasks = []
+    
     # Check if SQS queue URL is configured
     sqs_queue_url = os.getenv('SQS_QUEUE_URL', '')
     if not sqs_queue_url:
@@ -280,17 +461,24 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.info(f"SQS Queue URL configured: {sqs_queue_url[:50]}...")
         # Start background task for SQS polling
         background_task = asyncio.create_task(process_sqs_messages())
+        background_tasks.append(background_task)
         logger.info("Started SQS polling background task")
+        
+        # Start batch monitor task
+        batch_monitor = asyncio.create_task(batch_monitor_task())
+        background_tasks.append(batch_monitor)
+        logger.info("Started batch monitor background task")
     
     yield
     
     # Cleanup
-    if background_task:
-        background_task.cancel()
+    for task in background_tasks:
+        task.cancel()
         try:
-            await background_task
+            await task
         except asyncio.CancelledError:
-            logger.info("SQS polling background task cancelled")
+            pass
+    logger.info("All background tasks cancelled")
 
 
 # Initialize FastAPI app

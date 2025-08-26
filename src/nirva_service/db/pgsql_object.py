@@ -137,8 +137,86 @@ class AudioFileDB(UUIDBase):
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     retry_count: Mapped[int] = mapped_column(default=0)
     
+    # Batch association
+    batch_id: Mapped[Optional[UUID]] = mapped_column(
+        ForeignKey("audio_batches.id"), nullable=True, index=True
+    )
+    
     # Relationships
     user: Mapped["UserDB"] = relationship("UserDB", backref="audio_files")
+    batch: Mapped["AudioBatchDB"] = relationship("AudioBatchDB", backref="audio_files")
+
+
+# Audio batch for accumulating segments
+class AudioBatchDB(UUIDBase):
+    __tablename__ = "audio_batches"
+    
+    # Session/user association
+    username: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    
+    # Batch timing
+    first_segment_time: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    last_segment_time: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    
+    # Batch status
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="accumulating"
+    )  # accumulating, processing, completed
+    
+    # Segment tracking
+    segment_count: Mapped[int] = mapped_column(default=0)
+    total_speech_duration: Mapped[float] = mapped_column(default=0.0)
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    processed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
+# Transcription results
+class TranscriptionResultDB(UUIDBase):
+    __tablename__ = "transcription_results"
+    
+    # Session/user association
+    username: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    
+    # Batch reference
+    batch_id: Mapped[Optional[UUID]] = mapped_column(
+        ForeignKey("audio_batches.id"), nullable=True, index=True
+    )
+    
+    # Time range of the transcription (actual audio time range)
+    start_time: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+    end_time: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    
+    # Transcription data
+    transcription_text: Mapped[str] = mapped_column(Text, nullable=False)
+    transcription_confidence: Mapped[Optional[float]] = mapped_column(nullable=True)
+    transcription_service: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="deepgram"
+    )
+    
+    # Metadata
+    num_segments: Mapped[int] = mapped_column(default=0)
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    
+    # Relationships
+    batch: Mapped["AudioBatchDB"] = relationship("AudioBatchDB", backref="transcription_results")
 
 
 """
