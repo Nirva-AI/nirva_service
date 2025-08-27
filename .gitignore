@@ -104,3 +104,4 @@ dump.rdb
 *.tmp
 *.temp
 .env
+scripts/setup_my_aws.py
