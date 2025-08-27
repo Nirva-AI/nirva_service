@@ -46,11 +46,13 @@ class STSService:
         Returns:
             Dictionary containing temporary AWS credentials and metadata
         """
-        # Create user-specific S3 prefix
-        s3_prefix = f"users/{user_id}/"
+        # Create user-specific S3 prefixes
+        # Allow both native-audio uploads and regular user uploads
+        native_audio_prefix = f"native-audio/{username}/"
+        user_prefix = f"users/{user_id}/"
         
         # Define the IAM policy for the temporary credentials
-        # This policy restricts access to only the user's folder in S3
+        # This policy restricts access to only the user's folders in S3
         policy = {
             "Version": "2012-10-17",
             "Statement": [
@@ -62,7 +64,10 @@ class STSService:
                         "s3:GetObject",
                         "s3:DeleteObject"
                     ],
-                    "Resource": f"arn:aws:s3:::{self.bucket_name}/{s3_prefix}*"
+                    "Resource": [
+                        f"arn:aws:s3:::{self.bucket_name}/{native_audio_prefix}*",
+                        f"arn:aws:s3:::{self.bucket_name}/{user_prefix}*"
+                    ]
                 },
                 {
                     "Effect": "Allow",
@@ -72,7 +77,10 @@ class STSService:
                     "Resource": f"arn:aws:s3:::{self.bucket_name}",
                     "Condition": {
                         "StringLike": {
-                            "s3:prefix": [f"{s3_prefix}*"]
+                            "s3:prefix": [
+                                f"{native_audio_prefix}*",
+                                f"{user_prefix}*"
+                            ]
                         }
                     }
                 }
@@ -81,9 +89,9 @@ class STSService:
         
         try:
             # Generate temporary credentials using GetSessionToken
-            # Note: GetSessionToken has a max duration of 36 hours (129600 seconds)
-            # For 7 days, we would need to use AssumeRole with a role
-            # For now, using max allowed duration of 36 hours
+            # Note: GetSessionToken doesn't accept inline policies, so the IAM user's
+            # permissions will apply. The IAM user should have access to the entire
+            # native-audio/* prefix to allow all users to upload.
             max_duration = min(duration_seconds, 129600)  # Max 36 hours for GetSessionToken
             
             response = self.sts_client.get_session_token(
@@ -92,18 +100,6 @@ class STSService:
             
             credentials = response['Credentials']
             
-            # Create a new STS client with temporary credentials to apply the policy
-            temp_sts = boto3.client(
-                'sts',
-                aws_access_key_id=credentials['AccessKeyId'],
-                aws_secret_access_key=credentials['SecretAccessKey'],
-                aws_session_token=credentials['SessionToken'],
-                region_name=self.region
-            )
-            
-            # Get the caller identity to construct the session name
-            identity = temp_sts.get_caller_identity()
-            
             # Return the credentials with metadata
             return {
                 "access_key_id": credentials['AccessKeyId'],
@@ -111,7 +107,8 @@ class STSService:
                 "session_token": credentials['SessionToken'],
                 "expiration": credentials['Expiration'].isoformat(),
                 "bucket": self.bucket_name,
-                "prefix": s3_prefix,
+                "prefix": user_prefix,  # Keep user prefix for backward compatibility
+                "native_audio_prefix": native_audio_prefix,  # Add native audio prefix
                 "region": self.region,
                 "duration_seconds": max_duration
             }

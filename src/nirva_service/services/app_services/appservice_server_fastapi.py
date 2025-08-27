@@ -10,6 +10,7 @@ from .chat_actions import chat_action_router
 from .login import login_router
 from .url_config import url_config_router
 from .upload_auth import upload_auth_router
+from .transcription_query import transcription_router
 
 
 # redis!
@@ -39,3 +40,4 @@ app.include_router(router=login_router)
 app.include_router(router=chat_action_router)
 app.include_router(router=analyze_action_router)
 app.include_router(router=upload_auth_router)
+app.include_router(router=transcription_router)
