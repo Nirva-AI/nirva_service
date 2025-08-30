@@ -9,7 +9,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / 'src'))
 
 from sqlalchemy import text
-from nirva_service.db.database import get_sync_db_engine
+from nirva_service.db.pgsql_client import get_sync_db_engine
 
 def run_migration():
     """Add new columns for Deepgram fields."""
