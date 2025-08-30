@@ -29,7 +29,7 @@ class DeepgramService:
         self,
         audio_bytes: bytes,
         sample_rate: int = 16000,
-        language: str = 'en',
+        language: str = 'auto',  # Changed to auto-detect by default
         model: str = 'nova-3'
     ) -> Dict[str, Any]:
         """
@@ -47,18 +47,24 @@ class DeepgramService:
         if not self.api_key:
             raise ValueError("DEEPGRAM_API_KEY not configured")
         
-        # Build query parameters
+        # Build query parameters - MATCH CLIENT CONFIGURATION EXACTLY
         params = {
-            'model': model,
-            'detect_language': 'true' if language == 'auto' else 'false',
-            'language': language if language != 'auto' else None,
-            'punctuate': 'true',
-            'utterances': 'true',
-            'paragraphs': 'true',
-            'smart_format': 'true',
-            'diarize': 'false',  # No diarization for single-speaker segments
+            'model': model,  # nova-3
+            'detect_language': 'true',  # ALWAYS enable language detection for multilingual support
+            'diarize': 'true',  # Enable speaker diarization (matches client)
+            'punctuate': 'true',  # Enable punctuation
+            'utterances': 'true',  # Enable utterances
+            'paragraphs': 'true',  # Group transcript into readable paragraphs
+            'smart_format': 'true',  # Provide punctuation and formatting
             'words': 'false',  # Skip word-level data to reduce response size
+            'sentiment': 'true',  # Enable sentiment analysis (matches client)
+            'topics': 'true',  # Enable topic detection (matches client)
+            'intents': 'true',  # Enable intent recognition (matches client)
         }
+        
+        # Only add language parameter if not auto-detecting
+        if language != 'auto':
+            params['language'] = language
         
         # Remove None values
         params = {k: v for k, v in params.items() if v is not None}
@@ -85,16 +91,29 @@ class DeepgramService:
                         transcription = self._extract_transcription(result)
                         confidence = self._extract_confidence(result)
                         detected_language = self._extract_language(result)
+                        sentiment_data = self._extract_sentiment(result)
+                        topics_data = self._extract_topics(result)
+                        intents_data = self._extract_intents(result)
                         
                         logger.info(
                             f"Transcription successful: {len(transcription)} chars, "
                             f"confidence: {confidence:.2f}, language: {detected_language}"
                         )
                         
+                        if sentiment_data:
+                            logger.info(f"Sentiment analysis available: {len(sentiment_data)} segments")
+                        if topics_data:
+                            logger.info(f"Topics detected: {len(topics_data)} topics")
+                        if intents_data:
+                            logger.info(f"Intents recognized: {len(intents_data)} intents")
+                        
                         return {
                             'transcription': transcription,
                             'confidence': confidence,
                             'language': detected_language,
+                            'sentiment_data': sentiment_data,
+                            'topics_data': topics_data,
+                            'intents_data': intents_data,
                             'raw_response': result
                         }
                     else:
@@ -162,11 +181,59 @@ class DeepgramService:
     def _extract_language(self, response: Dict[str, Any]) -> str:
         """Extract detected language from Deepgram response."""
         try:
+            # First check if language was detected in results
+            results = response.get('results', {})
+            channels = results.get('channels', [])
+            if channels and len(channels) > 0:
+                detected_languages = channels[0].get('detected_language')
+                if detected_languages:
+                    return detected_languages
+            
+            # Fall back to metadata
             metadata = response.get('metadata', {})
             return metadata.get('language', 'en')
         except Exception as e:
             logger.error(f"Error extracting language: {e}")
             return 'en'
+    
+    def _extract_sentiment(self, response: Dict[str, Any]) -> Optional[dict]:
+        """Extract sentiment analysis from Deepgram response."""
+        try:
+            results = response.get('results', {})
+            sentiments = results.get('sentiments')
+            if sentiments:
+                # Return the sentiment data structure as-is
+                return sentiments
+            return None
+        except Exception as e:
+            logger.error(f"Error extracting sentiment: {e}")
+            return None
+    
+    def _extract_topics(self, response: Dict[str, Any]) -> Optional[dict]:
+        """Extract topics from Deepgram response."""
+        try:
+            results = response.get('results', {})
+            topics = results.get('topics')
+            if topics:
+                # Return the topics data structure as-is
+                return topics
+            return None
+        except Exception as e:
+            logger.error(f"Error extracting topics: {e}")
+            return None
+    
+    def _extract_intents(self, response: Dict[str, Any]) -> Optional[dict]:
+        """Extract intents from Deepgram response."""
+        try:
+            results = response.get('results', {})
+            intents = results.get('intents')
+            if intents:
+                # Return the intents data structure as-is
+                return intents
+            return None
+        except Exception as e:
+            logger.error(f"Error extracting intents: {e}")
+            return None
 
 
 # Singleton instance

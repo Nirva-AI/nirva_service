@@ -114,7 +114,7 @@ async def process_batch_transcription(batch_id: str) -> None:
         start_time = first_segment.uploaded_at
         end_time = last_segment.uploaded_at + timedelta(seconds=last_segment.duration_seconds or 30)
         
-        # Store transcription result
+        # Store transcription result with all new fields
         transcription = TranscriptionResultDB(
             username=batch.username,
             batch_id=batch_id,
@@ -123,6 +123,11 @@ async def process_batch_transcription(batch_id: str) -> None:
             transcription_text=transcription_result['transcription'],
             transcription_confidence=transcription_result['confidence'],
             transcription_service='deepgram',
+            detected_language=transcription_result.get('language'),
+            sentiment_data=transcription_result.get('sentiment_data'),
+            topics_data=transcription_result.get('topics_data'),
+            intents_data=transcription_result.get('intents_data'),
+            raw_response=transcription_result.get('raw_response'),
             num_segments=len(segments)
         )
         

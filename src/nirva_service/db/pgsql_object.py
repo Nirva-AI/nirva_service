@@ -207,6 +207,21 @@ class TranscriptionResultDB(UUIDBase):
         String(20), nullable=False, default="deepgram"
     )
     
+    # Language detection
+    detected_language: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    
+    # Sentiment analysis (JSON array of sentiment scores per segment)
+    sentiment_data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    
+    # Topics detection (JSON array of detected topics with confidence scores)
+    topics_data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    
+    # Intents recognition (JSON array of detected intents with confidence scores)
+    intents_data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    
+    # Full Deepgram response for future processing (compressed JSON)
+    raw_response: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    
     # Metadata
     num_segments: Mapped[int] = mapped_column(default=0)
     
