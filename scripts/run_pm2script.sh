@@ -35,8 +35,14 @@ pm2 delete all
 ./scripts/kill_ports.sh
 
 # Start all services using ecosystem file
-# PM2 will handle loading the correct env files for each service
-pm2 start ecosystem.config.js
+# Use server config if on EC2, otherwise use local config
+if [ -d "/home/ec2-user" ]; then
+    echo "Using server ecosystem config..."
+    pm2 start ecosystem.server.config.js
+else
+    echo "Using local ecosystem config..."
+    pm2 start ecosystem.config.js
+fi
 
 echo "All servers started using PM2 ecosystem configuration!"
 echo "Use 'pm2 status' to check service status"
