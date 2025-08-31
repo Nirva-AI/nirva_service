@@ -121,3 +121,10 @@ build: clean ## Build the package
 # Security
 security-check: ## Run security checks
 	pip-audit
+
+# Deployment
+deploy: ## Deploy to EC2 server (usage: make deploy server=52.73.87.226)
+	./scripts/deploy_to_server.sh $(server)
+
+deploy-ec2: ## Deploy to default EC2 server
+	./scripts/deploy_to_server.sh 52.73.87.226
