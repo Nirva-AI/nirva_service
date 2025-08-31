@@ -3,13 +3,15 @@ Transcription query endpoint for client applications.
 """
 
 from datetime import datetime
-from typing import List, Optional
-from fastapi import APIRouter, Depends, Query, HTTPException
+from typing import List, Optional, Dict, Any
+from uuid import UUID
+from fastapi import APIRouter, Depends, Query, HTTPException, Path
 from pydantic import BaseModel
 from loguru import logger
+from sqlalchemy.orm import joinedload
 
 from ...db.pgsql_client import SessionLocal
-from ...db.pgsql_object import TranscriptionResultDB
+from ...db.pgsql_object import TranscriptionResultDB, AudioFileDB, AudioBatchDB
 from ...utils.username_hash import hash_username
 from .oauth_user import get_authenticated_user
 
@@ -22,6 +24,7 @@ transcription_router = APIRouter(
 
 class TranscriptionItem(BaseModel):
     """Single transcription item response."""
+    id: Optional[str] = None  # UUID as string
     text: str
     start_time: datetime
     end_time: datetime
@@ -91,6 +94,7 @@ async def get_transcriptions(
         # Convert to response format
         items = [
             TranscriptionItem(
+                id=str(t.id),
                 text=t.transcription_text,
                 start_time=t.start_time,
                 end_time=t.end_time
@@ -197,5 +201,103 @@ async def get_transcription_count(
     except Exception as e:
         logger.error(f"Error counting transcriptions: {e}")
         raise HTTPException(status_code=500, detail="Failed to count transcriptions")
+    finally:
+        db.close()
+
+
+@transcription_router.get("/transcriptions/{transcription_id}/details")
+async def get_transcription_details(
+    transcription_id: str = Path(..., description="Transcription ID"),
+    current_user: str = Depends(get_authenticated_user)
+) -> Dict[str, Any]:
+    """
+    Get detailed information about a specific transcription.
+    
+    Args:
+        transcription_id: UUID of the transcription
+        current_user: Authenticated user from token
+    
+    Returns:
+        Detailed transcription data including Deepgram analysis results
+    """
+    try:
+        db = SessionLocal()
+        
+        username = current_user
+        username_hash = hash_username(username)
+        
+        # Parse UUID
+        try:
+            trans_uuid = UUID(transcription_id)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid transcription ID format")
+        
+        # Get transcription with all related data
+        transcription = db.query(TranscriptionResultDB).filter(
+            TranscriptionResultDB.id == trans_uuid,
+            TranscriptionResultDB.username == username_hash
+        ).first()
+        
+        if not transcription:
+            raise HTTPException(status_code=404, detail="Transcription not found")
+        
+        # Get associated audio files if batch_id exists
+        audio_files = []
+        if transcription.batch_id:
+            audio_files_db = db.query(AudioFileDB).filter(
+                AudioFileDB.batch_id == transcription.batch_id
+            ).all()
+            
+            audio_files = [
+                {
+                    "id": str(af.id),
+                    "s3_key": af.s3_key,
+                    "file_size": af.file_size,
+                    "duration_seconds": af.duration_seconds,
+                    "format": af.format,
+                    "num_speech_segments": af.num_speech_segments,
+                    "total_speech_duration": af.total_speech_duration,
+                    "speech_ratio": af.speech_ratio,
+                    "status": af.status,
+                    "uploaded_at": af.uploaded_at.isoformat() if af.uploaded_at else None,
+                    "processed_at": af.processed_at.isoformat() if af.processed_at else None,
+                }
+                for af in audio_files_db
+            ]
+        
+        # Build response with all available fields
+        response = {
+            "id": str(transcription.id),
+            "text": transcription.transcription_text,
+            "start_time": transcription.start_time.isoformat(),
+            "end_time": transcription.end_time.isoformat(),
+            "transcription_confidence": transcription.transcription_confidence,
+            "transcription_service": transcription.transcription_service,
+            "detected_language": transcription.detected_language if hasattr(transcription, 'detected_language') else None,
+            "batch_id": str(transcription.batch_id) if transcription.batch_id else None,
+            "num_segments": transcription.num_segments,
+            "created_at": transcription.created_at.isoformat(),
+            "audio_files": audio_files,
+        }
+        
+        # Add new Deepgram fields if they exist
+        if hasattr(transcription, 'sentiment_data'):
+            response["sentiment_data"] = transcription.sentiment_data
+        if hasattr(transcription, 'topics_data'):
+            response["topics_data"] = transcription.topics_data
+        if hasattr(transcription, 'intents_data'):
+            response["intents_data"] = transcription.intents_data
+        if hasattr(transcription, 'raw_response'):
+            response["raw_response"] = transcription.raw_response
+        
+        logger.info(f"Returned detailed transcription {transcription_id} for user {username}")
+        
+        return response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching transcription details: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch transcription details")
     finally:
         db.close()
