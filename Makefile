@@ -128,3 +128,12 @@ deploy: ## Deploy to EC2 server (usage: make deploy server=52.73.87.226)
 
 deploy-ec2: ## Deploy to default EC2 server
 	./scripts/deploy_to_server.sh 52.73.87.226
+
+# Server setup
+server-setup: ## Copy and run setup script on server (usage: make server-setup server=52.73.87.226)
+	scp -i credentials/aws-my-ec2/my-ec2-key.pem scripts/server_setup.sh ec2-user@$(server):~/
+	ssh -i credentials/aws-my-ec2/my-ec2-key.pem ec2-user@$(server) "chmod +x server_setup.sh && ./server_setup.sh"
+
+# Quick fixes
+fix-db: ## Quick fix for database columns on EC2
+	ssh -i credentials/aws-my-ec2/my-ec2-key.pem ec2-user@52.73.87.226 "cd ~/nirva_service && ./scripts/run_migration.sh"
