@@ -108,6 +108,23 @@ async def process_batch_transcription(batch_id: str) -> None:
         logger.info(f"Sending {len(speech_audio)} bytes to Deepgram for transcription")
         transcription_result = await deepgram_service.transcribe_audio(speech_audio)
         
+        # Check if transcription text is meaningful (not null, not empty, more than 1 character)
+        transcription_text = transcription_result.get('transcription', '')
+        if not transcription_text or len(transcription_text.strip()) <= 1:
+            logger.warning(
+                f"Batch {batch_id}: Dropping empty/minimal transcription "
+                f"(text: '{transcription_text}', length: {len(transcription_text.strip())})"
+            )
+            # Mark batch as completed but don't save the transcription
+            batch_manager.mark_batch_completed(batch, db)
+            
+            # Update segment statuses to indicate they were processed but had no meaningful content
+            for segment in segments:
+                segment.status = 'transcribed'
+                segment.processed_at = datetime.utcnow()
+            db.commit()
+            return
+        
         # Calculate time range
         first_segment = segments[0]
         last_segment = segments[-1]
@@ -120,7 +137,7 @@ async def process_batch_transcription(batch_id: str) -> None:
             batch_id=batch_id,
             start_time=start_time,
             end_time=end_time,
-            transcription_text=transcription_result['transcription'],
+            transcription_text=transcription_text,
             transcription_confidence=transcription_result['confidence'],
             transcription_service='deepgram',
             detected_language=transcription_result.get('language'),
@@ -144,7 +161,7 @@ async def process_batch_transcription(batch_id: str) -> None:
         
         logger.info(
             f"Batch {batch_id} transcription complete: "
-            f"{len(transcription_result['transcription'])} chars, "
+            f"{len(transcription_text)} chars, "
             f"confidence: {transcription_result['confidence']:.2f}"
         )
         
