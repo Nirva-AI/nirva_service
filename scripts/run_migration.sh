@@ -33,13 +33,18 @@ import sys
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import ProgrammingError
 
-# Database connection - use correct credentials for EC2
-if os.path.exists('/home/ec2-user'):
-    # EC2 environment
-    DB_URL = 'postgresql://fastapi_user:123456@localhost/my_fastapi_db'
+# Database connection - use environment variables
+DB_USER = os.getenv('DB_USER', 'postgres')
+DB_PASSWORD = os.getenv('DB_PASSWORD', '')
+DB_HOST = os.getenv('DB_HOST', 'localhost')
+DB_PORT = os.getenv('DB_PORT', '5432')
+DB_NAME = os.getenv('DB_NAME', 'nirva')
+
+# Build connection URL from environment
+if DB_PASSWORD:
+    DB_URL = f'postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}'
 else:
-    # Local environment
-    DB_URL = os.getenv('DATABASE_URL', 'postgresql://nirva:nirva2025@localhost/nirva')
+    DB_URL = f'postgresql://{DB_USER}@{DB_HOST}:{DB_PORT}/{DB_NAME}'
 
 print("Connecting to database...")
 engine = create_engine(DB_URL)

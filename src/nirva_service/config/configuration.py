@@ -122,8 +122,10 @@ ACCESS_TOKEN_EXPIRE_MINUTES: Final[int] = 30  # 访问令牌的过期时间，�
 
 
 # 数据库配置
-postgres_password: Final[str] = "123456"
-POSTGRES_DATABASE_URL: Final[str] = (
+import os
+postgres_password: Final[str] = os.getenv("DB_PASSWORD", "")
+POSTGRES_DATABASE_URL: Final[str] = os.getenv(
+    "DATABASE_URL",
     f"postgresql://fastapi_user:{postgres_password}@localhost/my_fastapi_db"
 )
 
