@@ -178,7 +178,12 @@ fi
 # 12. Start services with PM2
 print_status "Starting services with PM2..."
 pm2 delete all 2>/dev/null || true
-pm2 start ecosystem.config.js
+# Use server-specific config if it exists, otherwise use default
+if [ -f ecosystem.server.config.js ]; then
+    pm2 start ecosystem.server.config.js
+else
+    pm2 start ecosystem.config.js
+fi
 pm2 save
 pm2 startup systemd -u ec2-user --hp /home/ec2-user | grep sudo | bash
 

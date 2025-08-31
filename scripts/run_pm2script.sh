@@ -18,6 +18,16 @@ set +a  # stop automatically exporting
 
 echo "Environment check completed!"
 
+# Run database migrations before starting services
+echo "Running database migrations..."
+if [ -f "scripts/run_migration.sh" ]; then
+    ./scripts/run_migration.sh
+elif command -v alembic &> /dev/null; then
+    alembic upgrade head 2>/dev/null || echo "Migrations skipped (alembic not configured or no pending migrations)"
+else
+    echo "Migration system not configured, skipping..."
+fi
+
 # Delete all pm2 processes
 pm2 delete all
 
