@@ -11,7 +11,6 @@ from .login import login_router
 from .url_config import url_config_router
 from .upload_auth import upload_auth_router
 from .transcription_query import transcription_router
-from .s3_presigned import s3_presigned_router
 
 
 # redis!
@@ -42,4 +41,3 @@ app.include_router(router=chat_action_router)
 app.include_router(router=analyze_action_router)
 app.include_router(router=upload_auth_router)
 app.include_router(router=transcription_router)
-app.include_router(router=s3_presigned_router)
