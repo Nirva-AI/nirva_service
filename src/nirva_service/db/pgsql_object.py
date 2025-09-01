@@ -225,6 +225,14 @@ class TranscriptionResultDB(UUIDBase):
     # Metadata
     num_segments: Mapped[int] = mapped_column(default=0)
     
+    # Analysis tracking
+    analysis_status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="pending"
+    )
+    analyzed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
