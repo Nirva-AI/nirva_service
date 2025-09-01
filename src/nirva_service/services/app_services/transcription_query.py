@@ -63,15 +63,29 @@ async def get_transcriptions(
     try:
         db = SessionLocal()
         
-        # Hash the username to match what's stored in the database
-        # The audio processor stores hashed usernames from S3 paths
+        # Check if we should use hashed or unhashed username
+        # For now, check both to handle legacy data
         username = current_user  # current_user is already the username string
         username_hash = hash_username(username)
         
-        # Base query - filter by hashed username
-        query = db.query(TranscriptionResultDB).filter(
-            TranscriptionResultDB.username == username_hash
-        )
+        # First check if there are any records with the unhashed username
+        unhashed_count = db.query(TranscriptionResultDB).filter(
+            TranscriptionResultDB.username == username
+        ).count()
+        
+        # Use whichever format has data
+        if unhashed_count > 0:
+            # Use unhashed username (legacy data)
+            query = db.query(TranscriptionResultDB).filter(
+                TranscriptionResultDB.username == username
+            )
+            logger.debug(f"Using unhashed username for query: {username}")
+        else:
+            # Use hashed username (new format)
+            query = db.query(TranscriptionResultDB).filter(
+                TranscriptionResultDB.username == username_hash
+            )
+            logger.debug(f"Using hashed username for query: {username_hash}")
         
         # Apply date filters if provided
         if start_date:
@@ -144,12 +158,25 @@ async def get_latest_transcription(
         username = current_user  # current_user is already the username string
         username_hash = hash_username(username)
         
-        # Get the most recent transcription
-        latest = db.query(TranscriptionResultDB).filter(
-            TranscriptionResultDB.username == username_hash
-        ).order_by(
-            TranscriptionResultDB.start_time.desc()
+        # Check for unhashed username first (legacy data)
+        unhashed_latest = db.query(TranscriptionResultDB).filter(
+            TranscriptionResultDB.username == username
         ).first()
+        
+        if unhashed_latest:
+            # Use unhashed username query
+            latest = db.query(TranscriptionResultDB).filter(
+                TranscriptionResultDB.username == username
+            ).order_by(
+                TranscriptionResultDB.start_time.desc()
+            ).first()
+        else:
+            # Use hashed username query
+            latest = db.query(TranscriptionResultDB).filter(
+                TranscriptionResultDB.username == username_hash
+            ).order_by(
+                TranscriptionResultDB.start_time.desc()
+            ).first()
         
         if not latest:
             raise HTTPException(status_code=404, detail="No transcriptions found")
@@ -190,9 +217,16 @@ async def get_transcription_count(
         username = current_user  # current_user is already the username string
         username_hash = hash_username(username)
         
-        count = db.query(TranscriptionResultDB).filter(
+        # Check both formats
+        unhashed_count = db.query(TranscriptionResultDB).filter(
+            TranscriptionResultDB.username == username
+        ).count()
+        
+        hashed_count = db.query(TranscriptionResultDB).filter(
             TranscriptionResultDB.username == username_hash
         ).count()
+        
+        count = unhashed_count if unhashed_count > 0 else hashed_count
         
         logger.info(f"User {username} has {count} transcriptions")
         
@@ -232,11 +266,18 @@ async def get_transcription_details(
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid transcription ID format")
         
-        # Get transcription with all related data
+        # Try unhashed username first (legacy)
         transcription = db.query(TranscriptionResultDB).filter(
             TranscriptionResultDB.id == trans_uuid,
-            TranscriptionResultDB.username == username_hash
+            TranscriptionResultDB.username == username
         ).first()
+        
+        # If not found, try hashed username
+        if not transcription:
+            transcription = db.query(TranscriptionResultDB).filter(
+                TranscriptionResultDB.id == trans_uuid,
+                TranscriptionResultDB.username == username_hash
+            ).first()
         
         if not transcription:
             raise HTTPException(status_code=404, detail="Transcription not found")
