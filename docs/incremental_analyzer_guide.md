@@ -212,7 +212,11 @@ make run-chat
 运行测试脚本验证功能：
 
 ```bash
-python scripts/test_incremental_analyzer.py
+# Test via API endpoints
+curl -X POST http://localhost:8000/action/analyze/incremental/v1/ \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"time_stamp": "2025-01-18", "new_transcript": "Test transcript content"}'
 ```
 
 ### 3. API文档

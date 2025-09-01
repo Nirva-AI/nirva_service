@@ -4,6 +4,19 @@
 
 `nirva_service` is a Python-based distributed microservice system serving the 'nirva_app'.
 
+## Quick Start
+
+```bash
+# Start all services with one command
+cd ~/nirva/nirva_service && ./scripts/run_pm2script.sh
+
+# Check status
+pm2 status
+
+# View logs
+pm2 logs
+```
+
 ---
 
 ## Environment Setup
@@ -163,7 +176,7 @@ This project uses MyPy strict mode to enhance long-term maintainability and stab
 
 ```shell
 # Type check specific files (as before)
-mypy --strict scripts/run_appservice_server.py scripts/run_chat_server.py scripts/run_analyzer_server.py scripts/run_dev_clear_db.py scripts/run_sample_app.py scripts/run_sample_internal_service.py
+mypy --strict scripts/run_appservice_server.py scripts/run_chat_server.py scripts/run_analyzer_server.py scripts/run_dev_clear_db.py
 
 # Or use the Makefile command
 make type-check
@@ -174,12 +187,59 @@ make type-check-all
 
 ---
 
-## Batch Startup Script
+## Scripts Documentation
 
-Use pm2 to batch start chat_server and appservice_server:
+### 📁 Scripts Overview
+
+All scripts are located in the `/scripts` directory. The main script you need is:
+
+```bash
+./scripts/run_pm2script.sh  # Starts ALL services at once
+```
+
+### Essential Scripts
+
+| Script | Purpose | Usage |
+|--------|---------|-------|
+| **`run_pm2script.sh`** | **Main script** - Starts all services with PM2 | `./scripts/run_pm2script.sh` |
+| `kill_ports.sh` | Kills processes on service ports | Auto-called by PM2 script |
+| `run_appservice_server.py` | AppService server (port 8000) | Used by PM2 |
+| `run_chat_server.py` | Chat server (port 8100) | Used by PM2 |
+| `run_analyzer_server.py` | Analyzer server (port 8200) | Used by PM2 |
+| `run_audio_processor_server.py` | Audio Processor server | Used by PM2 |
+
+### Server Setup Scripts (for new deployments)
+
+| Script | Purpose | When to Use |
+|--------|---------|-------------|
+| `server_setup.sh` | Initial EC2 setup (conda, PM2, deps) | New server only |
+| `setup_server_pm2.sh` | Configure PM2 environment | After server_setup |
+| `deploy_to_server.sh` | Deploy code updates | `make deploy` |
+
+### Database & Migration Scripts
+
+| Script | Purpose | Usage |
+|--------|---------|-------|
+| `run_migration.sh` | Run database migrations | Manual migrations |
+| `run_analysis_migration.sh` | Add analysis tracking | One-time migration |
+| `run_dev_clear_db.py` | Test DB & clear data | Development only |
+
+### Utility Scripts
+
+| Script | Purpose | Usage |
+|--------|---------|-------|
+| `load_env.sh` | Load environment variables | `source scripts/load_env.sh` |
+| `sync_requirements.py` | Sync requirements.txt | After conda updates |
+| `fix_precommit_issues.py` | Fix pre-commit issues | If pre-commit fails |
+
+---
+
+## Running Services with PM2
+
+The recommended way to start all services:
 
 ```shell
-# Using the shell script directly
+# Using the shell script directly (RECOMMENDED)
 ./scripts/run_pm2script.sh
 
 # Or using the Makefile

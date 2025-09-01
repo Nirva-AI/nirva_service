@@ -36,7 +36,7 @@ lint: ## Run linting checks
 	isort --check-only src/ scripts/ tests/
 
 type-check: ## Run mypy type checking
-	mypy scripts/run_appservice_server.py scripts/run_simulator_client.py scripts/run_chat_server.py scripts/run_analyzer_server.py scripts/run_dev_clear_db.py
+	mypy scripts/run_appservice_server.py scripts/run_chat_server.py scripts/run_analyzer_server.py scripts/run_dev_clear_db.py
 
 type-check-all: ## Run mypy type checking on all source code
 	mypy src/ scripts/
@@ -87,9 +87,6 @@ db-revision: ## Create a new database migration
 	alembic revision --autogenerate -m "$(message)"
 
 # Development utilities
-simulate: ## Run simulator client
-	python scripts/run_simulator_client.py
-
 logs: ## Show recent logs
 	tail -f logs/*.log
 
