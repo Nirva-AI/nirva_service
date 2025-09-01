@@ -118,7 +118,7 @@ JWT_SIGNING_KEY: Final[str] = (
 )
 JWT_SIGNING_ALGORITHM: Final[str] = "HS256"
 REFRESH_TOKEN_EXPIRE_DAYS: Final[int] = 7
-ACCESS_TOKEN_EXPIRE_MINUTES: Final[int] = 30  # 访问令牌的过期时间，单位为分钟
+ACCESS_TOKEN_EXPIRE_MINUTES: Final[int] = 1440  # 访问令牌的过期时间，单位为分钟 (24 hours)
 
 
 # 数据库配置
