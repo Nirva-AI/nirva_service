@@ -396,11 +396,16 @@ async def process_s3_event(message: dict, s3_client) -> None:
     username_hash = key_parts[1]
     filename = key_parts[2]
     
-    # For now, we store the hash as the username since we can't reverse it
-    # In the future, we might want to maintain a hash->username mapping
-    user_id = username_hash
+    # TEMPORARY: Map hash to actual username
+    # In production, we should store a proper mapping or use a different approach
+    if username_hash == "4f3dbd5df4b8c1f3":
+        user_id = "weilyupku@gmail.com"
+    else:
+        # For other users, we'd need their mapping
+        user_id = username_hash
+        logger.warning(f"Unknown username hash: {username_hash}, using hash as username")
     
-    logger.info(f"Processing audio file: {filename} for user hash: {user_id}")
+    logger.info(f"Processing audio file: {filename} for user: {user_id} (hash: {username_hash})")
     
     # Get file metadata from S3
     try:

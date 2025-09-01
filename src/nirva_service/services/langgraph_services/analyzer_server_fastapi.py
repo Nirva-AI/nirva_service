@@ -37,9 +37,9 @@ async def lifespan(app: FastAPI):
     chat_config = ChatServerConfig()
     
     langgraph_service = LanggraphService(
-        chat_service_localhost_urls=[f"http://localhost:{chat_config.port}"],
+        chat_service_localhost_urls=[f"http://localhost:{chat_config.port}/chat/v1/"],
         chat_service_test_get_urls=[f"http://localhost:{chat_config.port}/test_get"],
-        analyzer_service_localhost_urls=[f"http://localhost:{analyzer_server_config.port}"],
+        analyzer_service_localhost_urls=[f"http://localhost:{analyzer_server_config.port}/analyze/v1/"],
         analyzer_service_test_get_urls=[f"http://localhost:{analyzer_server_config.port}/test_get"]
     )
     
