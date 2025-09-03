@@ -201,17 +201,16 @@ class TranscriptionProcessor:
             sorted_trans = sorted(transcriptions, key=lambda x: x.start_time)
             
             # Prepare transcripts with timestamps for incremental analyzer
-            transcripts_with_timestamps = []
+            # Format as "[HH:MM] text" which the analyzer expects
+            transcript_parts = []
             for trans in sorted_trans:
                 text = trans.transcription_text.strip()
                 if text:
-                    transcripts_with_timestamps.append({
-                        'start_time': trans.start_time,
-                        'end_time': trans.end_time,
-                        'text': text
-                    })
+                    # Format time as HH:MM
+                    time_str = trans.start_time.strftime("%H:%M")
+                    transcript_parts.append(f"[{time_str}] {text}")
             
-            if not transcripts_with_timestamps:
+            if not transcript_parts:
                 logger.warning(
                     f"No valid transcriptions for {username}, marking as completed"
                 )
@@ -222,14 +221,21 @@ class TranscriptionProcessor:
                 db.commit()
                 return
             
+            # Combine all transcripts into one string
+            combined_transcript = " ".join(transcript_parts)
+            
             # Process through incremental analyzer
             logger.info(
-                f"Sending {len(transcripts_with_timestamps)} transcripts to analyzer for {username}"
+                f"Sending {len(transcript_parts)} transcripts to analyzer for {username}"
             )
             
-            result = await self.incremental_analyzer.process_transcripts(
+            # Use a date string (doesn't matter much as analyzer uses timestamps from transcript)
+            date_str = sorted_trans[0].start_time.strftime("%Y-%m-%d")
+            
+            result = await self.incremental_analyzer.process_incremental_transcript(
                 username=username,
-                transcripts=transcripts_with_timestamps
+                time_stamp=date_str,
+                new_transcript=combined_transcript
             )
             
             # Mark all transcriptions as completed
@@ -246,7 +252,7 @@ class TranscriptionProcessor:
                 f"Successfully analyzed transcripts for {username}: "
                 f"{result.new_events_count} new events, "
                 f"{result.updated_events_count} updated events, "
-                f"{result.completed_events_count} completed events"
+                f"{result.total_events_count} total events"
             )
             
         except Exception as e:

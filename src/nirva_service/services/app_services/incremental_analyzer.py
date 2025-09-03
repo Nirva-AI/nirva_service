@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 
 from loguru import logger
-from sqlalchemy import and_, or_, func
+from sqlalchemy import and_, or_, func, text
 
 from ...models.journal import JournalFile
 from ...models.prompt import EventAnalysis, OngoingEventOutput, CompletedEventOutput
@@ -214,13 +214,14 @@ class IncrementalAnalyzer:
             # Query for ongoing events (we'll need to add this to the journal file query)
             # For now, using a simplified approach
             journal_files = db.execute(
-                f"""
+                text("""
                 SELECT content_json 
                 FROM journal_files 
-                WHERE username = '{username}'
+                WHERE username = :username
                 ORDER BY created_at DESC
                 LIMIT 10
-                """
+                """),
+                {"username": username}
             ).fetchall()
             
             ongoing_events = []
@@ -341,7 +342,7 @@ class IncrementalAnalyzer:
         ongoing_event.first_person_narrative = response.event_story
         
         # Update time range and duration
-        if ongoing_event.start_timestamp:
+        if ongoing_event.start_timestamp and ongoing_event.end_timestamp:
             ongoing_event.time_range = f"{ongoing_event.start_timestamp.strftime('%H:%M')}-{ongoing_event.end_timestamp.strftime('%H:%M')}"
             ongoing_event.duration_minutes = int((ongoing_event.end_timestamp - ongoing_event.start_timestamp).total_seconds() / 60)
         
@@ -438,18 +439,20 @@ IMPORTANT: Respond with valid JSON matching this exact schema:
             response_text = request.last_response_message_content
             
             # Try to extract JSON from response
-            json_start = response_text.find('{')
-            json_end = response_text.rfind('}') + 1
+            import re
             
-            if json_start == -1 or json_end == 0:
-                # Try to find JSON in code block
-                import re
-                json_match = re.search(r'```json?\s*(\{.*?\})\s*```', response_text, re.DOTALL)
-                if json_match:
-                    json_str = json_match.group(1)
-                else:
-                    raise ValueError(f"No valid JSON found in response: {response_text}")
+            # First try to find JSON in a code block
+            json_match = re.search(r'```json?\s*(\{.*?\})\s*```', response_text, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(1)
             else:
+                # Try to find raw JSON
+                json_start = response_text.find('{')
+                json_end = response_text.rfind('}') + 1
+                
+                if json_start == -1 or json_end == 0:
+                    raise ValueError(f"No valid JSON found in response: {response_text[:500]}")
+                    
                 json_str = response_text[json_start:json_end]
             
             # Parse and validate
@@ -577,11 +580,12 @@ IMPORTANT: Respond with valid JSON matching this exact schema:
         db = SessionLocal()
         try:
             result = db.execute(
-                f"""
+                text("""
                 SELECT COUNT(*) as count
                 FROM journal_files
-                WHERE username = '{username}'
-                """
+                WHERE username = :username
+                """),
+                {"username": username}
             ).fetchone()
             
             if result:

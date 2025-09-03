@@ -21,7 +21,7 @@ Create the FINAL, complete diary entry for this event. Since the event is now co
 Provide a JSON response with the following structure:
 
 ```json
-{
+{{
   "event_title": "Final polished title (5-10 words)",
   "event_summary": "Complete 1-2 sentence summary of what happened",
   "event_story": "Final comprehensive diary entry (100-800 words)",
@@ -30,7 +30,7 @@ Provide a JSON response with the following structure:
   "activity_type": "work|exercise|social|learning|self-care|chores|commute|meal|leisure|unknown",
   "mood_labels": ["1-3 mood descriptors: peaceful, energized, engaged, disengaged, happy, sad, anxious, stressed, relaxed, excited, bored, frustrated, content, neutral"],
   "mood_score": 7
-}
+}}
 ```
 
 ## Important Guidelines
