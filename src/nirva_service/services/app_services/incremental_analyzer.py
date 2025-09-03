@@ -756,8 +756,16 @@ IMPORTANT:
 1. Extract actual time ranges from the [HH:MM] timestamps in the transcript
 2. Create DIFFERENT summary and narrative - summary should be objective, narrative should be subjective first-person
 3. If the transcript contains Chinese, respond with Chinese summaries/narratives
-4. Group related segments into single events (don't create too many small events)
+4. **CRITICAL**: Group related segments into larger events - aim for 3-5 major events per day maximum
 5. Focus on meaningful activities, not technical audio capture messages
+6. Merge activities that:
+   - Occur within 60 minutes of each other
+   - Happen in the same general location
+   - Involve similar types of activities
+7. Examples of what should be ONE event:
+   - Working on computer + checking emails + attending online meeting = "Work session"
+   - Making breakfast + eating + cleaning dishes = "Morning routine"
+   - Multiple conversations with the same people = "Social gathering"
 """
     
     
