@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Tuple, Optional
 from collections import defaultdict
 from uuid import UUID
+import pytz
 
 from loguru import logger
 from sqlalchemy import and_, or_, func
@@ -171,8 +172,16 @@ class TranscriptionProcessor:
         # Group by username and date
         groups = defaultdict(list)
         for transcription in pending:
-            # Extract date from start_time
-            date_str = transcription.start_time.strftime("%Y-%m-%d")
+            # Extract date from start_time, converting UTC to Pacific timezone
+            # This ensures events appear on the correct local date
+            pacific = pytz.timezone("America/Los_Angeles")
+            utc = pytz.UTC
+            
+            # Convert UTC time to Pacific time
+            utc_time = transcription.start_time.replace(tzinfo=utc)
+            pacific_time = utc_time.astimezone(pacific)
+            date_str = pacific_time.strftime("%Y-%m-%d")
+            
             key = (transcription.username, date_str)
             groups[key].append(transcription)
         
