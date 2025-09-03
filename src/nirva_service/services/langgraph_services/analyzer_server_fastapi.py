@@ -46,7 +46,7 @@ async def lifespan(app: FastAPI):
     # Create transcription processor
     transcription_processor = TranscriptionProcessor(
         langgraph_service=langgraph_service,
-        process_interval_seconds=120  # 2 minutes
+        process_interval_seconds=300  # 5 minutes
     )
     
     await transcription_processor.start()

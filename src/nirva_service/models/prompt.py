@@ -1,4 +1,5 @@
-from typing import List, Literal, final
+from typing import List, Literal, Optional, final
+from datetime import datetime
 
 from pydantic import BaseModel, Field
 
@@ -66,6 +67,84 @@ class EventAnalysis(BaseModel):
     )
     action_item: str = Field(
         description="**Only include key action items, decisions, or reminders that user_name (e.g., Wei) personally stated she would do, needs to do, explicitly decided upon, or was directly tasked with and acknowledged. Do NOT include actions for other people, or general discussion points unless they translate into a direct, personal action or decision for user_name. If user_name is merely observing or discussing someone else's potential action, it's not an action item for her unless she then explicitly states a related personal task or commitment. If no such action item exists for user_name, use 'N/A'.**"
+    )
+    
+    # New fields for ongoing/completed event processing
+    event_status: Literal["ongoing", "completed"] = Field(
+        default="completed",
+        description="Status of the event - 'ongoing' if still being processed, 'completed' when finalized"
+    )
+    event_story: Optional[str] = Field(
+        default=None,
+        description="Full diary-style narrative of the event, combining all details into a coherent story"
+    )
+    event_summary: Optional[str] = Field(
+        default=None,
+        description="Brief 1-2 sentence summary of the event's key activities and outcomes"
+    )
+    start_timestamp: Optional[datetime] = Field(
+        default=None,
+        description="Actual start timestamp of the event (UTC)"
+    )
+    end_timestamp: Optional[datetime] = Field(
+        default=None,
+        description="Actual end timestamp of the event (UTC)"
+    )
+    last_processed_at: Optional[datetime] = Field(
+        default=None,
+        description="Last time this event was processed by LLM"
+    )
+
+
+###############################################################################################################################################
+# Structured output models for the new incremental analyzer
+@final
+@register_base_model_class
+class OngoingEventOutput(BaseModel):
+    """LLM output structure for ongoing events"""
+    event_title: str = Field(
+        description="Brief, descriptive title of the event (5-10 words)"
+    )
+    event_summary: str = Field(
+        description="1-2 sentence summary of what's happening in this event"
+    )
+    event_story: str = Field(
+        description="Full narrative diary entry of the event from user's perspective (50-500 words)"
+    )
+
+
+@final
+@register_base_model_class
+class CompletedEventOutput(BaseModel):
+    """LLM output structure for completed events"""
+    event_title: str = Field(
+        description="Final, polished title of the completed event (5-10 words)"
+    )
+    event_summary: str = Field(
+        description="Complete 1-2 sentence summary of what happened in this event"
+    )
+    event_story: str = Field(
+        description="Final, comprehensive narrative diary entry of the entire event (100-800 words)"
+    )
+    location: str = Field(
+        description="Where the event took place, based on context clues from the transcript"
+    )
+    people_involved: List[str] = Field(
+        description="List of people mentioned or involved in the event (names or roles)"
+    )
+    activity_type: Literal[
+        "work", "exercise", "social", "learning", "self-care", 
+        "chores", "commute", "meal", "leisure", "unknown"
+    ] = Field(
+        description="Category of the event activity"
+    )
+    mood_labels: List[str] = Field(
+        description="1-3 mood descriptors from: peaceful, energized, engaged, disengaged, happy, sad, anxious, stressed, relaxed, excited, bored, frustrated, content, neutral"
+    )
+    mood_score: int = Field(
+        description="Overall mood score from 1 (very negative) to 10 (very positive)",
+        ge=1,
+        le=10
     )
 
 

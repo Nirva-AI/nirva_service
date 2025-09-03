@@ -5,10 +5,9 @@ Runs periodically to process pending transcriptions through the incremental anal
 
 import asyncio
 from datetime import datetime, timedelta
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Optional
 from collections import defaultdict
 from uuid import UUID
-import pytz
 
 from loguru import logger
 from sqlalchemy import and_, or_, func
@@ -114,31 +113,31 @@ class TranscriptionProcessor:
         Process all pending transcriptions.
         
         Returns:
-            Number of user/date groups processed
+            Number of user groups processed
         """
         db: Session = SessionLocal()
         processed_groups = 0
         
         try:
-            # Get pending transcriptions grouped by user and date
+            # Get pending transcriptions grouped by user
             pending_groups = self._get_pending_transcription_groups(db)
             
             if not pending_groups:
                 return 0
             
-            logger.info(f"Found {len(pending_groups)} user/date groups to process")
+            logger.info(f"Found {len(pending_groups)} user groups to process")
             
-            # Process each group
-            for (username, date_str), transcriptions in pending_groups.items():
+            # Process each user's transcriptions
+            for username, transcriptions in pending_groups.items():
                 try:
-                    await self._process_user_date_group(
-                        db, username, date_str, transcriptions
+                    await self._process_user_group(
+                        db, username, transcriptions
                     )
                     processed_groups += 1
                     
                 except Exception as e:
                     logger.error(
-                        f"Failed to process group {username}/{date_str}: {e}"
+                        f"Failed to process group for {username}: {e}"
                     )
                     self._mark_transcriptions_failed(db, transcriptions, str(e))
                     self.stats["total_failed"] += len(transcriptions)
@@ -151,12 +150,12 @@ class TranscriptionProcessor:
     
     def _get_pending_transcription_groups(
         self, db: Session
-    ) -> Dict[Tuple[str, str], List[TranscriptionResultDB]]:
+    ) -> Dict[str, List[TranscriptionResultDB]]:
         """
-        Get pending transcriptions grouped by username and date.
+        Get pending transcriptions grouped by username.
         
         Returns:
-            Dictionary mapping (username, date) to list of transcriptions
+            Dictionary mapping username to list of transcriptions
         """
         # Query pending transcriptions
         pending = db.query(TranscriptionResultDB).filter(
@@ -169,39 +168,27 @@ class TranscriptionProcessor:
         if not pending:
             return {}
         
-        # Group by username and date
+        # Group by username only (incremental analyzer handles time-based grouping)
         groups = defaultdict(list)
         for transcription in pending:
-            # Extract date from start_time, converting UTC to Pacific timezone
-            # This ensures events appear on the correct local date
-            pacific = pytz.timezone("America/Los_Angeles")
-            utc = pytz.UTC
-            
-            # Convert UTC time to Pacific time
-            utc_time = transcription.start_time.replace(tzinfo=utc)
-            pacific_time = utc_time.astimezone(pacific)
-            date_str = pacific_time.strftime("%Y-%m-%d")
-            
-            key = (transcription.username, date_str)
-            groups[key].append(transcription)
+            groups[transcription.username].append(transcription)
         
         return dict(groups)
     
     
-    async def _process_user_date_group(
+    async def _process_user_group(
         self,
         db: Session,
         username: str,
-        date_str: str,
         transcriptions: List[TranscriptionResultDB]
     ):
         """
-        Process all transcriptions for a specific user and date.
-        Makes ONE LLM call for all transcriptions combined.
+        Process all pending transcriptions for a specific user.
+        Passes transcriptions with timestamps to incremental analyzer.
         """
         logger.info(
             f"Processing {len(transcriptions)} transcriptions for "
-            f"user {username[:8]}... on {date_str}"
+            f"user {username[:8]}..."
         )
         
         # Mark as processing
@@ -213,12 +200,20 @@ class TranscriptionProcessor:
             # Sort by start time to maintain chronological order
             sorted_trans = sorted(transcriptions, key=lambda x: x.start_time)
             
-            # Concatenate all transcriptions with time markers
-            combined_text = self._concatenate_transcriptions(sorted_trans)
+            # Prepare transcripts with timestamps for incremental analyzer
+            transcripts_with_timestamps = []
+            for trans in sorted_trans:
+                text = trans.transcription_text.strip()
+                if text:
+                    transcripts_with_timestamps.append({
+                        'start_time': trans.start_time,
+                        'end_time': trans.end_time,
+                        'text': text
+                    })
             
-            if not combined_text or len(combined_text.strip()) <= 1:
+            if not transcripts_with_timestamps:
                 logger.warning(
-                    f"Empty combined text for {username}/{date_str}, marking as completed"
+                    f"No valid transcriptions for {username}, marking as completed"
                 )
                 # Mark as completed even if empty (no need to retry)
                 for trans in transcriptions:
@@ -227,15 +222,14 @@ class TranscriptionProcessor:
                 db.commit()
                 return
             
-            # Process through incremental analyzer (ONE LLM call)
+            # Process through incremental analyzer
             logger.info(
-                f"Sending {len(combined_text)} chars to analyzer for {username}/{date_str}"
+                f"Sending {len(transcripts_with_timestamps)} transcripts to analyzer for {username}"
             )
             
-            result = await self.incremental_analyzer.process_incremental_transcript(
+            result = await self.incremental_analyzer.process_transcripts(
                 username=username,
-                time_stamp=date_str,
-                new_transcript=combined_text
+                transcripts=transcripts_with_timestamps
             )
             
             # Mark all transcriptions as completed
@@ -249,48 +243,20 @@ class TranscriptionProcessor:
             self.stats["total_processed"] += len(transcriptions)
             
             logger.info(
-                f"Successfully analyzed {username}/{date_str}: "
+                f"Successfully analyzed transcripts for {username}: "
                 f"{result.new_events_count} new events, "
                 f"{result.updated_events_count} updated events, "
-                f"{result.total_events_count} total events"
+                f"{result.completed_events_count} completed events"
             )
             
         except Exception as e:
             # Mark as failed on error
-            logger.error(f"Analysis failed for {username}/{date_str}: {e}")
+            logger.error(f"Analysis failed for {username}: {e}")
             for trans in transcriptions:
                 trans.analysis_status = "failed"
             db.commit()
             raise
     
-    
-    def _concatenate_transcriptions(
-        self, transcriptions: List[TranscriptionResultDB]
-    ) -> str:
-        """
-        Concatenate multiple transcriptions with time markers.
-        
-        Args:
-            transcriptions: List of transcriptions sorted by time
-            
-        Returns:
-            Combined text with time markers
-        """
-        parts = []
-        
-        for trans in transcriptions:
-            # Format time marker
-            time_str = trans.start_time.strftime("%H:%M")
-            
-            # Get transcription text
-            text = trans.transcription_text.strip()
-            
-            if text:
-                # Add time marker and text
-                parts.append(f"[{time_str}] {text}")
-        
-        # Join with space for natural flow
-        return " ".join(parts)
     
     
     def _mark_transcriptions_failed(

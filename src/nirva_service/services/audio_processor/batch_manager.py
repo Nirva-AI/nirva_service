@@ -16,13 +16,13 @@ from nirva_service.db.pgsql_object import AudioFileDB, AudioBatchDB
 class BatchManager:
     """Manages batching of audio segments for transcription."""
     
-    def __init__(self, max_gap_seconds: int = 300, timeout_seconds: int = 300):
+    def __init__(self, max_gap_seconds: int = 180, timeout_seconds: int = 420):
         """
         Initialize batch manager.
         
         Args:
-            max_gap_seconds: Maximum gap between segments to consider same batch (default: 5 minutes)
-            timeout_seconds: Time after which to process a batch (default: 5 minutes)
+            max_gap_seconds: Maximum gap between segments to consider same batch (default: 3 minutes)
+            timeout_seconds: Time after which to process a batch (default: 7 minutes)
         """
         self.max_gap = timedelta(seconds=max_gap_seconds)
         self.timeout = timedelta(seconds=timeout_seconds)
@@ -192,7 +192,7 @@ def get_batch_manager(
     """Get or create the singleton batch manager instance."""
     global _batch_manager
     if _batch_manager is None:
-        max_gap = max_gap_seconds or int(os.getenv('BATCH_MAX_GAP_SECONDS', '300'))
-        timeout = timeout_seconds or int(os.getenv('BATCH_TIMEOUT_SECONDS', '300'))
+        max_gap = max_gap_seconds or int(os.getenv('BATCH_MAX_GAP_SECONDS', '180'))
+        timeout = timeout_seconds or int(os.getenv('BATCH_TIMEOUT_SECONDS', '420'))
         _batch_manager = BatchManager(max_gap, timeout)
     return _batch_manager
