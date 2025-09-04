@@ -7,7 +7,9 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from loguru import logger
 
-import nirva_service.db.pgsql_journal_file
+import nirva_service.db.pgsql_journal_file  # Will be removed later
+import nirva_service.db.pgsql_events as pgsql_events
+import nirva_service.db.pgsql_daily_reflections as pgsql_reflections
 import nirva_service.db.redis_task as redis_task
 import nirva_service.db.redis_upload_transcript
 import nirva_service.db.redis_user
@@ -16,7 +18,8 @@ import nirva_service.utils.format_string as format_string
 from nirva_service.models import (
     AnalyzeActionRequest,
     BackgroundTaskResponse,
-    JournalFile,
+    JournalFile,  # Will be removed later
+    EventAnalysis,
     LabelExtractionResponse,
     ReflectionResponse,
     UploadTranscriptActionRequest,
@@ -404,33 +407,18 @@ async def handle_get_events(
     try:
         from datetime import datetime
         from zoneinfo import ZoneInfo
-        import json
         
-        # Get all events (new structure stores everything under 'all_events')
-        journal_db = nirva_service.db.pgsql_journal_file.get_journal_file(
-            username=authenticated_user,
-            time_stamp='all_events'
-        )
+        # Get all events from the new events table
+        all_events = pgsql_events.get_user_events(authenticated_user)
         
-        # If no events at all, try legacy date-based lookup
-        if not journal_db:
-            journal_db = nirva_service.db.pgsql_journal_file.get_journal_file(
-                username=authenticated_user,
-                time_stamp=request_data.time_stamp
-            )
-        
-        if not journal_db:
+        if not all_events:
             # No events found
             return GetEventsResponse(
                 time_stamp=request_data.time_stamp,
                 events=[],
                 total_count=0,
-                last_updated="未找到数据"
+                last_updated=datetime.utcnow().isoformat()
             )
-        
-        # Parse journal content
-        journal_data = json.loads(journal_db.content_json)
-        journal_file = JournalFile.model_validate(journal_data)
         
         # Filter events by the requested date
         # Assume user is in PST timezone if not specified
@@ -446,7 +434,7 @@ async def handle_get_events(
             
             # Filter events
             filtered_events = []
-            for event in journal_file.events:
+            for event in all_events:
                 if event.start_timestamp:
                     # Ensure timestamp is timezone-aware
                     if event.start_timestamp.tzinfo is None:
@@ -460,15 +448,15 @@ async def handle_get_events(
             
             events = filtered_events
         except:
-            # If date parsing fails or time_stamp is 'all_events', return all events
-            events = journal_file.events
+            # If date parsing fails, return all events
+            events = all_events
         
         # Return filtered events
         return GetEventsResponse(
             time_stamp=request_data.time_stamp,
             events=events,
             total_count=len(events),
-            last_updated=journal_db.updated_at.isoformat() if journal_db.updated_at else "未知"
+            last_updated=datetime.utcnow().isoformat()
         )
 
     except Exception as e:
@@ -551,36 +539,39 @@ async def get_task_status(
 ###################################################################################################################################################################
 ###################################################################################################################################################################
 @analyze_action_router.get(
-    path="/action/get_journal_file/v1/{time_stamp}/", response_model=JournalFile
+    path="/action/get_journal_file/v1/{time_stamp}/", response_model=JournalFile,
+    deprecated=True  # This endpoint is deprecated, use get_events_by_date instead
 )
 async def get_journal_file(
     time_stamp: str,
     authenticated_user: str = Depends(get_authenticated_user),
 ) -> JournalFile:
-    """获取用户的日记文件"""
+    """
+    DEPRECATED: 获取用户的日记文件
+    This endpoint is deprecated and will be removed. Use /action/get_events_by_date/v1/ instead.
+    """
 
-    logger.info(f"/action/get_journal_file/v1/{time_stamp}/")
+    logger.info(f"DEPRECATED ENDPOINT: /action/get_journal_file/v1/{time_stamp}/")
 
-    try:
-        # 从数据库获取日记文件
-        journal_file_db = nirva_service.db.pgsql_journal_file.get_journal_file(
-            username=authenticated_user, time_stamp=time_stamp
-        )
+    # Return empty JournalFile for backward compatibility
+    # The data is now in the events table
+    from ..models.prompt import DailyReflection
+    
+    # Get events for backward compatibility
+    events = pgsql_events.get_user_events(authenticated_user)
+    
+    # Get daily reflection if it exists
+    reflection = pgsql_reflections.get_daily_reflection(authenticated_user, time_stamp)
+    if not reflection:
+        reflection = pgsql_reflections.get_or_create_default_reflection(authenticated_user, time_stamp)
+    
+    return JournalFile(
+        username=authenticated_user,
+        time_stamp=time_stamp,
+        events=events[:10] if events else [],  # Return first 10 events for compatibility
+        daily_reflection=reflection
+    )
 
-        if journal_file_db is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"日记文件未找到: 用户={authenticated_user}, 时间戳={time_stamp}",
-            )
-
-        # 返回实际的日记文件
-        return JournalFile.model_validate_json(journal_file_db.content_json)
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"获取日记文件失败: {e}",
-        )
 
 
 ###################################################################################################################################################################
@@ -589,13 +580,13 @@ async def get_journal_file(
 
 
 @analyze_action_router.get(
-    path="/action/get_events_by_date/v1/", response_model=JournalFile
+    path="/action/get_events_by_date/v1/", response_model=List[EventAnalysis]
 )
 async def get_events_by_date(
     date: str,  # Format: YYYY-MM-DD
     timezone: str = "UTC",  # e.g., "America/Los_Angeles", "UTC", etc.
     authenticated_user: str = Depends(get_authenticated_user),
-) -> JournalFile:
+) -> List[EventAnalysis]:
     """
     Get events for a specific date in the user's timezone.
     
@@ -605,9 +596,9 @@ async def get_events_by_date(
         authenticated_user: Username from authentication
     
     Returns:
-        JournalFile with events that occurred on the specified date in the user's timezone
+        List of EventAnalysis that occurred on the specified date in the user's timezone
     """
-    from datetime import datetime, timedelta
+    from datetime import datetime
     from zoneinfo import ZoneInfo
     
     logger.info(f"/action/get_events_by_date/v1/: date={date}, timezone={timezone}, user={authenticated_user}")
@@ -625,44 +616,14 @@ async def get_events_by_date(
         start_utc = start_of_day.astimezone(ZoneInfo('UTC'))
         end_utc = end_of_day.astimezone(ZoneInfo('UTC'))
         
-        # Get all events for the user
-        all_events_journal = nirva_service.db.pgsql_journal_file.get_journal_file(
-            username=authenticated_user, time_stamp='all_events'
+        # Get events from the new events table for the date range
+        all_events = pgsql_events.get_events_in_range(
+            authenticated_user,
+            start_utc,
+            end_utc
         )
         
-        if all_events_journal is None:
-            # Return empty journal for the date
-            return JournalFile(
-                username=authenticated_user,
-                time_stamp=date,
-                events=[],
-                daily_reflection=None
-            )
-        
-        # Parse the journal
-        journal = JournalFile.model_validate_json(all_events_journal.content_json)
-        
-        # Filter events by date range
-        filtered_events = []
-        for event in journal.events:
-            if event.start_timestamp:
-                # Ensure timestamp is timezone-aware
-                if event.start_timestamp.tzinfo is None:
-                    event_time = event.start_timestamp.replace(tzinfo=ZoneInfo('UTC'))
-                else:
-                    event_time = event.start_timestamp
-                
-                # Check if event falls within the requested date in user's timezone
-                if start_utc <= event_time <= end_utc:
-                    filtered_events.append(event)
-        
-        # Return journal with filtered events
-        return JournalFile(
-            username=authenticated_user,
-            time_stamp=date,
-            events=filtered_events,
-            daily_reflection=journal.daily_reflection
-        )
+        return all_events
         
     except ValueError as e:
         raise HTTPException(

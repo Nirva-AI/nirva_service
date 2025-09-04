@@ -7,12 +7,11 @@ from collections import defaultdict
 from loguru import logger
 from sqlalchemy import and_, or_, func, text
 
-from ...models.journal import JournalFile
 from ...models.prompt import EventAnalysis, OngoingEventOutput, CompletedEventOutput
 from ...models.api import IncrementalAnalyzeResponse
 from ...db.pgsql_client import SessionLocal
 from ...db.pgsql_object import TranscriptionResultDB
-from ...db.pgsql_journal_file import get_journal_file, save_or_update_journal_file
+from ...db.pgsql_events import get_user_events, save_events
 from ..langgraph_services.langgraph_request_task import LanggraphRequestTask
 from ..langgraph_services.langgraph_service import LanggraphService
 
@@ -209,32 +208,16 @@ class IncrementalAnalyzer:
         """
         Get ongoing events for a user.
         """
-        db = SessionLocal()
-        try:
-            # Query for ongoing events (we'll need to add this to the journal file query)
-            # For now, using a simplified approach
-            journal_files = db.execute(
-                text("""
-                SELECT content_json 
-                FROM journal_files 
-                WHERE username = :username
-                ORDER BY created_at DESC
-                LIMIT 10
-                """),
-                {"username": username}
-            ).fetchall()
-            
-            ongoing_events = []
-            for row in journal_files:
-                journal = JournalFile.model_validate_json(row[0])
-                for event in journal.events:
-                    if hasattr(event, 'event_status') and event.event_status == 'ongoing':
-                        ongoing_events.append(event)
-            
-            return ongoing_events
-            
-        finally:
-            db.close()
+        # Get all events for the user
+        all_events = get_user_events(username)
+        
+        # Filter for ongoing events
+        ongoing_events = [
+            event for event in all_events 
+            if event.event_status == 'ongoing'
+        ]
+        
+        return ongoing_events
     
     def _find_matching_ongoing_event(
         self, 
@@ -482,108 +465,18 @@ IMPORTANT: Respond with valid JSON matching this exact schema:
     
     async def _save_events(self, username: str, events: List[EventAnalysis]):
         """
-        Save events to database without date grouping.
-        All events are stored with their timestamps, allowing client-side timezone handling.
+        Save events directly to the events table.
         """
         if not events:
             return
         
-        db = SessionLocal()
-        try:
-            # Use a single journal entry for all events
-            # The time_stamp field will be 'all_events' as a placeholder
-            time_stamp = 'all_events'
-            
-            # Get existing journal or create new one
-            existing = get_journal_file(username, time_stamp)
-            
-            if existing:
-                journal_data = json.loads(existing.content_json)
-                journal = JournalFile.model_validate(journal_data)
-                
-                # Update existing events or add new ones
-                event_map = {e.event_id: e for e in journal.events}
-                for event in events:
-                    event_map[event.event_id] = event
-                
-                journal.events = list(event_map.values())
-            else:
-                # Create new journal
-                journal = JournalFile(
-                    username=username,
-                    time_stamp=time_stamp,
-                    events=events,
-                    daily_reflection=self._create_default_reflection()
-                )
-            
-            # Save to database
-            save_or_update_journal_file(username, journal)
-                
-        finally:
-            db.close()
-    
-    def _create_default_reflection(self):
-        """
-        Create a default daily reflection structure.
-        """
-        from ...models.prompt import (
-            DailyReflection, Gratitude, ChallengesAndGrowth,
-            LearningAndInsights, ConnectionsAndRelationships, LookingForward
-        )
-        
-        return DailyReflection(
-            reflection_summary="Daily activities and experiences",
-            gratitude=Gratitude(
-                gratitude_summary=["Daily experiences"],
-                gratitude_details="Grateful for the day's experiences",
-                win_summary=["Completed activities"],
-                win_details="Successfully navigated the day",
-                feel_alive_moments="Moments of connection and activity"
-            ),
-            challenges_and_growth=ChallengesAndGrowth(
-                growth_summary=["Personal development"],
-                obstacles_faced="Daily challenges",
-                unfinished_intentions="Tasks to complete",
-                contributing_factors="Time and circumstances"
-            ),
-            learning_and_insights=LearningAndInsights(
-                new_knowledge="Daily learnings",
-                self_discovery="Personal insights",
-                insights_about_others="Social observations",
-                broader_lessons="Life lessons"
-            ),
-            connections_and_relationships=ConnectionsAndRelationships(
-                meaningful_interactions="Social interactions",
-                notable_about_people="People in my life",
-                follow_up_needed="Future connections"
-            ),
-            looking_forward=LookingForward(
-                do_differently_tomorrow="Areas for improvement",
-                continue_what_worked="Successful practices",
-                top_3_priorities_tomorrow=["Priority 1", "Priority 2", "Priority 3"]
-            )
-        )
+        # Save events using the new events table
+        saved_count = save_events(username, events)
+        logger.info(f"Saved {saved_count} events for user {username}")
     
     async def _get_total_event_count(self, username: str) -> int:
         """
         Get total event count for a user.
         """
-        db = SessionLocal()
-        try:
-            result = db.execute(
-                text("""
-                SELECT COUNT(*) as count
-                FROM journal_files
-                WHERE username = :username
-                """),
-                {"username": username}
-            ).fetchone()
-            
-            if result:
-                # Need to actually count events within journals
-                # This is a simplified version
-                return result[0] * 5  # Rough estimate
-            return 0
-            
-        finally:
-            db.close()
+        events = get_user_events(username)
+        return len(events)

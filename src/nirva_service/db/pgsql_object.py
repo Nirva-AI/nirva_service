@@ -49,6 +49,12 @@ class UserDB(UUIDBase):
     journal_files: Mapped["JournalFileDB"] = relationship(
         "JournalFileDB", back_populates="user"
     )
+    events: Mapped["EventDB"] = relationship(
+        "EventDB", back_populates="user"
+    )
+    daily_reflections: Mapped["DailyReflectionDB"] = relationship(
+        "DailyReflectionDB", back_populates="user"
+    )
 
 
 # 用户的日记数据
@@ -80,6 +86,107 @@ class JournalFileDB(UUIDBase):
 
     # 关系
     user: Mapped["UserDB"] = relationship("UserDB", back_populates="journal_files")
+
+
+# Event storage (replacing journal_files)
+class EventDB(UUIDBase):
+    __tablename__ = "events"
+    
+    # User association
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id"), nullable=False, index=True
+    )
+    username: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    
+    # Event identification
+    event_id: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
+    event_status: Mapped[str] = mapped_column(String(20), nullable=False, default="completed")
+    
+    # Event content
+    event_title: Mapped[str] = mapped_column(String(500), nullable=False)
+    event_summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    event_story: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    
+    # Timestamps (indexed for efficient querying)
+    start_timestamp: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
+    end_timestamp: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
+    last_processed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    
+    # Display fields
+    time_range: Mapped[str] = mapped_column(String(50), nullable=False)
+    duration_minutes: Mapped[int] = mapped_column(nullable=False)
+    location: Mapped[str] = mapped_column(String(500), nullable=False)
+    
+    # Metrics
+    mood_score: Mapped[int] = mapped_column(nullable=False)
+    stress_level: Mapped[int] = mapped_column(nullable=False)
+    energy_level: Mapped[int] = mapped_column(nullable=False)
+    
+    # Categories
+    activity_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    interaction_dynamic: Mapped[str] = mapped_column(String(50), nullable=False)
+    inferred_impact_on_user_name: Mapped[str] = mapped_column(String(50), nullable=False)
+    
+    # JSON fields for arrays
+    mood_labels: Mapped[list] = mapped_column(JSON, nullable=False)
+    people_involved: Mapped[list] = mapped_column(JSON, nullable=False)
+    topic_labels: Mapped[list] = mapped_column(JSON, nullable=False)
+    
+    # Text fields
+    one_sentence_summary: Mapped[str] = mapped_column(Text, nullable=False)
+    first_person_narrative: Mapped[str] = mapped_column(Text, nullable=False)
+    action_item: Mapped[str] = mapped_column(Text, nullable=False)
+    
+    # Metadata
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+    
+    # Relationship
+    user: Mapped["UserDB"] = relationship("UserDB", back_populates="events")
+
+
+# Daily reflections (AI-generated summaries)
+class DailyReflectionDB(UUIDBase):
+    __tablename__ = "daily_reflections"
+    
+    # User association
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id"), nullable=False, index=True
+    )
+    username: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    
+    # Date for the reflection (user's local date as string)
+    reflection_date: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    
+    # Reflection content as JSON (stores the entire DailyReflection model)
+    reflection_json: Mapped[dict] = mapped_column(JSON, nullable=False)
+    
+    # Metadata
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+    
+    # Relationship
+    user: Mapped["UserDB"] = relationship("UserDB", back_populates="daily_reflections")
 
 
 # Audio file tracking
