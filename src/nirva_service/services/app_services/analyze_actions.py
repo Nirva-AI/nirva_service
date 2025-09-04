@@ -402,14 +402,25 @@ async def handle_get_events(
     logger.info(f"/action/analyze/events/get/v1/: {request_data.model_dump_json()}")
 
     try:
-        # 从数据库获取JournalFile
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        import json
+        
+        # Get all events (new structure stores everything under 'all_events')
         journal_db = nirva_service.db.pgsql_journal_file.get_journal_file(
             username=authenticated_user,
-            time_stamp=request_data.time_stamp
+            time_stamp='all_events'
         )
         
+        # If no events at all, try legacy date-based lookup
         if not journal_db:
-            # 如果没有找到，返回空的事件列表
+            journal_db = nirva_service.db.pgsql_journal_file.get_journal_file(
+                username=authenticated_user,
+                time_stamp=request_data.time_stamp
+            )
+        
+        if not journal_db:
+            # No events found
             return GetEventsResponse(
                 time_stamp=request_data.time_stamp,
                 events=[],
@@ -417,16 +428,46 @@ async def handle_get_events(
                 last_updated="未找到数据"
             )
         
-        # 解析JournalFile内容
-        import json
+        # Parse journal content
         journal_data = json.loads(journal_db.content_json)
         journal_file = JournalFile.model_validate(journal_data)
         
-        # 返回事件列表
+        # Filter events by the requested date
+        # Assume user is in PST timezone if not specified
+        user_tz = ZoneInfo('America/Los_Angeles')
+        try:
+            date_obj = datetime.strptime(request_data.time_stamp, '%Y-%m-%d')
+            start_of_day = date_obj.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=user_tz)
+            end_of_day = date_obj.replace(hour=23, minute=59, second=59, microsecond=999999, tzinfo=user_tz)
+            
+            # Convert to UTC for comparison
+            start_utc = start_of_day.astimezone(ZoneInfo('UTC'))
+            end_utc = end_of_day.astimezone(ZoneInfo('UTC'))
+            
+            # Filter events
+            filtered_events = []
+            for event in journal_file.events:
+                if event.start_timestamp:
+                    # Ensure timestamp is timezone-aware
+                    if event.start_timestamp.tzinfo is None:
+                        event_time = event.start_timestamp.replace(tzinfo=ZoneInfo('UTC'))
+                    else:
+                        event_time = event.start_timestamp
+                    
+                    # Check if event falls within the requested date in user's timezone
+                    if start_utc <= event_time <= end_utc:
+                        filtered_events.append(event)
+            
+            events = filtered_events
+        except:
+            # If date parsing fails or time_stamp is 'all_events', return all events
+            events = journal_file.events
+        
+        # Return filtered events
         return GetEventsResponse(
             time_stamp=request_data.time_stamp,
-            events=journal_file.events,
-            total_count=len(journal_file.events),
+            events=events,
+            total_count=len(events),
             last_updated=journal_db.updated_at.isoformat() if journal_db.updated_at else "未知"
         )
 
