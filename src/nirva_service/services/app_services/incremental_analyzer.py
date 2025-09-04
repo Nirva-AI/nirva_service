@@ -194,14 +194,14 @@ class IncrementalAnalyzer:
         """
         Parse time string HH:MM to datetime (using today's date for now).
         """
-        from datetime import datetime, time
+        from datetime import datetime, time, timezone
         
         parts = time_str.split(':')
         hour = int(parts[0])
         minute = int(parts[1])
         
-        # Use current date with the specified time
-        now = datetime.utcnow()
+        # Use current date with the specified time, timezone-aware
+        now = datetime.now(timezone.utc)
         return now.replace(hour=hour, minute=minute, second=0, microsecond=0)
     
     async def _get_ongoing_events(self, username: str) -> List[EventAnalysis]:
