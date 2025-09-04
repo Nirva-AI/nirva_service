@@ -14,6 +14,15 @@ from .prompt import EventAnalysis
 
 @final
 @register_base_model_class
+class AudioPresignedUrlResponse(BaseModel):
+    presigned_url: str
+    expires_in_seconds: int
+    s3_key: str
+    filename: str
+
+
+@final
+@register_base_model_class
 class URLConfigurationResponse(BaseModel):
     api_version: str = ""
     endpoints: dict[str, str] = {}

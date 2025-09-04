@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from ...db.redis_client import get_redis
 from .analyze_actions import analyze_action_router
+from .audio_download import audio_download_router
 from .chat_actions import chat_action_router
 from .login import login_router
 from .url_config import url_config_router
@@ -41,3 +42,4 @@ app.include_router(router=chat_action_router)
 app.include_router(router=analyze_action_router)
 app.include_router(router=upload_auth_router)
 app.include_router(router=transcription_router)
+app.include_router(router=audio_download_router)
