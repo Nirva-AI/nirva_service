@@ -21,15 +21,10 @@ Update the diary entry by incorporating the new content. The event continues to 
 
 ## Output Requirements
 
-Provide a JSON response with the following structure:
-
-```json
-{
-  "event_title": "Updated title reflecting the full event (5-10 words)",
-  "event_summary": "Updated 1-2 sentence summary including new developments",
-  "event_story": "Expanded narrative combining previous and new content (50-500 words)"
-}
-```
+Provide your response with:
+- **event_title**: Updated title reflecting the full event (5-10 words)
+- **event_summary**: Updated 1-2 sentence summary including new developments  
+- **event_story**: Expanded narrative combining previous and new content (50-500 words)
 
 ## Important Guidelines
 

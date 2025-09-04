@@ -392,58 +392,36 @@ class IncrementalAnalyzer:
         response_model: Any
     ) -> Any:
         """
-        Call LLM with structured output enforcement.
+        Call LLM with structured output using OpenAI's latest structured output API.
         """
-        # Add JSON schema to prompt
-        schema = response_model.model_json_schema()
-        enhanced_prompt = f"""{prompt}
-
-IMPORTANT: Respond with valid JSON matching this exact schema:
-```json
-{json.dumps(schema, indent=2)}
-```"""
+        import os
+        from openai import AsyncOpenAI
         
-        # Create request
-        request = LanggraphRequestTask(
-            username="system",
-            prompt=enhanced_prompt,
-            chat_history=[],
-            timeout=60 * 2
+        # Create OpenAI client
+        client = AsyncOpenAI(
+            api_key=os.getenv("OPENAI_API_KEY")
         )
         
         try:
-            # Call LLM
-            await self.langgraph_service.analyze(request_handlers=[request])
+            # Use the latest structured output API with parse method
+            completion = await client.beta.chat.completions.parse(
+                model="gpt-4.1",  # Latest model supporting structured outputs
+                messages=[
+                    {"role": "system", "content": "You are an AI assistant that analyzes transcripts and returns structured data."},
+                    {"role": "user", "content": prompt}
+                ],
+                response_format=response_model,
+                temperature=0.1
+            )
             
-            if not request.last_response_message_content:
-                raise ValueError("LLM returned no content")
-            
-            # Parse response
-            response_text = request.last_response_message_content
-            
-            # Try to extract JSON from response
-            import re
-            
-            # First try to find JSON in a code block
-            json_match = re.search(r'```json?\s*(\{.*?\})\s*```', response_text, re.DOTALL)
-            if json_match:
-                json_str = json_match.group(1)
+            # Access the parsed response directly
+            if completion.choices and completion.choices[0].message.parsed:
+                return completion.choices[0].message.parsed
             else:
-                # Try to find raw JSON
-                json_start = response_text.find('{')
-                json_end = response_text.rfind('}') + 1
+                raise ValueError("OpenAI returned no parsed content")
                 
-                if json_start == -1 or json_end == 0:
-                    raise ValueError(f"No valid JSON found in response: {response_text[:500]}")
-                    
-                json_str = response_text[json_start:json_end]
-            
-            # Parse and validate
-            data = json.loads(json_str)
-            return response_model.model_validate(data)
-            
         except Exception as e:
-            logger.error(f"LLM call failed: {e}")
+            logger.error(f"OpenAI structured call failed: {e}")
             # Return a default response based on the model
             if response_model == OngoingEventOutput:
                 return OngoingEventOutput(

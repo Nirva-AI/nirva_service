@@ -12,15 +12,10 @@ Analyze the transcript below and create a diary entry with a title, summary, and
 
 ## Output Requirements
 
-Provide a JSON response with the following structure:
-
-```json
-{
-  "event_title": "Brief descriptive title (5-10 words)",
-  "event_summary": "1-2 sentence summary of what's happening",
-  "event_story": "Full narrative diary entry from the user's perspective (50-500 words)"
-}
-```
+Provide your response with:
+- **event_title**: Brief descriptive title (5-10 words)
+- **event_summary**: 1-2 sentence summary of what's happening
+- **event_story**: Full narrative diary entry from the user's perspective (50-500 words)
 
 ## Important Guidelines
 
