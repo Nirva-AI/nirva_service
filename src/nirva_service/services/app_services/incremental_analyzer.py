@@ -275,7 +275,7 @@ class IncrementalAnalyzer:
         with open('src/nirva_service/prompts/process_new_ongoing.md', 'r') as f:
             prompt_template = f.read()
         
-        prompt = prompt_template.replace('{transcript}', raw_group['text'])
+        prompt = prompt_template.replace('{transcript}', raw_group.get('text', ''))
         
         # Call LLM
         response = await self._call_llm_structured(prompt, OngoingEventOutput)
@@ -323,10 +323,10 @@ class IncrementalAnalyzer:
             prompt_template = f.read()
         
         prompt = prompt_template.format(
-            previous_title=ongoing_event.event_title,
-            previous_summary=ongoing_event.event_summary or ongoing_event.one_sentence_summary,
-            previous_story=ongoing_event.event_story or ongoing_event.first_person_narrative,
-            new_transcript=raw_group['text']
+            previous_title=ongoing_event.event_title or "Ongoing Activity",
+            previous_summary=(ongoing_event.event_summary or ongoing_event.one_sentence_summary or "An activity is in progress"),
+            previous_story=(ongoing_event.event_story or ongoing_event.first_person_narrative or "Activity details not available"),
+            new_transcript=raw_group.get('text', '')
         )
         
         # Call LLM
@@ -364,9 +364,9 @@ class IncrementalAnalyzer:
         previous_section = ""
         if ongoing_event.event_story or ongoing_event.first_person_narrative:
             previous_section = f"""## Previous Event Details
-**Title:** {ongoing_event.event_title}
-**Summary:** {ongoing_event.event_summary or ongoing_event.one_sentence_summary}
-**Story:** {ongoing_event.event_story or ongoing_event.first_person_narrative}"""
+**Title:** {ongoing_event.event_title or "Ongoing Activity"}
+**Summary:** {ongoing_event.event_summary or ongoing_event.one_sentence_summary or "An activity in progress"}
+**Story:** {ongoing_event.event_story or ongoing_event.first_person_narrative or "Activity details not available"}"""
         
         # Build new section if there's new transcript
         new_section = ""
