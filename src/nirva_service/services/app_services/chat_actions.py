@@ -151,7 +151,7 @@ async def handle_chat_action(
                 id=str(uuid.uuid4()),
                 role=MessageRole.AI,  # AI消息
                 content=request_task.last_response_message_content,
-                time_stamp=datetime.datetime.now().isoformat(),
+                time_stamp=datetime.datetime.now(datetime.timezone.utc).isoformat(),
             ),
         )
 
