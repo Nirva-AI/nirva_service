@@ -547,6 +547,94 @@ async def get_journal_file(
 ###################################################################################################################################################################
 
 
+@analyze_action_router.get(
+    path="/action/get_events_by_date/v1/", response_model=JournalFile
+)
+async def get_events_by_date(
+    date: str,  # Format: YYYY-MM-DD
+    timezone: str = "UTC",  # e.g., "America/Los_Angeles", "UTC", etc.
+    authenticated_user: str = Depends(get_authenticated_user),
+) -> JournalFile:
+    """
+    Get events for a specific date in the user's timezone.
+    
+    Args:
+        date: Date in YYYY-MM-DD format (in the user's timezone)
+        timezone: User's timezone (e.g., "America/Los_Angeles")
+        authenticated_user: Username from authentication
+    
+    Returns:
+        JournalFile with events that occurred on the specified date in the user's timezone
+    """
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+    
+    logger.info(f"/action/get_events_by_date/v1/: date={date}, timezone={timezone}, user={authenticated_user}")
+    
+    try:
+        # Parse the date and create start/end times in the user's timezone
+        user_tz = ZoneInfo(timezone)
+        date_obj = datetime.strptime(date, '%Y-%m-%d')
+        
+        # Create start and end of day in user's timezone
+        start_of_day = date_obj.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=user_tz)
+        end_of_day = date_obj.replace(hour=23, minute=59, second=59, microsecond=999999, tzinfo=user_tz)
+        
+        # Convert to UTC for comparison
+        start_utc = start_of_day.astimezone(ZoneInfo('UTC'))
+        end_utc = end_of_day.astimezone(ZoneInfo('UTC'))
+        
+        # Get all events for the user
+        all_events_journal = nirva_service.db.pgsql_journal_file.get_journal_file(
+            username=authenticated_user, time_stamp='all_events'
+        )
+        
+        if all_events_journal is None:
+            # Return empty journal for the date
+            return JournalFile(
+                username=authenticated_user,
+                time_stamp=date,
+                events=[],
+                daily_reflection=None
+            )
+        
+        # Parse the journal
+        journal = JournalFile.model_validate_json(all_events_journal.content_json)
+        
+        # Filter events by date range
+        filtered_events = []
+        for event in journal.events:
+            if event.start_timestamp:
+                # Ensure timestamp is timezone-aware
+                if event.start_timestamp.tzinfo is None:
+                    event_time = event.start_timestamp.replace(tzinfo=ZoneInfo('UTC'))
+                else:
+                    event_time = event.start_timestamp
+                
+                # Check if event falls within the requested date in user's timezone
+                if start_utc <= event_time <= end_utc:
+                    filtered_events.append(event)
+        
+        # Return journal with filtered events
+        return JournalFile(
+            username=authenticated_user,
+            time_stamp=date,
+            events=filtered_events,
+            daily_reflection=journal.daily_reflection
+        )
+        
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid date format or timezone: {e}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get events: {e}"
+        )
+
+
 @analyze_action_router.post(
     path="/action/upload_transcript/v1/", response_model=UploadTranscriptActionResponse
 )

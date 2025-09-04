@@ -482,51 +482,42 @@ IMPORTANT: Respond with valid JSON matching this exact schema:
     
     async def _save_events(self, username: str, events: List[EventAnalysis]):
         """
-        Save events to database.
+        Save events to database without date grouping.
+        All events are stored with their timestamps, allowing client-side timezone handling.
         """
         if not events:
             return
         
         db = SessionLocal()
         try:
-            # Group events by their date (computed from start_timestamp)
-            events_by_date = defaultdict(list)
+            # Use a single journal entry for all events
+            # The time_stamp field will be 'all_events' as a placeholder
+            time_stamp = 'all_events'
             
-            for event in events:
-                # Use start_timestamp to determine date
-                if event.start_timestamp:
-                    date_str = event.start_timestamp.strftime('%Y-%m-%d')
-                else:
-                    date_str = datetime.utcnow().strftime('%Y-%m-%d')
-                
-                events_by_date[date_str].append(event)
+            # Get existing journal or create new one
+            existing = get_journal_file(username, time_stamp)
             
-            # Save each day's events
-            for date_str, day_events in events_by_date.items():
-                # Get existing journal or create new one
-                existing = get_journal_file(username, date_str)
+            if existing:
+                journal_data = json.loads(existing.content_json)
+                journal = JournalFile.model_validate(journal_data)
                 
-                if existing:
-                    journal_data = json.loads(existing.content_json)
-                    journal = JournalFile.model_validate(journal_data)
-                    
-                    # Update existing events or add new ones
-                    event_map = {e.event_id: e for e in journal.events}
-                    for event in day_events:
-                        event_map[event.event_id] = event
-                    
-                    journal.events = list(event_map.values())
-                else:
-                    # Create new journal
-                    journal = JournalFile(
-                        username=username,
-                        time_stamp=date_str,
-                        events=day_events,
-                        daily_reflection=self._create_default_reflection()
-                    )
+                # Update existing events or add new ones
+                event_map = {e.event_id: e for e in journal.events}
+                for event in events:
+                    event_map[event.event_id] = event
                 
-                # Save to database
-                save_or_update_journal_file(username, journal)
+                journal.events = list(event_map.values())
+            else:
+                # Create new journal
+                journal = JournalFile(
+                    username=username,
+                    time_stamp=time_stamp,
+                    events=events,
+                    daily_reflection=self._create_default_reflection()
+                )
+            
+            # Save to database
+            save_or_update_journal_file(username, journal)
                 
         finally:
             db.close()
