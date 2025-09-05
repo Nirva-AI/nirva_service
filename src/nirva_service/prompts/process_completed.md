@@ -21,7 +21,7 @@ Create the FINAL, complete diary entry for this event. Since the event is now co
 Provide your response with:
 - **event_title**: Final polished title (5-10 words)
 - **event_summary**: Complete 1-2 sentence summary of what happened
-- **event_story**: Final comprehensive diary entry (100-800 words)
+- **event_story**: Final comprehensive diary entry (20-600 words, based on transcription length)
 - **location**: Where this took place (be specific if mentioned, general if not)
 - **people_involved**: List of people mentioned or involved
 - **activity_type**: work|exercise|social|learning|self-care|chores|commute|meal|leisure|unknown

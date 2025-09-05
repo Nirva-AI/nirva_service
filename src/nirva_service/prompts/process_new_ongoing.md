@@ -15,7 +15,7 @@ Analyze the transcript below and create a diary entry with a title, summary, and
 Provide your response with:
 - **event_title**: Brief descriptive title (5-10 words)
 - **event_summary**: 1-2 sentence summary of what's happening
-- **event_story**: Full narrative diary entry from the user's perspective (50-500 words)
+- **event_story**: Full narrative diary entry from the user's perspective (20-500 words, based on transcription length)
 
 ## Important Guidelines
 
