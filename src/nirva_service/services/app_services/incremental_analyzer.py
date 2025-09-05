@@ -124,25 +124,37 @@ class IncrementalAnalyzer:
     def _parse_transcript_with_times(self, transcript: str) -> List[Dict[str, Any]]:
         """
         Parse transcript with time markers to extract chunks with timestamps.
-        Supports both [HH:MM] and [ISO_TIMESTAMP] formats.
+        Supports:
+        - [START_ISO|END_ISO] for full timestamp ranges
+        - [ISO_TIMESTAMP] for single timestamps
+        - [HH:MM] for simple times
         
         Returns:
-            List of dicts with 'time', 'text' keys
+            List of dicts with 'start_time', 'end_time', 'text' keys
         """
         import re
         
         chunks = []
-        # Pattern to match either [ISO_TIMESTAMP] or [HH:MM] followed by text
-        # ISO format: 2025-09-04T23:30:00+00:00
-        # Simple time: 23:30
+        # Pattern to match timestamps in brackets followed by text
         pattern = r'\[([^\]]+)\]\s*([^\[]+)'
         matches = re.findall(pattern, transcript)
         
         for time_str, text in matches:
-            chunks.append({
-                'time': time_str,
-                'text': text.strip()
-            })
+            # Check if this is a range format (start|end)
+            if '|' in time_str:
+                start_str, end_str = time_str.split('|', 1)
+                chunks.append({
+                    'start_time': start_str.strip(),
+                    'end_time': end_str.strip(),
+                    'text': text.strip()
+                })
+            else:
+                # Single timestamp - use it for both start and end (legacy format)
+                chunks.append({
+                    'start_time': time_str.strip(),
+                    'end_time': time_str.strip(),
+                    'text': text.strip()
+                })
         
         return chunks
     
@@ -161,21 +173,25 @@ class IncrementalAnalyzer:
             return []
         
         groups = []
-        # Parse first timestamp without previous context
-        first_time = self._parse_time_string(transcript_chunks[0]['time'])
+        # Parse first chunk's timestamps
+        first_chunk = transcript_chunks[0]
+        first_start = self._parse_time_string(first_chunk['start_time'])
+        first_end = self._parse_time_string(first_chunk['end_time'])
+        
         current_group = {
-            'chunks': [transcript_chunks[0]],
-            'start_time': first_time,
-            'end_time': first_time
+            'chunks': [first_chunk],
+            'start_time': first_start,
+            'end_time': first_end  # Use actual end time from transcript
         }
         
         # Keep track of the last parsed time for midnight crossing detection
-        last_time = first_time
+        last_time = first_end
         
         for chunk in transcript_chunks[1:]:
             # Parse with previous time context to handle midnight crossing
-            chunk_time = self._parse_time_string(chunk['time'], last_time)
-            time_gap = (chunk_time - current_group['end_time']).total_seconds()
+            chunk_start = self._parse_time_string(chunk['start_time'], last_time)
+            chunk_end = self._parse_time_string(chunk['end_time'], last_time)
+            time_gap = (chunk_start - current_group['end_time']).total_seconds()
             
             if time_gap > self.raw_event_gap_seconds:
                 # Gap too large, finalize current group and start new one
@@ -184,16 +200,16 @@ class IncrementalAnalyzer:
                 
                 current_group = {
                     'chunks': [chunk],
-                    'start_time': chunk_time,
-                    'end_time': chunk_time
+                    'start_time': chunk_start,
+                    'end_time': chunk_end  # Use actual end time
                 }
             else:
                 # Add to current group
                 current_group['chunks'].append(chunk)
-                current_group['end_time'] = chunk_time
+                current_group['end_time'] = chunk_end  # Extend to include this chunk's end
             
             # Update last_time for next iteration
-            last_time = chunk_time
+            last_time = chunk_end
         
         # Add final group
         if current_group['chunks']:
