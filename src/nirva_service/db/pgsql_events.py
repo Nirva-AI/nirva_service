@@ -13,9 +13,9 @@ from .pgsql_object import EventDB, UserDB, TranscriptionResultDB
 from ..models.prompt import EventAnalysis
 
 
-def event_to_model(event_db: EventDB) -> EventAnalysis:
+def event_to_model(event_db: EventDB, include_transcriptions: bool = True) -> EventAnalysis:
     """Convert EventDB to EventAnalysis model."""
-    return EventAnalysis(
+    event = EventAnalysis(
         event_id=event_db.event_id,
         event_title=event_db.event_title,
         event_summary=event_db.event_summary,
@@ -40,6 +40,12 @@ def event_to_model(event_db: EventDB) -> EventAnalysis:
         first_person_narrative=event_db.first_person_narrative,
         action_item=event_db.action_item,
     )
+    
+    # Include transcriptions if requested
+    if include_transcriptions:
+        event.transcriptions = get_event_transcriptions(event_db.event_id)
+    
+    return event
 
 
 def model_to_event(event: EventAnalysis, username: str, user_id: str) -> dict:
