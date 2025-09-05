@@ -204,45 +204,27 @@ class IncrementalAnalyzer:
     
     def _parse_time_string(self, time_str: str, previous_time: Optional[datetime] = None) -> datetime:
         """
-        Parse time string to datetime. Handles both ISO format and HH:MM format.
-        For HH:MM format, handles midnight crossing based on previous_time.
+        Parse time string to datetime. Always returns UTC datetime.
+        Handles ISO format timestamps directly.
         """
-        from datetime import datetime, timedelta, timezone
-        import re
+        from datetime import datetime, timezone
+        from dateutil import parser
         
-        # Check if it's ISO format (contains 'T' or full date)
-        if 'T' in time_str or len(time_str) > 5:
-            try:
-                # Parse ISO format timestamp
-                from dateutil import parser
-                return parser.isoparse(time_str)
-            except:
-                pass
-        
-        # Parse HH:MM format
-        parts = time_str.split(':')
-        if len(parts) == 2:
-            hour = int(parts[0])
-            minute = int(parts[1])
+        try:
+            # Parse ISO format timestamp (this should be the primary format now)
+            parsed = parser.isoparse(time_str)
             
-            # If we have a previous time, use it to determine the date
-            if previous_time:
-                # Create new time on the same day as previous
-                new_time = previous_time.replace(hour=hour, minute=minute, second=0, microsecond=0)
-                
-                # Check if we've crossed midnight (new hour is much smaller than previous)
-                if new_time < previous_time:
-                    # We've likely crossed midnight, add a day
-                    new_time = new_time + timedelta(days=1)
-                
-                return new_time
-            else:
-                # No previous time, use current date
-                now = datetime.now(timezone.utc)
-                return now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-        
-        # Fallback - shouldn't reach here
-        raise ValueError(f"Cannot parse time string: {time_str}")
+            # Ensure it's timezone-aware (UTC if not specified)
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            
+            # Convert to UTC if it has a different timezone
+            return parsed.astimezone(timezone.utc)
+            
+        except Exception as e:
+            logger.error(f"Failed to parse timestamp '{time_str}': {e}")
+            # Fallback to current time in UTC
+            return datetime.now(timezone.utc)
     
     async def _get_ongoing_events(self, username: str) -> List[EventAnalysis]:
         """
