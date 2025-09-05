@@ -201,13 +201,13 @@ class TranscriptionProcessor:
             sorted_trans = sorted(transcriptions, key=lambda x: x.start_time)
             
             # Prepare transcripts with timestamps for incremental analyzer
-            # Format as "[HH:MM] text" which the analyzer expects
+            # Format as "[ISO_TIMESTAMP] text" to preserve full date/time information
             transcript_parts = []
             for trans in sorted_trans:
                 text = trans.transcription_text.strip()
                 if text:
-                    # Format time as HH:MM
-                    time_str = trans.start_time.strftime("%H:%M")
+                    # Format as ISO timestamp to preserve date for midnight crossing
+                    time_str = trans.start_time.isoformat()
                     transcript_parts.append(f"[{time_str}] {text}")
             
             if not transcript_parts:

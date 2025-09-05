@@ -123,7 +123,8 @@ class IncrementalAnalyzer:
     
     def _parse_transcript_with_times(self, transcript: str) -> List[Dict[str, Any]]:
         """
-        Parse transcript with time markers [HH:MM] to extract chunks with timestamps.
+        Parse transcript with time markers to extract chunks with timestamps.
+        Supports both [HH:MM] and [ISO_TIMESTAMP] formats.
         
         Returns:
             List of dicts with 'time', 'text' keys
@@ -131,8 +132,10 @@ class IncrementalAnalyzer:
         import re
         
         chunks = []
-        # Pattern to match [HH:MM] followed by text
-        pattern = r'\[(\d{1,2}:\d{2})\]\s*([^\[]+)'
+        # Pattern to match either [ISO_TIMESTAMP] or [HH:MM] followed by text
+        # ISO format: 2025-09-04T23:30:00+00:00
+        # Simple time: 23:30
+        pattern = r'\[([^\]]+)\]\s*([^\[]+)'
         matches = re.findall(pattern, transcript)
         
         for time_str, text in matches:
@@ -158,14 +161,20 @@ class IncrementalAnalyzer:
             return []
         
         groups = []
+        # Parse first timestamp without previous context
+        first_time = self._parse_time_string(transcript_chunks[0]['time'])
         current_group = {
             'chunks': [transcript_chunks[0]],
-            'start_time': self._parse_time_string(transcript_chunks[0]['time']),
-            'end_time': self._parse_time_string(transcript_chunks[0]['time'])
+            'start_time': first_time,
+            'end_time': first_time
         }
         
+        # Keep track of the last parsed time for midnight crossing detection
+        last_time = first_time
+        
         for chunk in transcript_chunks[1:]:
-            chunk_time = self._parse_time_string(chunk['time'])
+            # Parse with previous time context to handle midnight crossing
+            chunk_time = self._parse_time_string(chunk['time'], last_time)
             time_gap = (chunk_time - current_group['end_time']).total_seconds()
             
             if time_gap > self.raw_event_gap_seconds:
@@ -182,6 +191,9 @@ class IncrementalAnalyzer:
                 # Add to current group
                 current_group['chunks'].append(chunk)
                 current_group['end_time'] = chunk_time
+            
+            # Update last_time for next iteration
+            last_time = chunk_time
         
         # Add final group
         if current_group['chunks']:
@@ -190,19 +202,47 @@ class IncrementalAnalyzer:
         
         return groups
     
-    def _parse_time_string(self, time_str: str) -> datetime:
+    def _parse_time_string(self, time_str: str, previous_time: Optional[datetime] = None) -> datetime:
         """
-        Parse time string HH:MM to datetime (using today's date for now).
+        Parse time string to datetime. Handles both ISO format and HH:MM format.
+        For HH:MM format, handles midnight crossing based on previous_time.
         """
-        from datetime import datetime, time, timezone
+        from datetime import datetime, timedelta, timezone
+        import re
         
+        # Check if it's ISO format (contains 'T' or full date)
+        if 'T' in time_str or len(time_str) > 5:
+            try:
+                # Parse ISO format timestamp
+                from dateutil import parser
+                return parser.isoparse(time_str)
+            except:
+                pass
+        
+        # Parse HH:MM format
         parts = time_str.split(':')
-        hour = int(parts[0])
-        minute = int(parts[1])
+        if len(parts) == 2:
+            hour = int(parts[0])
+            minute = int(parts[1])
+            
+            # If we have a previous time, use it to determine the date
+            if previous_time:
+                # Create new time on the same day as previous
+                new_time = previous_time.replace(hour=hour, minute=minute, second=0, microsecond=0)
+                
+                # Check if we've crossed midnight (new hour is much smaller than previous)
+                if new_time < previous_time:
+                    # We've likely crossed midnight, add a day
+                    new_time = new_time + timedelta(days=1)
+                
+                return new_time
+            else:
+                # No previous time, use current date
+                now = datetime.now(timezone.utc)
+                return now.replace(hour=hour, minute=minute, second=0, microsecond=0)
         
-        # Use current date with the specified time, timezone-aware
-        now = datetime.now(timezone.utc)
-        return now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        # Fallback - shouldn't reach here
+        raise ValueError(f"Cannot parse time string: {time_str}")
     
     async def _get_ongoing_events(self, username: str) -> List[EventAnalysis]:
         """

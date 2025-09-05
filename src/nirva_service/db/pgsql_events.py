@@ -3,13 +3,13 @@ Database operations for events table.
 Replaces the old journal_files operations.
 """
 
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
-from sqlalchemy import desc, and_
+from sqlalchemy import desc, and_, or_
 from loguru import logger
 
 from .pgsql_client import SessionLocal
-from .pgsql_object import EventDB, UserDB
+from .pgsql_object import EventDB, UserDB, TranscriptionResultDB
 from ..models.prompt import EventAnalysis
 
 
@@ -195,5 +195,45 @@ def get_events_in_range(
             )
         ).order_by(EventDB.start_timestamp).all()
         return [event_to_model(event) for event in events]
+    finally:
+        db.close()
+
+
+def get_event_transcriptions(event_id: str) -> List[Dict[str, Any]]:
+    """Get transcriptions that overlap with an event's time range."""
+    db = SessionLocal()
+    try:
+        # Get the event first
+        event = db.query(EventDB).filter_by(event_id=event_id).first()
+        if not event:
+            return []
+        
+        # Find transcriptions that overlap with the event's time range
+        # A transcription overlaps if:
+        # - It starts before the event ends AND
+        # - It ends after the event starts
+        transcriptions = db.query(TranscriptionResultDB).filter(
+            and_(
+                TranscriptionResultDB.username == event.username,
+                TranscriptionResultDB.start_time < event.end_timestamp,
+                TranscriptionResultDB.end_time > event.start_timestamp
+            )
+        ).order_by(TranscriptionResultDB.start_time).all()
+        
+        # Convert to dictionaries for JSON serialization
+        result = []
+        for trans in transcriptions:
+            result.append({
+                "id": str(trans.id),
+                "transcription_text": trans.transcription_text,
+                "start_time": trans.start_time.isoformat(),
+                "end_time": trans.end_time.isoformat(),
+                "duration_seconds": trans.duration_seconds,
+                "audio_file_key": trans.audio_file_key,
+                "transcription_type": trans.transcription_type,
+                "created_at": trans.created_at.isoformat()
+            })
+        
+        return result
     finally:
         db.close()

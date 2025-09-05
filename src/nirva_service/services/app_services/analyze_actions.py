@@ -432,7 +432,7 @@ async def handle_get_events(
             start_utc = start_of_day.astimezone(ZoneInfo('UTC'))
             end_utc = end_of_day.astimezone(ZoneInfo('UTC'))
             
-            # Filter events
+            # Filter events and add transcriptions
             filtered_events = []
             for event in all_events:
                 if event.start_timestamp:
@@ -444,14 +444,19 @@ async def handle_get_events(
                     
                     # Check if event falls within the requested date in user's timezone
                     if start_utc <= event_time <= end_utc:
+                        # Add transcriptions for this event
+                        event.transcriptions = pgsql_events.get_event_transcriptions(event.event_id)
                         filtered_events.append(event)
             
             events = filtered_events
         except:
             # If date parsing fails, return all events
             events = all_events
+            # Still add transcriptions
+            for event in events:
+                event.transcriptions = pgsql_events.get_event_transcriptions(event.event_id)
         
-        # Return filtered events
+        # Return filtered events with transcriptions
         return GetEventsResponse(
             time_stamp=request_data.time_stamp,
             events=events,

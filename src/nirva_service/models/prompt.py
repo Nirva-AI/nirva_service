@@ -1,4 +1,4 @@
-from typing import List, Literal, Optional, final
+from typing import List, Literal, Optional, final, Dict, Any
 from datetime import datetime
 
 from pydantic import BaseModel, Field
@@ -93,6 +93,10 @@ class EventAnalysis(BaseModel):
     last_processed_at: Optional[datetime] = Field(
         default=None,
         description="Last time this event was processed by LLM"
+    )
+    transcriptions: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="Related transcriptions that occurred during this event"
     )
 
 
