@@ -223,14 +223,17 @@ def get_event_transcriptions(event_id: str) -> List[Dict[str, Any]]:
         # Convert to dictionaries for JSON serialization
         result = []
         for trans in transcriptions:
+            # Calculate duration from start/end times
+            duration_seconds = (trans.end_time - trans.start_time).total_seconds()
+            
             result.append({
                 "id": str(trans.id),
                 "transcription_text": trans.transcription_text,
                 "start_time": trans.start_time.isoformat(),
                 "end_time": trans.end_time.isoformat(),
-                "duration_seconds": trans.duration_seconds,
-                "audio_file_key": trans.audio_file_key,
-                "transcription_type": trans.transcription_type,
+                "duration_seconds": duration_seconds,
+                "transcription_service": trans.transcription_service,
+                "detected_language": trans.detected_language,
                 "created_at": trans.created_at.isoformat()
             })
         
