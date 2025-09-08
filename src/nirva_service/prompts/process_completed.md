@@ -12,6 +12,19 @@ You are finalizing a diary entry for a completed event. This event has ended and
 
 Create the FINAL, complete diary entry for this event. Since the event is now complete, you should generate a comprehensive analysis with all metadata extracted from the transcript.
 
+## Quality Assessment
+
+Before analyzing the event details, you should first evaluate if this event contains meaningful content worth saving.
+
+Set `should_drop: true` if ANY of these conditions apply:
+- The transcript consists mostly of random words, fragments, or noise
+- There's no coherent activity, conversation, or identifiable event
+- The transcript is too fragmented to understand what's happening
+
+If dropping, also set `drop_reason` with a brief explanation (e.g., "Random fragments with no coherent activity").
+
+Only proceed with full analysis if the event is meaningful and coherent.
+
 ## Output Structure
 
 Generate your response with the following fields:

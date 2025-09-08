@@ -105,7 +105,8 @@ class IncrementalAnalyzer:
                             # Type 3c: Complete the ongoing event
                             logger.info(f"Completing event {ongoing.event_id}")
                             completed = await self._complete_event(ongoing, username=username)
-                            processed_events.append(completed)
+                            if completed:  # Only append if not dropped
+                                processed_events.append(completed)
 
                     # Type 3a: Create new ongoing event
                     logger.info("Creating new ongoing event")
@@ -399,10 +400,35 @@ class IncrementalAnalyzer:
     async def _complete_event(
         self, ongoing_event: EventAnalysis, new_transcript: Optional[str] = None,
         username: str = "unknown"
-    ) -> EventAnalysis:
+    ) -> Optional[EventAnalysis]:
         """
         Type 3c: Complete an event.
+        Returns None if event should be dropped.
         """
+        # Pre-filter: Check actual transcript content volume only
+        transcript_text = new_transcript or ""
+        
+        # Also check if ongoing_event has stored transcriptions
+        if hasattr(ongoing_event, 'transcriptions') and ongoing_event.transcriptions:
+            for trans in ongoing_event.transcriptions:
+                if isinstance(trans, dict) and 'text' in trans:
+                    transcript_text += " " + trans.get('text', '')
+        
+        # Count words in actual transcriptions only
+        word_count = len(transcript_text.split())
+        
+        # Count transcript segments
+        segment_count = 0
+        if new_transcript:
+            segment_count += 1  # Current new transcript
+        if hasattr(ongoing_event, 'transcriptions') and ongoing_event.transcriptions:
+            segment_count += len(ongoing_event.transcriptions)
+        
+        # Drop if very low transcript content
+        if word_count < 20 and segment_count < 3:
+            logger.info(f"Dropping event {ongoing_event.event_id}: insufficient transcript content (words={word_count}, segments={segment_count})")
+            return None  # Signal to drop
+        
         # Load and format prompt
         with open("src/nirva_service/prompts/process_completed.md", "r") as f:
             prompt_template = f.read()
@@ -432,6 +458,11 @@ class IncrementalAnalyzer:
 
         # Call LLM
         response = await self._call_llm_structured(prompt, CompletedEventOutput, username)
+        
+        # Check if LLM recommends dropping
+        if response.should_drop:
+            logger.info(f"LLM dropping event {ongoing_event.event_id}: {response.drop_reason}")
+            return None  # Signal to drop
 
         # Update event with completed data
         ongoing_event.event_title = response.event_title
