@@ -1,5 +1,5 @@
-from typing import List, Literal, Optional, final, Dict, Any
 from datetime import datetime
+from typing import Any, Dict, List, Literal, Optional, final
 
 from pydantic import BaseModel, Field
 
@@ -68,35 +68,32 @@ class EventAnalysis(BaseModel):
     action_item: str = Field(
         description="**Only include key action items, decisions, or reminders that user_name (e.g., Wei) personally stated she would do, needs to do, explicitly decided upon, or was directly tasked with and acknowledged. Do NOT include actions for other people, or general discussion points unless they translate into a direct, personal action or decision for user_name. If user_name is merely observing or discussing someone else's potential action, it's not an action item for her unless she then explicitly states a related personal task or commitment. If no such action item exists for user_name, use 'N/A'.**"
     )
-    
+
     # New fields for ongoing/completed event processing
     event_status: Literal["ongoing", "completed"] = Field(
         default="completed",
-        description="Status of the event - 'ongoing' if still being processed, 'completed' when finalized"
+        description="Status of the event - 'ongoing' if still being processed, 'completed' when finalized",
     )
     event_story: Optional[str] = Field(
         default=None,
-        description="Full diary-style narrative of the event, combining all details into a coherent story"
+        description="Full diary-style narrative of the event, combining all details into a coherent story",
     )
     event_summary: Optional[str] = Field(
         default=None,
-        description="Brief 1-2 sentence summary of the event's key activities and outcomes"
+        description="Brief 1-2 sentence summary of the event's key activities and outcomes",
     )
     start_timestamp: Optional[datetime] = Field(
-        default=None,
-        description="Actual start timestamp of the event (UTC)"
+        default=None, description="Actual start timestamp of the event (UTC)"
     )
     end_timestamp: Optional[datetime] = Field(
-        default=None,
-        description="Actual end timestamp of the event (UTC)"
+        default=None, description="Actual end timestamp of the event (UTC)"
     )
     last_processed_at: Optional[datetime] = Field(
-        default=None,
-        description="Last time this event was processed by LLM"
+        default=None, description="Last time this event was processed by LLM"
     )
     transcriptions: Optional[List[Dict[str, Any]]] = Field(
         default=None,
-        description="Related transcriptions that occurred during this event"
+        description="Related transcriptions that occurred during this event",
     )
 
 
@@ -106,6 +103,7 @@ class EventAnalysis(BaseModel):
 @register_base_model_class
 class OngoingEventOutput(BaseModel):
     """LLM output structure for ongoing events"""
+
     event_title: str = Field(
         description="Brief, descriptive title of the event (5-10 words)"
     )
@@ -121,6 +119,7 @@ class OngoingEventOutput(BaseModel):
 @register_base_model_class
 class CompletedEventOutput(BaseModel):
     """LLM output structure for completed events"""
+
     event_title: str = Field(
         description="Final, polished title of the completed event (5-10 words)"
     )
@@ -137,18 +136,46 @@ class CompletedEventOutput(BaseModel):
         description="List of people mentioned or involved in the event (names or roles)"
     )
     activity_type: Literal[
-        "work", "exercise", "social", "learning", "self-care", 
-        "chores", "commute", "meal", "leisure", "unknown"
-    ] = Field(
-        description="Category of the event activity"
-    )
+        "work",
+        "exercise",
+        "social",
+        "learning",
+        "self-care",
+        "chores",
+        "commute",
+        "meal",
+        "leisure",
+        "unknown",
+    ] = Field(description="Category of the event activity")
     mood_labels: List[str] = Field(
         description="1-3 mood descriptors from: peaceful, energized, engaged, disengaged, happy, sad, anxious, stressed, relaxed, excited, bored, frustrated, content, neutral"
     )
     mood_score: int = Field(
         description="Overall mood score from 1 (very negative) to 10 (very positive)",
         ge=1,
-        le=10
+        le=10,
+    )
+    stress_level: int = Field(
+        description="Stress level from 1 (very low stress) to 10 (very high stress)",
+        ge=1,
+        le=10,
+    )
+    energy_level: int = Field(
+        description="Energy level from 1 (very low energy/drained) to 10 (very high energy/engaged)",
+        ge=1,
+        le=10,
+    )
+    interaction_dynamic: str = Field(
+        description="If social, describe the dynamic (e.g., 'collaborative', 'supportive', 'tense'). If not social, use 'N/A'."
+    )
+    inferred_impact_on_user_name: str = Field(
+        description="For social interactions, infer if it seemed 'energizing', 'draining', or 'neutral'. For non-social, use 'N/A'."
+    )
+    topic_labels: List[str] = Field(
+        description="Main conversation topics (up to 2). Use ['N/A'] if not a conversation."
+    )
+    action_item: str = Field(
+        description="Key action items that user personally committed to. Use 'N/A' if none."
     )
 
 
