@@ -8,6 +8,7 @@ from jose import JWTError
 
 import nirva_service.db.pgsql_user
 import nirva_service.db.redis_user
+import nirva_service.db.redis_user_context
 from nirva_service.config.configuration import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
     REFRESH_TOKEN_EXPIRE_DAYS,
@@ -32,6 +33,8 @@ login_router = APIRouter()
 @login_router.post(path="/login/v1/", response_model=UserToken)
 async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
+    timezone: Optional[str] = Form(default="UTC"),
+    locale: Optional[str] = Form(default="en-US"),
 ) -> UserToken:
     try:
         # 检查用户是否存在
@@ -81,6 +84,13 @@ async def login(
         nirva_service.db.redis_user.set_user_display_name(
             username=user_db.username,
             display_name=user_db.display_name or user_db.username,
+        )
+
+        # Store user context (timezone and locale)
+        nirva_service.db.redis_user_context.set_user_context(
+            username=user_db.username,
+            timezone=timezone or "UTC",
+            locale=locale or "en-US",
         )
 
         # 正确的返回。

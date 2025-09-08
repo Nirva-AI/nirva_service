@@ -12,6 +12,7 @@ from ...db.pgsql_events import get_user_events, save_events
 from ...db.pgsql_object import TranscriptionResultDB
 from ...models.api import IncrementalAnalyzeResponse
 from ...models.prompt import CompletedEventOutput, EventAnalysis, OngoingEventOutput
+from ...services.llm_context_helper import inject_user_context
 from ..langgraph_services.langgraph_request_task import LanggraphRequestTask
 from ..langgraph_services.langgraph_service import LanggraphService
 
@@ -85,7 +86,7 @@ class IncrementalAnalyzer:
                     # Type 3b: Continue ongoing event
                     logger.info(f"Continuing ongoing event {matching_ongoing.event_id}")
                     updated_event = await self._continue_ongoing_event(
-                        matching_ongoing, raw_group
+                        matching_ongoing, raw_group, username
                     )
                     processed_events.append(updated_event)
                     events_updated += 1
@@ -103,12 +104,12 @@ class IncrementalAnalyzer:
                         ):
                             # Type 3c: Complete the ongoing event
                             logger.info(f"Completing event {ongoing.event_id}")
-                            completed = await self._complete_event(ongoing)
+                            completed = await self._complete_event(ongoing, username=username)
                             processed_events.append(completed)
 
                     # Type 3a: Create new ongoing event
                     logger.info("Creating new ongoing event")
-                    new_event = await self._process_new_ongoing_event(raw_group)
+                    new_event = await self._process_new_ongoing_event(raw_group, username)
                     processed_events.append(new_event)
                     events_created += 1
 
@@ -182,13 +183,13 @@ class IncrementalAnalyzer:
         if not transcript_chunks:
             return []
 
-        groups = []
+        groups: List[Dict[str, Any]] = []
         # Parse first chunk's timestamps
         first_chunk = transcript_chunks[0]
         first_start = self._parse_time_string(first_chunk["start_time"])
         first_end = self._parse_time_string(first_chunk["end_time"])
 
-        current_group = {
+        current_group: Dict[str, Any] = {
             "chunks": [first_chunk],
             "start_time": first_start,
             "end_time": first_end,  # Use actual end time from transcript
@@ -300,7 +301,7 @@ class IncrementalAnalyzer:
         return False
 
     async def _process_new_ongoing_event(
-        self, raw_group: Dict[str, Any]
+        self, raw_group: Dict[str, Any], username: str
     ) -> EventAnalysis:
         """
         Type 3a: Process new ongoing event.
@@ -312,7 +313,7 @@ class IncrementalAnalyzer:
         prompt = prompt_template.replace("{transcript}", raw_group.get("text", ""))
 
         # Call LLM
-        response = await self._call_llm_structured(prompt, OngoingEventOutput)
+        response = await self._call_llm_structured(prompt, OngoingEventOutput, username)
 
         # Create EventAnalysis object
         event = EventAnalysis(
@@ -347,7 +348,7 @@ class IncrementalAnalyzer:
         return event
 
     async def _continue_ongoing_event(
-        self, ongoing_event: EventAnalysis, raw_group: Dict[str, Any]
+        self, ongoing_event: EventAnalysis, raw_group: Dict[str, Any], username: str
     ) -> EventAnalysis:
         """
         Type 3b: Continue an ongoing event with new content.
@@ -372,7 +373,7 @@ class IncrementalAnalyzer:
         )
 
         # Call LLM
-        response = await self._call_llm_structured(prompt, OngoingEventOutput)
+        response = await self._call_llm_structured(prompt, OngoingEventOutput, username)
 
         # Update event
         ongoing_event.event_title = response.event_title
@@ -396,7 +397,8 @@ class IncrementalAnalyzer:
         return ongoing_event
 
     async def _complete_event(
-        self, ongoing_event: EventAnalysis, new_transcript: Optional[str] = None
+        self, ongoing_event: EventAnalysis, new_transcript: Optional[str] = None,
+        username: str = "unknown"
     ) -> EventAnalysis:
         """
         Type 3c: Complete an event.
@@ -429,7 +431,7 @@ class IncrementalAnalyzer:
         )
 
         # Call LLM
-        response = await self._call_llm_structured(prompt, CompletedEventOutput)
+        response = await self._call_llm_structured(prompt, CompletedEventOutput, username)
 
         # Update event with completed data
         ongoing_event.event_title = response.event_title
@@ -455,7 +457,7 @@ class IncrementalAnalyzer:
 
         return ongoing_event
 
-    async def _call_llm_structured(self, prompt: str, response_model: Any) -> Any:
+    async def _call_llm_structured(self, prompt: str, response_model: Any, username: str) -> Any:
         """
         Call LLM with structured output using OpenAI's latest structured output API.
         """
@@ -475,7 +477,7 @@ class IncrementalAnalyzer:
                         "role": "system",
                         "content": "You are an AI assistant that analyzes transcripts and returns structured data.",
                     },
-                    {"role": "user", "content": prompt},
+                    {"role": "user", "content": inject_user_context(prompt, username)},
                 ],
                 response_format=response_model,
                 temperature=0.1,
@@ -514,7 +516,7 @@ class IncrementalAnalyzer:
                     action_item="N/A",
                 )
 
-    async def _save_events(self, username: str, events: List[EventAnalysis]):
+    async def _save_events(self, username: str, events: List[EventAnalysis]) -> None:
         """
         Save events directly to the events table.
         """
