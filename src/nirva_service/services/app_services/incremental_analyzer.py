@@ -107,6 +107,13 @@ class IncrementalAnalyzer:
                             completed = await self._complete_event(ongoing, username=username)
                             if completed:  # Only append if not dropped
                                 processed_events.append(completed)
+                            else:
+                                # Event was dropped - mark it as dropped in database
+                                logger.info(f"Marking event {ongoing.event_id} as dropped")
+                                ongoing.event_status = "dropped"
+                                ongoing.should_drop = True
+                                ongoing.drop_reason = "Insufficient content"
+                                processed_events.append(ongoing)  # Save the dropped status
 
                     # Type 3a: Create new ongoing event
                     logger.info("Creating new ongoing event")
@@ -285,7 +292,14 @@ class IncrementalAnalyzer:
         """
         for event in ongoing_events:
             if hasattr(event, "end_timestamp") and event.end_timestamp:
-                gap = (new_start_time - event.end_timestamp).total_seconds()
+                # Ensure both timestamps are timezone-aware for comparison
+                event_end = event.end_timestamp
+                if event_end.tzinfo is None:
+                    event_end = event_end.replace(tzinfo=timezone.utc)
+                if new_start_time.tzinfo is None:
+                    new_start_time = new_start_time.replace(tzinfo=timezone.utc)
+                    
+                gap = (new_start_time - event_end).total_seconds()
                 if gap <= self.raw_event_gap_seconds:
                     return event
         return None
@@ -297,7 +311,14 @@ class IncrementalAnalyzer:
         Check if an ongoing event should be completed.
         """
         if hasattr(ongoing_event, "end_timestamp") and ongoing_event.end_timestamp:
-            gap = (new_start_time - ongoing_event.end_timestamp).total_seconds()
+            # Ensure both timestamps are timezone-aware for comparison
+            event_end = ongoing_event.end_timestamp
+            if event_end.tzinfo is None:
+                event_end = event_end.replace(tzinfo=timezone.utc)
+            if new_start_time.tzinfo is None:
+                new_start_time = new_start_time.replace(tzinfo=timezone.utc)
+                
+            gap = (new_start_time - event_end).total_seconds()
             return gap > self.raw_event_gap_seconds
         return False
 

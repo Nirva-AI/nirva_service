@@ -80,10 +80,15 @@ def model_to_event(event: EventAnalysis, username: str, user_id: str) -> dict:
 
 
 def get_user_events(username: str) -> List[EventAnalysis]:
-    """Get all events for a user."""
+    """Get all events for a user (excluding dropped events)."""
     db = SessionLocal()
     try:
-        events = db.query(EventDB).filter_by(username=username).order_by(
+        events = db.query(EventDB).filter(
+            and_(
+                EventDB.username == username,
+                EventDB.event_status != "dropped"  # Exclude dropped events
+            )
+        ).order_by(
             desc(EventDB.start_timestamp)
         ).all()
         return [event_to_model(event) for event in events]
@@ -185,24 +190,52 @@ def delete_user_events(username: str) -> int:
         db.close()
 
 
+def get_ongoing_events(username: Optional[str] = None) -> List[EventAnalysis]:
+    """
+    Get all ongoing events, optionally filtered by username.
+    
+    Args:
+        username: Optional username to filter by
+        
+    Returns:
+        List of ongoing events as EventAnalysis objects
+    """
+    db = SessionLocal()
+    try:
+        query = db.query(EventDB).filter(EventDB.event_status == "ongoing")
+        
+        if username:
+            query = query.filter(EventDB.username == username)
+            
+        events = query.order_by(EventDB.updated_at.desc()).all()
+        return [event_to_model(event) for event in events]
+    finally:
+        db.close()
+
+
 def get_events_in_range(
     username: str, 
     start_time: datetime, 
     end_time: datetime
 ) -> List[EventAnalysis]:
-    """Get events within a time range (for client-side filtering)."""
+    """Get events within a time range (excluding dropped events)."""
     db = SessionLocal()
     try:
         events = db.query(EventDB).filter(
             and_(
                 EventDB.username == username,
                 EventDB.start_timestamp >= start_time,
-                EventDB.start_timestamp <= end_time
+                EventDB.start_timestamp <= end_time,
+                EventDB.event_status != "dropped"  # Exclude dropped events
             )
         ).order_by(EventDB.start_timestamp).all()
         return [event_to_model(event) for event in events]
     finally:
         db.close()
+
+
+# Alias for compatibility with mental_state_service
+get_user_events_by_date_range = get_events_in_range
 
 
 def get_event_transcriptions(event_id: str) -> List[Dict[str, Any]]:

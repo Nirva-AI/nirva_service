@@ -7,7 +7,19 @@ from nirva_service.config.configuration import POSTGRES_DATABASE_URL
 from .pgsql_object import Base
 
 ############################################################################################################
-engine = create_engine(POSTGRES_DATABASE_URL)
+# Increase pool size and overflow to handle concurrent connections better
+# pool_size: number of persistent connections
+# max_overflow: maximum overflow connections above pool_size
+# pool_timeout: seconds to wait before timing out
+# pool_recycle: recycle connections after this many seconds (prevent stale connections)
+engine = create_engine(
+    POSTGRES_DATABASE_URL,
+    pool_size=20,  # Increased from default 5
+    max_overflow=40,  # Increased from default 10
+    pool_timeout=60,  # Increased from default 30
+    pool_recycle=3600,  # Recycle connections after 1 hour
+    pool_pre_ping=True,  # Test connections before using them
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 ############################################################################################################
 # 创建表
