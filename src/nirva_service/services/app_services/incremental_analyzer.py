@@ -110,10 +110,11 @@ class IncrementalAnalyzer:
                             else:
                                 # Event was dropped - mark it as dropped in database
                                 logger.info(f"Marking event {ongoing.event_id} as dropped")
-                                ongoing.event_status = "dropped"
-                                ongoing.should_drop = True
-                                ongoing.drop_reason = "Insufficient content"
-                                processed_events.append(ongoing)  # Save the dropped status
+                                # Update the existing event to dropped status
+                                dropped_data = ongoing.model_dump()
+                                dropped_data['event_status'] = 'dropped'
+                                dropped_event = EventAnalysis(**dropped_data)
+                                processed_events.append(dropped_event)  # Save the dropped status
 
                     # Type 3a: Create new ongoing event
                     logger.info("Creating new ongoing event")
