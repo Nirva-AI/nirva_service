@@ -25,13 +25,19 @@ class EventAnalysis(BaseModel):
         description="Identify 1 to 3 mood labels that best describe user_name's personal mood during this event, based on their speech and reactions. Choose from: peaceful, energized, engaged, disengaged, happy, sad, anxious, stressed, relaxed, excited, bored, frustrated, content, neutral. The first label should be the most dominant mood for user_name. If only one strong mood is evident for user_name, use only that one label. If user_name's mood is unclear or mixed without a dominant feeling, use 'neutral'. These labels should reflect user_name's state, not the general atmosphere or the mood of other people involved, unless it clearly dictates user_name's mood."
     )
     mood_score: int = Field(
-        description="Integer from 1 (very negative) to 10 (very positive) assessing user_name's overall mood during this event"
+        description="Integer from 1 (very negative) to 100 (very positive) assessing user_name's overall mood during this event",
+        ge=1,
+        le=100,
     )
     stress_level: int = Field(
-        description="Integer from 1 (very low stress) to 10 (very high stress) assessing user_name's stress level during this event"
+        description="Integer from 1 (very low stress) to 100 (very high stress) assessing user_name's stress level during this event",
+        ge=1,
+        le=100,
     )
     energy_level: int = Field(
-        description="Integer from 1 (very low energy/drained) to 10 (very high energy/engaged) assessing user_name's energy level during this event"
+        description="Integer from 1 (very low energy/drained) to 100 (very high energy/engaged) assessing user_name's energy level during this event",
+        ge=1,
+        le=100,
     )
     activity_type: Literal[
         "work",
@@ -161,19 +167,19 @@ class CompletedEventOutput(BaseModel):
         description="1-3 mood descriptors from: peaceful, energized, engaged, disengaged, happy, sad, anxious, stressed, relaxed, excited, bored, frustrated, content, neutral"
     )
     mood_score: int = Field(
-        description="Overall mood score from 1 (very negative) to 10 (very positive)",
+        description="Overall mood score from 1 (very negative) to 100 (very positive)",
         ge=1,
-        le=10,
+        le=100,
     )
     stress_level: int = Field(
-        description="Stress level from 1 (very low stress) to 10 (very high stress)",
+        description="Stress level from 1 (very low stress) to 100 (very high stress)",
         ge=1,
-        le=10,
+        le=100,
     )
     energy_level: int = Field(
-        description="Energy level from 1 (very low energy/drained) to 10 (very high energy/engaged)",
+        description="Energy level from 1 (very low energy/drained) to 100 (very high energy/engaged)",
         ge=1,
-        le=10,
+        le=100,
     )
     interaction_dynamic: str = Field(
         description="If social, describe the dynamic (e.g., 'collaborative', 'supportive', 'tense'). If not social, use 'N/A'."

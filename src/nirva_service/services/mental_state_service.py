@@ -139,15 +139,15 @@ class MentalStateCalculator:
         
         # Daily stress pattern (1-100 scale)
         stress_curve = {
-            0: 15,   # Midnight
+            0: 20,   # Midnight
             3: 10,   # Deep sleep
-            6: 20,   # Wake up
-            9: 40,   # Work start
-            12: 50,  # Midday pressure
-            15: 55,  # Afternoon peak
-            18: 40,  # Evening relief
-            21: 25,  # Relaxation
-            23: 18   # Prepare for sleep
+            6: 25,   # Wake up
+            9: 45,   # Work start
+            12: 60,  # Midday pressure
+            15: 70,  # Afternoon peak
+            18: 45,  # Evening relief
+            21: 30,  # Relaxation
+            23: 20   # Prepare for sleep
         }
         
         # Interpolate for exact hour

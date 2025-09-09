@@ -1,7 +1,7 @@
 import json
 import uuid
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from loguru import logger
@@ -76,51 +76,97 @@ class IncrementalAnalyzer:
             events_updated = 0
             events_created = 0
 
-            for raw_group in raw_event_groups:
-                # Check if this group continues an ongoing event
+            # First, complete any existing ongoing events that should be completed
+            completed_ongoing_ids = set()
+            for ongoing in ongoing_events:
+                if len(raw_event_groups) > 0 and self._should_complete_event(ongoing, raw_event_groups[0]["start_time"]):
+                    logger.info(f"Completing existing ongoing event {ongoing.event_id}")
+                    completed = await self._complete_event(ongoing, username=username)
+                    if completed:
+                        processed_events.append(completed)
+                        completed_ongoing_ids.add(ongoing.event_id)
+                    else:
+                        logger.info(f"Marking existing event {ongoing.event_id} as dropped")
+                        dropped_data = ongoing.model_dump()
+                        dropped_data['event_status'] = 'dropped'
+                        dropped_event = EventAnalysis(**dropped_data)
+                        processed_events.append(dropped_event)
+                        completed_ongoing_ids.add(ongoing.event_id)
+
+            # Remove completed events from ongoing list
+            ongoing_events = [e for e in ongoing_events if e.event_id not in completed_ongoing_ids]
+
+            for i, raw_group in enumerate(raw_event_groups):
+                is_last_group = (i == len(raw_event_groups) - 1)
+                current_time = datetime.utcnow().replace(tzinfo=timezone.utc)
+                
+                # Check if this group continues an existing ongoing event
                 matching_ongoing = self._find_matching_ongoing_event(
                     raw_group["start_time"], ongoing_events
                 )
 
                 if matching_ongoing:
-                    # Type 3b: Continue ongoing event
+                    # Continue ongoing event
                     logger.info(f"Continuing ongoing event {matching_ongoing.event_id}")
                     updated_event = await self._continue_ongoing_event(
                         matching_ongoing, raw_group, username
                     )
-                    processed_events.append(updated_event)
-                    events_updated += 1
-                    # Remove from ongoing list so it won't be completed
-                    ongoing_events = [
-                        e
-                        for e in ongoing_events
-                        if e.event_id != matching_ongoing.event_id
-                    ]
+                    
+                    # Decide if this should now be completed
+                    time_since_end = (current_time - raw_group["end_time"]).total_seconds()
+                    if not is_last_group or time_since_end > self.raw_event_gap_seconds:
+                        # This is not the last group, or it's old - complete it
+                        logger.info(f"Completing continued event {updated_event.event_id} (not recent)")
+                        completed = await self._complete_event(updated_event, username=username)
+                        if completed:
+                            processed_events.append(completed)
+                        else:
+                            logger.info(f"Dropping continued event {updated_event.event_id}")
+                            dropped_data = updated_event.model_dump()
+                            dropped_data['event_status'] = 'dropped'
+                            dropped_event = EventAnalysis(**dropped_data)
+                            processed_events.append(dropped_event)
+                    else:
+                        # Keep as ongoing (last group and recent)
+                        processed_events.append(updated_event)
+                        events_updated += 1
+                    
+                    # Remove from ongoing list
+                    ongoing_events = [e for e in ongoing_events if e.event_id != matching_ongoing.event_id]
                 else:
-                    # Check if there's an ongoing event that should be completed
-                    for ongoing in ongoing_events:
-                        if self._should_complete_event(
-                            ongoing, raw_group["start_time"]
-                        ):
-                            # Type 3c: Complete the ongoing event
-                            logger.info(f"Completing event {ongoing.event_id}")
-                            completed = await self._complete_event(ongoing, username=username)
-                            if completed:  # Only append if not dropped
-                                processed_events.append(completed)
-                            else:
-                                # Event was dropped - mark it as dropped in database
-                                logger.info(f"Marking event {ongoing.event_id} as dropped")
-                                # Update the existing event to dropped status
-                                dropped_data = ongoing.model_dump()
-                                dropped_data['event_status'] = 'dropped'
-                                dropped_event = EventAnalysis(**dropped_data)
-                                processed_events.append(dropped_event)  # Save the dropped status
+                    # Create new event - decide if ongoing or completed immediately
+                    time_since_end = (current_time - raw_group["end_time"]).total_seconds()
+                    
+                    if not is_last_group or time_since_end > self.raw_event_gap_seconds:
+                        # Not the last group, or it's old - create as completed
+                        logger.info(f"Creating completed event (not recent)")
+                        completed_event = await self._create_completed_event(raw_group, username)
+                        if completed_event:
+                            processed_events.append(completed_event)
+                            events_created += 1
+                        else:
+                            logger.info(f"Dropped event during creation")
+                    else:
+                        # Last group and recent - create as ongoing
+                        logger.info("Creating new ongoing event (recent)")
+                        new_event = await self._process_new_ongoing_event(raw_group, username)
+                        processed_events.append(new_event)
+                        events_created += 1
 
-                    # Type 3a: Create new ongoing event
-                    logger.info("Creating new ongoing event")
-                    new_event = await self._process_new_ongoing_event(raw_group, username)
-                    processed_events.append(new_event)
-                    events_created += 1
+            # After processing all groups, complete any remaining ongoing events that weren't matched
+            # This ensures bulk processing completes events within the same batch
+            for ongoing in ongoing_events:
+                logger.info(f"Completing remaining ongoing event {ongoing.event_id} (end of batch)")
+                completed = await self._complete_event(ongoing, username=username)
+                if completed:  # Only append if not dropped
+                    processed_events.append(completed)
+                else:
+                    # Event was dropped - mark it as dropped in database
+                    logger.info(f"Marking remaining event {ongoing.event_id} as dropped")
+                    dropped_data = ongoing.model_dump()
+                    dropped_data['event_status'] = 'dropped'
+                    dropped_event = EventAnalysis(**dropped_data)
+                    processed_events.append(dropped_event)
 
             # Save all processed events
             await self._save_events(username, processed_events)
@@ -355,9 +401,9 @@ class IncrementalAnalyzer:
             ),
             location="unspecified",
             mood_labels=["neutral"],
-            mood_score=7,
-            stress_level=5,
-            energy_level=7,
+            mood_score=50,  # Neutral on 1-100 scale
+            stress_level=50,  # Neutral on 1-100 scale
+            energy_level=50,  # Neutral on 1-100 scale
             activity_type="unknown",
             people_involved=[],
             interaction_dynamic="solo",
@@ -510,6 +556,76 @@ class IncrementalAnalyzer:
 
         return ongoing_event
 
+    async def _create_completed_event(
+        self, raw_group: Dict[str, Any], username: str
+    ) -> Optional[EventAnalysis]:
+        """
+        Create a completed event directly from raw transcript group.
+        This bypasses the ongoing stage and uses the completion prompt immediately.
+        """
+        transcript_text = raw_group.get("text", "")
+        
+        # Pre-filter: Check transcript content volume
+        word_count = len(transcript_text.split())
+        if word_count < 20:
+            logger.info(f"Dropping completed event: insufficient content (words={word_count})")
+            return None
+        
+        # Load completion prompt template
+        with open("src/nirva_service/prompts/process_completed.md", "r") as f:
+            prompt_template = f.read()
+        
+        # Build prompt with transcript as new section
+        new_section = f"""## New Transcript
+{transcript_text}"""
+        
+        prompt = prompt_template.format(
+            previous_section="", 
+            new_section=new_section
+        )
+        
+        # Inject user context
+        prompt = inject_user_context(prompt, username)
+        
+        # Call LLM for completion analysis
+        response = await self._call_llm_structured(prompt, CompletedEventOutput, username)
+        
+        # Check if should be dropped
+        if hasattr(response, 'should_drop') and response.should_drop:
+            logger.info(f"LLM decided to drop completed event: {getattr(response, 'drop_reason', 'No reason given')}")
+            return None
+        
+        # Create completed EventAnalysis object
+        event = EventAnalysis(
+            event_id=str(uuid.uuid4()),
+            event_title=response.event_title,
+            event_summary=response.event_summary,
+            event_story=response.event_story,
+            event_status="completed",  # Mark as completed immediately
+            start_timestamp=raw_group["start_time"],
+            end_timestamp=raw_group["end_time"],
+            last_processed_at=datetime.utcnow(),
+            time_range=f"{raw_group['start_time'].strftime('%H:%M')}-{raw_group['end_time'].strftime('%H:%M')}",
+            duration_minutes=int(
+                (raw_group["end_time"] - raw_group["start_time"]).total_seconds() / 60
+            ),
+            location=response.location,
+            mood_labels=response.mood_labels,
+            mood_score=response.mood_score,
+            stress_level=response.stress_level,
+            energy_level=response.energy_level,
+            activity_type=response.activity_type,
+            people_involved=response.people_involved,
+            interaction_dynamic=response.interaction_dynamic,
+            inferred_impact_on_user_name=response.inferred_impact_on_user_name,
+            topic_labels=response.topic_labels,
+            one_sentence_summary=response.event_summary,
+            first_person_narrative=response.event_story,
+            action_item=response.action_item,
+        )
+        
+        return event
+
     async def _call_llm_structured(self, prompt: str, response_model: Any, username: str) -> Any:
         """
         Call LLM with structured output using OpenAI's latest structured output API.
@@ -560,9 +676,9 @@ class IncrementalAnalyzer:
                     people_involved=[],
                     activity_type="unknown",
                     mood_labels=["neutral"],
-                    mood_score=5,
-                    stress_level=5,
-                    energy_level=5,
+                    mood_score=50,  # Neutral on 1-100 scale
+                    stress_level=50,  # Neutral on 1-100 scale
+                    energy_level=50,  # Neutral on 1-100 scale
                     interaction_dynamic="N/A",
                     inferred_impact_on_user_name="N/A",
                     topic_labels=["N/A"],
