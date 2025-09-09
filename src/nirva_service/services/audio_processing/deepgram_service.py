@@ -55,8 +55,8 @@ class DeepgramService:
             'punctuate': 'true',  # Enable punctuation
             'utterances': 'true',  # Enable utterances
             'paragraphs': 'true',  # Group transcript into readable paragraphs
-            'smart_format': 'true',  # Provide punctuation and formatting
-            'words': 'false',  # Skip word-level data to reduce response size
+            # 'smart_format': 'true',  # REMOVED - causes spacing issues with Chinese characters
+            'words': 'true',  # Enable word-level data for better timing and punctuation
             'sentiment': 'true',  # Enable sentiment analysis (matches client)
             'topics': 'true',  # Enable topic detection (matches client)
             'intents': 'true',  # Enable intent recognition (matches client)
@@ -130,28 +130,84 @@ class DeepgramService:
     
     def _extract_transcription(self, response: Dict[str, Any]) -> str:
         """Extract transcription text from Deepgram response."""
+        import re
+        
         try:
             results = response.get('results', {})
+            
+            # Use utterances for better formatting
+            utterances = results.get('utterances', [])
+            if utterances:
+                # Check how many unique speakers there are
+                unique_speakers = set()
+                for utt in utterances:
+                    speaker = utt.get('speaker')
+                    if speaker is not None:
+                        unique_speakers.add(speaker)
+                
+                # Determine if we need speaker prefixes
+                has_multiple_speakers = len(unique_speakers) > 1
+                
+                # Get language for proper spacing
+                detected_lang = self._extract_language(response)
+                is_cjk = detected_lang in ['zh', 'zh-CN', 'zh-TW', 'zh-hans', 'zh-hant', 'ja', 'ko']
+                
+                # Build transcript from utterances
+                transcripts = []
+                last_speaker = None
+                
+                for utt in utterances:
+                    text = utt.get('transcript', '').strip()
+                    if not text:
+                        continue
+                        
+                    speaker = utt.get('speaker')
+                    
+                    # Add speaker prefix only if multiple speakers
+                    if has_multiple_speakers and speaker is not None:
+                        # Add speaker label if speaker changed
+                        if speaker != last_speaker:
+                            transcripts.append(f"\nSpeaker {speaker}: {text}")
+                            last_speaker = speaker
+                        else:
+                            transcripts.append(text)
+                    else:
+                        # Single speaker - no prefix needed
+                        transcripts.append(text)
+                
+                # Join with appropriate spacing
+                if has_multiple_speakers:
+                    # For multi-speaker, join with space (speaker labels handle separation)
+                    full_transcript = ' '.join(transcripts).strip()
+                elif is_cjk:
+                    # For single-speaker CJK, join without extra spaces
+                    full_transcript = ''.join(transcripts)
+                else:
+                    # For single-speaker non-CJK, join with space
+                    full_transcript = ' '.join(transcripts)
+                
+                # Fix CJK character spacing if needed
+                if is_cjk:
+                    # Remove spaces between CJK characters
+                    cjk_pattern = r'([\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af])\s+([\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af])'
+                    full_transcript = re.sub(cjk_pattern, r'\1\2', full_transcript)
+                
+                return full_transcript
+            
+            # Fallback to regular transcript if no utterances
             channels = results.get('channels', [])
+            if channels and channels[0].get('alternatives'):
+                transcript = channels[0]['alternatives'][0].get('transcript', '')
+                
+                # Fix CJK spacing in fallback too
+                detected_lang = self._extract_language(response)
+                if detected_lang in ['zh', 'zh-CN', 'zh-TW', 'zh-hans', 'zh-hant', 'ja', 'ko']:
+                    cjk_pattern = r'([\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af])\s+([\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af])'
+                    transcript = re.sub(cjk_pattern, r'\1\2', transcript)
+                
+                return transcript
             
-            if not channels:
-                return ""
-            
-            channel = channels[0]
-            alternatives = channel.get('alternatives', [])
-            
-            if not alternatives:
-                return ""
-            
-            alternative = alternatives[0]
-            
-            # Try to get paragraphs first (most readable)
-            paragraphs = alternative.get('paragraphs', {})
-            if isinstance(paragraphs, dict) and 'transcript' in paragraphs:
-                return paragraphs['transcript']
-            
-            # Fall back to regular transcript
-            return alternative.get('transcript', '')
+            return ""
             
         except Exception as e:
             logger.error(f"Error extracting transcription: {e}")

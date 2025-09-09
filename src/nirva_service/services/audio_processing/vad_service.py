@@ -189,16 +189,21 @@ class VADService:
         try:
             all_speech_segments = []
             
-            for audio_path, vad_result in audio_files_with_vad:
+            # Create silence gaps (as tensors)
+            silence_between_files = torch.zeros(int(0.5 * self.sample_rate))  # 500ms
+            silence_within_file = torch.zeros(int(0.2 * self.sample_rate))  # 200ms
+            
+            for file_idx, (audio_path, vad_result) in enumerate(audio_files_with_vad):
                 if not vad_result.get('segments'):
                     logger.debug(f"No speech in {audio_path}, skipping")
                     continue
                 
                 # Read audio file
                 wav = read_audio(audio_path, sampling_rate=self.sample_rate)
+                file_segments = []
                 
                 # Extract speech segments (vad_result segments are in samples if return_seconds=False)
-                for start, end in vad_result['segments']:
+                for seg_idx, (start, end) in enumerate(vad_result['segments']):
                     # If segments are in seconds, convert to samples
                     if isinstance(start, float):
                         start_sample = int(start * self.sample_rate)
@@ -208,13 +213,24 @@ class VADService:
                         end_sample = end
                     
                     speech_segment = wav[start_sample:end_sample]
-                    all_speech_segments.append(speech_segment)
+                    file_segments.append(speech_segment)
+                    
+                    # Add silence between segments within the same file
+                    if seg_idx < len(vad_result['segments']) - 1:
+                        file_segments.append(silence_within_file)
+                
+                # Add file segments to all segments
+                if file_segments:
+                    all_speech_segments.extend(file_segments)
+                    # Add silence between different files
+                    if file_idx < len(audio_files_with_vad) - 1:
+                        all_speech_segments.append(silence_between_files)
             
             if not all_speech_segments:
                 logger.warning("No speech segments found in any audio files")
                 return None
             
-            # Concatenate all speech segments
+            # Concatenate all speech segments (including silence gaps)
             concatenated = torch.cat(all_speech_segments)
             
             # Convert to numpy for saving
