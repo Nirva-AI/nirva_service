@@ -13,8 +13,8 @@ from .registry import register_base_model_class
 class MentalStatePoint(BaseModel):
     """Single mental state data point."""
     timestamp: datetime = Field(description="Timestamp of the measurement")
-    energy_score: float = Field(ge=0, le=10, description="Energy level from 0-10")
-    stress_score: float = Field(ge=0, le=10, description="Stress level from 0-10")
+    energy_score: float = Field(ge=0, le=100, description="Energy level from 0-100")
+    stress_score: float = Field(ge=0, le=100, description="Stress level from 0-100")
     confidence: float = Field(ge=0, le=1, default=0.5, description="Confidence in the scores")
     data_source: Literal["event", "interpolated", "baseline"] = Field(
         description="Source of the data point"
