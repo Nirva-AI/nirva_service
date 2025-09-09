@@ -47,7 +47,7 @@ async def get_mental_state_insights(
         insights = calculator.get_mental_state_insights(
             username=username,
             date=target_date,
-            timezone=timezone
+            timezone_str=timezone
         )
         
         logger.info(f"Generated mental state insights for user {username}")

@@ -5,6 +5,7 @@ import math
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Dict, Any, Tuple
 from statistics import mean
+import pytz
 from loguru import logger
 
 from ..models.mental_state import (
@@ -17,6 +18,7 @@ from ..models.prompt import EventAnalysis
 from ..db.pgsql_events import get_user_events_by_date_range
 from ..db.pgsql_object import MentalStateScoreDB, UserDB
 from ..db.pgsql_client import SessionLocal
+from ..db.redis_user_context import get_user_context
 
 
 class MentalStateCalculator:
@@ -32,15 +34,24 @@ class MentalStateCalculator:
     def calculate_timeline(
         self, 
         username: str, 
-        date: datetime,
-        interval_minutes: int = 30
+        start_time: datetime,
+        interval_minutes: int = 30,
+        end_time: Optional[datetime] = None
     ) -> List[MentalStatePoint]:
-        """Generate mental state points for a full day."""
+        """Generate mental state points from start_time to end_time (or now)."""
         points = []
-        current_time = date.replace(hour=0, minute=0, second=0, microsecond=0)
-        end_time = current_time + timedelta(days=1)
+        current_time = start_time
         
-        while current_time < end_time:
+        # Default end_time is now if not specified
+        if end_time is None:
+            end_time = datetime.now(start_time.tzinfo or timezone.utc)
+        
+        # Don't generate future data
+        now = datetime.now(end_time.tzinfo or timezone.utc)
+        if end_time > now:
+            end_time = now
+        
+        while current_time <= end_time:
             point = self.calculate_point(username, current_time)
             points.append(point)
             current_time += timedelta(minutes=interval_minutes)
@@ -295,34 +306,52 @@ class MentalStateCalculator:
         self,
         username: str,
         date: Optional[datetime] = None,
-        timezone: str = "UTC"
+        timezone_str: str = "UTC"
     ) -> MentalStateInsights:
         """Get complete mental state insights for the UI."""
-        if date is None:
-            date = datetime.now(timezone.utc)
+        # Get user's timezone from Redis if not provided or is default
+        if timezone_str == "UTC":
+            context = get_user_context(username)
+            if context and context.get('timezone'):
+                timezone_str = context['timezone']
+                logger.info(f"Using timezone from Redis for {username}: {timezone_str}")
         
-        # Generate 24h timeline (48 points)
+        # Convert timezone string to timezone object
+        try:
+            tz = pytz.timezone(timezone_str)
+        except pytz.UnknownTimeZoneError:
+            logger.warning(f"Unknown timezone {timezone_str}, using UTC")
+            tz = pytz.UTC
+        
+        # Get current time in user's timezone
+        now = datetime.now(tz)
+        
+        # Generate timeline for LAST 24 hours from now (not yesterday!)
+        start_time = now - timedelta(hours=24)
         timeline_24h = self.calculate_timeline(
             username, 
-            date - timedelta(days=1),
-            interval_minutes=30
+            start_time,
+            interval_minutes=30,
+            end_time=now  # Stop at current time
         )
         
-        # Get 7-day trend (hourly aggregates for performance)
-        timeline_7d = self._get_weekly_trend(username, date)
+        # Get 7-day trend (but stop at current time)
+        timeline_7d = self._get_weekly_trend(username, now)
         
-        # Calculate daily stats
-        daily_stats = self._calculate_daily_stats(timeline_24h[-48:])  # Today's points
+        # Calculate daily stats for today's data
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        today_points = [p for p in timeline_24h if p.timestamp >= today_start]
+        daily_stats = self._calculate_daily_stats(today_points) if today_points else self._get_default_daily_stats()
         
-        # Detect patterns
-        patterns = self._detect_patterns(timeline_7d)
+        # Current state is the most recent calculated point (now)
+        current_state = self.calculate_point(username, now)
         
-        # Generate recommendations
-        current_state = timeline_24h[-1]
+        # Generate recommendations based on recent data
+        recent_points = timeline_24h[-10:] if len(timeline_24h) >= 10 else timeline_24h
         recommendations = self._generate_recommendations(
             current_state,
-            timeline_24h[-10:],  # Last 5 hours
-            patterns
+            recent_points,
+            patterns=self._detect_patterns(timeline_7d)
         )
         
         # Assess risks
@@ -333,7 +362,7 @@ class MentalStateCalculator:
             timeline_24h=timeline_24h,
             timeline_7d=timeline_7d,
             daily_stats=daily_stats,
-            patterns=patterns,
+            patterns=self._detect_patterns(timeline_7d),
             recommendations=recommendations,
             risk_indicators=risk_indicators
         )
@@ -437,17 +466,34 @@ class MentalStateCalculator:
         username: str, 
         end_date: datetime
     ) -> List[MentalStatePoint]:
-        """Get hourly aggregated points for the past week."""
+        """Get hourly aggregated points for the past week, stopping at current time."""
         points = []
-        current = end_date - timedelta(days=7)
+        start_date = end_date - timedelta(days=7)
+        current = start_date
         
-        while current <= end_date:
+        # Don't generate future data
+        now = datetime.now(end_date.tzinfo or timezone.utc)
+        actual_end = min(end_date, now)
+        
+        while current <= actual_end:
             # Calculate hourly point instead of every 30 min for performance
             point = self.calculate_point(username, current)
             points.append(point)
             current += timedelta(hours=1)
         
         return points
+    
+    def _get_default_daily_stats(self) -> DailyMentalStateStats:
+        """Return default stats when no data is available."""
+        return DailyMentalStateStats(
+            avg_energy=5.0,
+            avg_stress=5.0,
+            peak_energy_time="N/A",
+            peak_stress_time="N/A",
+            optimal_state_minutes=0,
+            burnout_risk_minutes=0,
+            recovery_periods=0
+        )
     
     def _calculate_daily_stats(
         self, 
