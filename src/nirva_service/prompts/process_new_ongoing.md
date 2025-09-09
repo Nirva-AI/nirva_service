@@ -24,5 +24,10 @@ Provide your response with:
 3. **Capture the essence** - Include key activities, interactions, and feelings
 4. **Natural language** - Write as if the user is telling their own story
 5. **No timestamps** - Don't mention times, just focus on the narrative flow
+6. **Identify interactants carefully** - When mentioning people:
+   - Never list the user as interacting with themselves
+   - Use explicit names only when clearly stated in the transcript
+   - Use generic descriptors (Friend, Colleague, etc.) when names are unclear
+   - Only include people actively participating, not those merely mentioned
 
 Remember: This event is ONGOING, so the story might be incomplete. That's okay - just capture what has happened so far.

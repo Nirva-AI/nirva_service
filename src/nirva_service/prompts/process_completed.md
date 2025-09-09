@@ -2,6 +2,8 @@
 
 You are finalizing a diary entry for a completed event. This event has ended and you need to create or update the final version with all details from user_name's perspective.
 
+**Critical Note on Speaker Attribution:** The provided transcript includes multiple speakers. It is crucial to **diligently distinguish between what user_name said versus what others said.** Your analysis, particularly the `event_story` and extracted metadata, must *only* reflect user_name's direct speech, thoughts, and experiences. Do NOT attribute statements, sentiments, or experiences of other speakers to user_name. When analyzing the transcript, make careful note of when user_name is speaking versus when others are speaking.
+
 ## Input Details
 
 {previous_section}
@@ -25,6 +27,21 @@ If dropping, also set `drop_reason` with a brief explanation (e.g., "Random frag
 
 Only proceed with full analysis if the event is meaningful and coherent.
 
+## Event Context Understanding
+
+**Examples of what constitutes a SINGLE event:**
+* A 3-hour coffee shop conversation covering relationships, work, family, and future plans
+* A dinner party with multiple people discussing various topics throughout the evening
+* A phone call that covers several different subjects
+* A work meeting that discusses multiple agenda items
+
+**Examples of what constitutes SEPARATE events:**
+* Coffee shop conversation (Event 1) → Driving home (Event 2) → Cooking dinner at home (Event 3)
+* Solo morning routine (Event 1) → Work meeting with colleagues (Event 2) → Lunch with friend (Event 3)
+* Group dinner (Event 1) → Walking to bar with same group (Event 2) → Late night solo reflection at home (Event 3)
+
+When in doubt, err on the side of treating the transcript as a single, cohesive event rather than fragmenting it.
+
 ## Output Structure
 
 Generate your response with the following fields:
@@ -40,7 +57,40 @@ Generate your response with the following fields:
 - **location**: Where the event took place. **CRITICAL: Only use specific proper nouns for locations (e.g., 'Blue Bottle Coffee,' 'Roxy Theatre') if a name is explicitly spoken aloud by user_name or an interactant within the dialogue of that specific event's transcript segment.** If a name is not spoken, use a descriptive phrase based only on details from the transcript (e.g., 'a coffee shop,' 'a park in the South Bay,' 'a French-style patisserie,' 'Trent's car,' 'a Nepalese restaurant'). **Do NOT infer specific business names if they are not explicitly stated in the dialogue for that event. Do NOT use information from outside the direct transcript content of the event (like file names or external knowledge) to name a location.** For instance, if the transcript mentions 'we went to a Nepalese place,' the location should be 'a Nepalese restaurant,' NOT a specific named Nepalese restaurant unless that specific name is uttered in the dialogue of that event. Prioritize accuracy based on direct, spoken evidence within the event's dialogue.
 
 ### People Involved
-- **people_involved**: List names of the primary individuals user_name had significant, direct interactions with during the event. **Do NOT include user_name (e.g., Wei) herself in this list.** Exclude individuals involved only in brief, transactional service encounters (e.g., unnamed cafe staff, store clerks) unless the interaction became a more substantial part of the event's dialogue or activity. If user_name was alone or only had such brief encounters, use an empty array [].
+- **people_involved**: List names of the primary individuals user_name had significant, direct interactions with during the event. 
+
+  **Critical Rules for Identifying Interactants:**
+  
+  * **user_name is Never an Interactant with Herself:** Do NOT include user_name (e.g., Wei) in this list. The goal is to identify other individuals she is interacting with.
+  
+  * **Prioritize Explicit Naming within the Event:**
+    - Look for direct introductions (e.g., "This is Trent," "My friend Ash")
+    - Listen for instances where user_name or another speaker addresses someone by name within the current event's dialogue
+  
+  * **Contextual Clues for Upcoming Interactions:**
+    - If user_name states an intention to meet a specific person (e.g., "I'm going to see Ash for our picnic"), use that name for the subsequent event if the context confirms they are indeed the person she meets
+  
+  * **Strictly Avoid Name Carryover and Assumptions:**
+    - Do NOT carry over names from previous, distinct events unless they are clearly and continuously interacting with user_name
+    - Do NOT use the name of someone user_name is merely talking about if that person is not actively participating
+    - If a name was mentioned for an upcoming interaction but the actual interaction doesn't explicitly confirm that name, be cautious
+  
+  * **Handling Unclear or Unnamed Interactants (Fallback Strategy):**
+    - If an interactant's name is not clearly identifiable from the dialogue, use a generic but contextually appropriate descriptor:
+      - "Friend" (if context suggests a personal, informal relationship)
+      - "Companion" (for sustained interaction where relationship isn't clear)
+      - "Colleague(s)" (if in a work setting)
+      - "Group of friends/colleagues/people" (if multiple unnamed individuals)
+      - "Staff" (e.g., "Cafe Staff," "Restaurant Staff") for service interactions
+      - "Family Member" (e.g., "Mom," "Brother") if context indicates
+  
+  * **Distinguish Active Interactants from Conversation Subjects:**
+    - Only list individuals as interactants if they are actively speaking to/with user_name or directly involved in an activity
+    - People who are merely the topic of conversation but not present should not be listed
+  
+  * **Exclude Brief Service Encounters:** Exclude unnamed cafe staff, store clerks, etc. unless the interaction became a substantial part of the event
+  
+  If user_name was alone or only had brief service encounters, use an empty array [].
 
 ### Activity Classification
 - **activity_type**: Categorize the event. Choose one: work, exercise, social, learning, self-care, chores, commute, meal, leisure, unknown.
