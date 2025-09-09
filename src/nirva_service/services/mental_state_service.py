@@ -89,9 +89,9 @@ class MentalStateCalculator:
             final_energy, final_stress
         )
         
-        # Clamp values to valid range
-        final_energy = max(0, min(10, final_energy))
-        final_stress = max(0, min(10, final_stress))
+        # Clamp values to valid range (0-100)
+        final_energy = max(0, min(100, final_energy))
+        final_stress = max(0, min(100, final_stress))
         
         # Calculate confidence
         confidence = self.calculate_confidence(
@@ -109,8 +109,8 @@ class MentalStateCalculator:
         
         return MentalStatePoint(
             timestamp=timestamp,
-            energy_score=round(final_energy, 1),
-            stress_score=round(final_stress, 1),
+            energy_score=round(final_energy, 0),  # Now 0-100 scale
+            stress_score=round(final_stress, 0),  # Now 0-100 scale
             confidence=round(confidence, 2),
             data_source=data_source,
             event_id=event_id
@@ -121,33 +121,33 @@ class MentalStateCalculator:
         hour = timestamp.hour + timestamp.minute / 60.0  # Decimal hour
         day_of_week = timestamp.weekday()
         
-        # Circadian rhythm for energy (smoother curve)
+        # Circadian rhythm for energy (1-100 scale)
         energy_curve = {
-            0: 3.0,   # Midnight
-            3: 2.5,   # Deep sleep
-            6: 4.0,   # Wake up
-            9: 6.5,   # Morning rise
-            11: 7.5,  # Peak morning
-            13: 6.0,  # Lunch time
-            14: 5.5,  # Post-lunch dip
-            16: 6.5,  # Afternoon recovery
-            18: 6.0,  # Early evening
-            20: 5.0,  # Evening
-            21: 4.5,  # Wind down
-            23: 3.5   # Prepare for sleep
+            0: 30,   # Midnight
+            3: 25,   # Deep sleep
+            6: 40,   # Wake up
+            9: 65,   # Morning rise
+            11: 75,  # Peak morning
+            13: 60,  # Lunch time
+            14: 55,  # Post-lunch dip
+            16: 65,  # Afternoon recovery
+            18: 60,  # Early evening
+            20: 50,  # Evening
+            21: 45,  # Wind down
+            23: 35   # Prepare for sleep
         }
         
-        # Daily stress pattern
+        # Daily stress pattern (1-100 scale)
         stress_curve = {
-            0: 1.5,   # Midnight
-            3: 1.0,   # Deep sleep
-            6: 2.0,   # Wake up
-            9: 4.0,   # Work start
-            12: 5.0,  # Midday pressure
-            15: 5.5,  # Afternoon peak
-            18: 4.0,  # Evening relief
-            21: 2.5,  # Relaxation
-            23: 1.8   # Prepare for sleep
+            0: 15,   # Midnight
+            3: 10,   # Deep sleep
+            6: 20,   # Wake up
+            9: 40,   # Work start
+            12: 50,  # Midday pressure
+            15: 55,  # Afternoon peak
+            18: 40,  # Evening relief
+            21: 25,  # Relaxation
+            23: 18   # Prepare for sleep
         }
         
         # Interpolate for exact hour
@@ -192,9 +192,9 @@ class MentalStateCalculator:
             # Direct impact if during event
             if event.start_timestamp <= timestamp <= event.end_timestamp:
                 current_event_id = event.event_id
-                # Use actual event scores as deltas from neutral
-                energy_delta = (event.energy_level - 5.5)
-                stress_delta = (event.stress_level - 5.0)
+                # Use actual event scores as deltas from neutral (1-100 scale)
+                energy_delta = event.energy_level - 55  # Neutral is 55 for energy
+                stress_delta = event.stress_level - 50  # Neutral is 50 for stress
             
             # Lingering effects after event
             elif event.end_timestamp < timestamp:
@@ -203,8 +203,8 @@ class MentalStateCalculator:
                 # Exponential decay of impact
                 decay_factor = math.exp(-0.5 * hours_passed)  # 50% after ~1.4 hours
                 
-                energy_impact = (event.energy_level - 5.5) * decay_factor
-                stress_impact = (event.stress_level - 5.0) * decay_factor
+                energy_impact = (event.energy_level - 55) * decay_factor  # 1-100 scale
+                stress_impact = (event.stress_level - 50) * decay_factor  # 1-100 scale
                 
                 # Stress lingers longer than energy changes
                 energy_delta += energy_impact
@@ -214,13 +214,13 @@ class MentalStateCalculator:
             elif event.start_timestamp > timestamp:
                 hours_until = (event.start_timestamp - timestamp).total_seconds() / 3600
                 if hours_until <= 1:
-                    # Anticipation affects stress more than energy
+                    # Anticipation affects stress more than energy (1-100 scale)
                     if event.activity_type == 'work':
-                        stress_delta += 0.5
+                        stress_delta += 5  # Add 5 stress points
                     elif event.activity_type == 'social':
-                        energy_delta += 0.3
+                        energy_delta += 3  # Add 3 energy points
                         if event.interaction_dynamic == 'tense':
-                            stress_delta += 0.4
+                            stress_delta += 4  # Add 4 stress points
         
         return energy_delta, stress_delta, current_event_id
     
@@ -261,23 +261,23 @@ class MentalStateCalculator:
         stress: float
     ) -> Tuple[float, float]:
         """Apply feedback loops between energy and stress."""
-        # High stress drains energy
-        if stress > 7:
-            energy_drain = (stress - 7) * 0.3
+        # High stress drains energy (1-100 scale)
+        if stress > 70:
+            energy_drain = (stress - 70) * 0.3
             energy -= energy_drain
         
         # Very low energy increases stress vulnerability
-        if energy < 3:
-            stress_increase = (3 - energy) * 0.2
+        if energy < 30:
+            stress_increase = (30 - energy) * 0.2
             stress += stress_increase
         
         # Optimal zone boost (high energy, low stress)
-        if energy > 7 and stress < 3:
+        if energy > 70 and stress < 30:
             energy *= 1.1  # 10% boost
             stress *= 0.9  # 10% reduction
         
         # Danger zone spiral (low energy, high stress)
-        if energy < 3 and stress > 7:
+        if energy < 30 and stress > 70:
             energy *= 0.9  # 10% worse
             stress *= 1.1  # 10% worse
         
@@ -486,8 +486,8 @@ class MentalStateCalculator:
     def _get_default_daily_stats(self) -> DailyMentalStateStats:
         """Return default stats when no data is available."""
         return DailyMentalStateStats(
-            avg_energy=5.0,
-            avg_stress=5.0,
+            avg_energy=50.0,  # Neutral on 1-100 scale
+            avg_stress=50.0,  # Neutral on 1-100 scale
             peak_energy_time="N/A",
             peak_stress_time="N/A",
             optimal_state_minutes=0,
@@ -519,13 +519,13 @@ class MentalStateCalculator:
         peak_stress_idx = stresses.index(max(stresses))
         
         # Count state minutes (each point represents 30 minutes)
-        optimal_count = sum(1 for p in points if p.energy_score > 7 and p.stress_score < 3)
-        burnout_count = sum(1 for p in points if p.energy_score < 3 and p.stress_score > 7)
+        optimal_count = sum(1 for p in points if p.energy_score > 70 and p.stress_score < 30)
+        burnout_count = sum(1 for p in points if p.energy_score < 30 and p.stress_score > 70)
         
-        # Detect recovery periods (stress drops by 2+ points)
+        # Detect recovery periods (stress drops by 20+ points)
         recovery_count = 0
         for i in range(1, len(points)):
-            if points[i-1].stress_score - points[i].stress_score >= 2:
+            if points[i-1].stress_score - points[i].stress_score >= 20:  # Scaled from 2 to 20
                 recovery_count += 1
         
         return DailyMentalStateStats(
@@ -549,7 +549,7 @@ class MentalStateCalculator:
         afternoon_points = [p for p in points if 13 <= p.timestamp.hour <= 15]
         if afternoon_points:
             avg_afternoon = mean([p.energy_score for p in afternoon_points])
-            if avg_afternoon < 5:
+            if avg_afternoon < 50:  # Scaled from 5 to 50
                 patterns.append(MentalStatePattern(
                     pattern_type="afternoon_dip",
                     description="Consistent energy drop in early afternoon",
@@ -561,7 +561,7 @@ class MentalStateCalculator:
         morning_points = [p for p in points if 7 <= p.timestamp.hour <= 10]
         if morning_points:
             avg_morning_stress = mean([p.stress_score for p in morning_points])
-            if avg_morning_stress > 6:
+            if avg_morning_stress > 60:  # Scaled from 6 to 60
                 patterns.append(MentalStatePattern(
                     pattern_type="morning_stress",
                     description="High stress levels during morning hours",
@@ -583,17 +583,17 @@ class MentalStateCalculator:
         recommendations = []
         
         # Current state recommendations
-        if current.energy_score < 3 and current.stress_score > 7:
+        if current.energy_score < 30 and current.stress_score > 70:
             recommendations.append("⚠️ High burnout risk detected. Consider taking a break immediately.")
-        elif current.energy_score < 4:
+        elif current.energy_score < 40:
             recommendations.append("💡 Low energy detected. A short walk or healthy snack might help.")
-        elif current.stress_score > 7:
+        elif current.stress_score > 70:
             recommendations.append("🧘 High stress levels. Try deep breathing or a 5-minute meditation.")
         
         # Trend-based recommendations
         if len(recent_trend) >= 3:
             recent_stress = [p.stress_score for p in recent_trend[-3:]]
-            if all(s > 6 for s in recent_stress):
+            if all(s > 60 for s in recent_stress):
                 recommendations.append("📈 Sustained high stress detected. Schedule some recovery time.")
         
         # Pattern-based recommendations
@@ -614,9 +614,9 @@ class MentalStateCalculator:
             return {}
         
         # Count risk states
-        burnout_count = sum(1 for p in points if p.energy_score < 3 and p.stress_score > 7)
-        high_stress_count = sum(1 for p in points if p.stress_score > 7)
-        low_energy_count = sum(1 for p in points if p.energy_score < 3)
+        burnout_count = sum(1 for p in points if p.energy_score < 30 and p.stress_score > 70)
+        high_stress_count = sum(1 for p in points if p.stress_score > 70)
+        low_energy_count = sum(1 for p in points if p.energy_score < 30)
         
         return {
             "burnout_risk": "high" if burnout_count > 4 else "medium" if burnout_count > 2 else "low",
