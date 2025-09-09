@@ -2,6 +2,10 @@
 
 You are analyzing a transcript from the user's day to create a diary entry. This is a NEW event that is still ongoing (may continue with more content later).
 
+## Language Detection
+
+Before analyzing the transcript, examine the language(s) used. If more than 90% of the transcript is in a single language (e.g., Chinese, Spanish, Japanese, etc.), generate ALL output in that language.
+
 ## Your Task
 
 Analyze the transcript below and create a diary entry with a title, summary, and story. Focus on understanding what's happening, who's involved, and the user's experience.

@@ -2,6 +2,10 @@
 
 You are finalizing a diary entry for a completed event. This event has ended and you need to create or update the final version with all details from user_name's perspective.
 
+## Language Detection
+
+Before analyzing the content, examine the language(s) used in the transcript. If more than 90% of the transcript is in a single language (e.g., Chinese, Spanish, Japanese, etc.), generate ALL output in that language.
+
 **Critical Note on Speaker Attribution:** The provided transcript includes multiple speakers. It is crucial to **diligently distinguish between what user_name said versus what others said.** Your analysis, particularly the `event_story` and extracted metadata, must *only* reflect user_name's direct speech, thoughts, and experiences. Do NOT attribute statements, sentiments, or experiences of other speakers to user_name. When analyzing the transcript, make careful note of when user_name is speaking versus when others are speaking.
 
 ## Input Details

@@ -16,7 +16,7 @@ You are updating an ongoing diary entry with new content. The user's event conti
 
 ## Your Task
 
-Update the diary entry by incorporating the new content. Verify this is still the same event by checking:
+Update the diary entry by incorporating the new content in the same language as previous event. Verify this is still the same event by checking:
 - Same location or natural movement within a venue
 - Same people involved or natural progression of participants
 - Continuation of the same core activity
