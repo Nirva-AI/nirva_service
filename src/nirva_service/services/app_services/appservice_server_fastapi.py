@@ -12,6 +12,7 @@ from .login import login_router
 from .url_config import url_config_router
 from .upload_auth import upload_auth_router
 from .transcription_query import transcription_router
+from ...routers.mental_state import router as mental_state_router
 
 
 # redis!
@@ -19,7 +20,9 @@ from .transcription_query import transcription_router
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # 启动时连接
     app.state.redis = get_redis()
+    
     yield
+    
     # 关闭时清理
     app.state.redis.close()
 
@@ -43,3 +46,4 @@ app.include_router(router=analyze_action_router)
 app.include_router(router=upload_auth_router)
 app.include_router(router=transcription_router)
 app.include_router(router=audio_download_router)
+app.include_router(router=mental_state_router)

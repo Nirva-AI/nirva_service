@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID, uuid4
 
 from sqlalchemy import DateTime, ForeignKey, String, Text, func, JSON
@@ -55,6 +55,9 @@ class UserDB(UUIDBase):
     daily_reflections: Mapped["DailyReflectionDB"] = relationship(
         "DailyReflectionDB", back_populates="user"
     )
+    mental_state_scores: Mapped[List["MentalStateScoreDB"]] = relationship(
+        "MentalStateScoreDB", back_populates="user"
+    )
 
 
 # 用户的日记数据
@@ -86,6 +89,45 @@ class JournalFileDB(UUIDBase):
 
     # 关系
     user: Mapped["UserDB"] = relationship("UserDB", back_populates="journal_files")
+
+
+# Mental State Scores
+class MentalStateScoreDB(Base):
+    __tablename__ = "user_mental_state_scores"
+    
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    
+    # User association
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id"), nullable=False, index=True
+    )
+    
+    # Timestamp for the score
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+    
+    # Mental state scores
+    energy_score: Mapped[float] = mapped_column(nullable=False)
+    stress_score: Mapped[float] = mapped_column(nullable=False)
+    
+    # Confidence and source
+    confidence: Mapped[float] = mapped_column(default=0.5, nullable=False)
+    data_source: Mapped[str] = mapped_column(String(20), nullable=False)  # 'event', 'interpolated', 'baseline'
+    event_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # Reference if from event
+    
+    # Metadata
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    
+    # Unique constraint to prevent duplicate entries
+    __table_args__ = (
+        {"extend_existing": True},
+    )
+    
+    # Relationship
+    user: Mapped["UserDB"] = relationship("UserDB", back_populates="mental_state_scores")
 
 
 # Event storage (replacing journal_files)
