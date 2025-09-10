@@ -58,6 +58,64 @@ class MentalStateCalculator:
         
         return points
     
+    def _smooth_stress_transition(
+        self,
+        username: str,
+        current_stress: float,
+        timestamp: datetime
+    ) -> float:
+        """Apply smoothing to prevent sharp stress transitions."""
+        # Get previous point (30 minutes ago) for comparison
+        prev_timestamp = timestamp - timedelta(minutes=30)
+        try:
+            prev_point = self._get_recent_stress_value(username, prev_timestamp)
+            if prev_point is not None:
+                # Limit change rate to max 12 points per 30-minute interval
+                max_change = 12.0
+                stress_delta = current_stress - prev_point
+                
+                if abs(stress_delta) > max_change:
+                    # Apply gradual transition
+                    if stress_delta > 0:
+                        return prev_point + max_change
+                    else:
+                        return prev_point - max_change
+        except Exception:
+            pass  # If we can't get previous data, proceed without smoothing
+        
+        return current_stress
+    
+    def _get_recent_stress_value(
+        self,
+        username: str,
+        timestamp: datetime
+    ) -> Optional[float]:
+        """Get stress value from recent history for smoothing."""
+        try:
+            # Look for a stored value within 1 hour of the target timestamp
+            from ..db.pgsql_object import UserDB
+            user = self.session.query(UserDB).filter(
+                UserDB.username == username
+            ).first()
+            if not user:
+                return None
+            
+            # Query for nearby points
+            window_start = timestamp - timedelta(minutes=60)
+            window_end = timestamp + timedelta(minutes=60)
+            
+            recent_point = self.session.query(MentalStateScoreDB).filter(
+                MentalStateScoreDB.user_id == user.id,
+                MentalStateScoreDB.timestamp >= window_start,
+                MentalStateScoreDB.timestamp <= window_end
+            ).order_by(
+                MentalStateScoreDB.timestamp.desc()
+            ).first()
+            
+            return recent_point.stress_score if recent_point else None
+        except Exception:
+            return None
+
     def calculate_point(
         self,
         username: str,
@@ -89,9 +147,12 @@ class MentalStateCalculator:
             final_energy, final_stress
         )
         
-        # Clamp values to valid range (0-100)
+        # Apply stress smoothing to prevent sharp transitions
+        final_stress = self._smooth_stress_transition(username, final_stress, timestamp)
+        
+        # Clamp values to valid range (0-100 for energy, 8-100 for stress)
         final_energy = max(0, min(100, final_energy))
-        final_stress = max(0, min(100, final_stress))
+        final_stress = max(8, min(100, final_stress))  # Minimum stress floor of 8
         
         # Calculate confidence
         confidence = self.calculate_confidence(
@@ -156,7 +217,7 @@ class MentalStateCalculator:
         
         # Weekend adjustment
         if day_of_week >= 5:  # Saturday = 5, Sunday = 6
-            base_stress *= 0.7  # 30% less stress
+            base_stress *= 0.8  # 20% less stress (more gradual)
             base_energy *= 1.1  # 10% more energy
         
         return base_energy, base_stress
@@ -194,21 +255,22 @@ class MentalStateCalculator:
                 current_event_id = event.event_id
                 # Use actual event scores as deltas from neutral (1-100 scale)
                 energy_delta = event.energy_level - 55  # Neutral is 55 for energy
-                stress_delta = event.stress_level - 50  # Neutral is 50 for stress
+                stress_delta = (event.stress_level - 42) * 0.75  # Neutral is 42 for stress, dampened
             
             # Lingering effects after event
             elif event.end_timestamp < timestamp:
                 hours_passed = (timestamp - event.end_timestamp).total_seconds() / 3600
                 
-                # Exponential decay of impact
-                decay_factor = math.exp(-0.5 * hours_passed)  # 50% after ~1.4 hours
+                # Different decay rates for energy and stress
+                energy_decay = math.exp(-0.5 * hours_passed)  # 50% after ~1.4 hours
+                stress_decay = math.exp(-0.23 * hours_passed)  # 50% after ~3 hours (gentler)
                 
-                energy_impact = (event.energy_level - 55) * decay_factor  # 1-100 scale
-                stress_impact = (event.stress_level - 50) * decay_factor  # 1-100 scale
+                energy_impact = (event.energy_level - 55) * energy_decay  # 1-100 scale
+                stress_impact = (event.stress_level - 42) * 0.75 * stress_decay  # 1-100 scale, dampened
                 
-                # Stress lingers longer than energy changes
+                # Apply impacts
                 energy_delta += energy_impact
-                stress_delta += stress_impact * 1.3  # Stress decays 30% slower
+                stress_delta += stress_impact
             
             # Anticipation effects (upcoming events)
             elif event.start_timestamp > timestamp:
@@ -274,7 +336,7 @@ class MentalStateCalculator:
         # Optimal zone boost (high energy, low stress)
         if energy > 70 and stress < 30:
             energy *= 1.1  # 10% boost
-            stress *= 0.9  # 10% reduction
+            stress *= 0.95  # 5% reduction (gentler)
         
         # Danger zone spiral (low energy, high stress)
         if energy < 30 and stress > 70:
