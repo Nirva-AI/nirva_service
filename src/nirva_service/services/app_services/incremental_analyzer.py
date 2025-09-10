@@ -87,12 +87,10 @@ class IncrementalAnalyzer:
                     if completed:
                         processed_events.append(completed)
                         completed_ongoing_ids.add(ongoing.event_id)
+                        if completed.event_status == "dropped":
+                            logger.info(f"Event {ongoing.event_id} dropped locally")
                     else:
-                        logger.info(f"Marking existing event {ongoing.event_id} as dropped")
-                        dropped_data = ongoing.model_dump()
-                        dropped_data['event_status'] = 'dropped'
-                        dropped_event = EventAnalysis(**dropped_data)
-                        processed_events.append(dropped_event)
+                        logger.info(f"Skipping event {ongoing.event_id} - dropped locally")
                         completed_ongoing_ids.add(ongoing.event_id)
 
             # Remove completed events from ongoing list
@@ -122,12 +120,10 @@ class IncrementalAnalyzer:
                         completed = await self._complete_event(updated_event, username=username)
                         if completed:
                             processed_events.append(completed)
+                            if completed.event_status == "dropped":
+                                logger.info(f"Continued event {updated_event.event_id} dropped locally")
                         else:
-                            logger.info(f"Dropping continued event {updated_event.event_id}")
-                            dropped_data = updated_event.model_dump()
-                            dropped_data['event_status'] = 'dropped'
-                            dropped_event = EventAnalysis(**dropped_data)
-                            processed_events.append(dropped_event)
+                            logger.info(f"Skipping continued event {updated_event.event_id} - dropped locally")
                     else:
                         # Keep as ongoing (last group and recent)
                         processed_events.append(updated_event)
@@ -146,8 +142,8 @@ class IncrementalAnalyzer:
                         if completed_event:
                             processed_events.append(completed_event)
                             events_created += 1
-                        else:
-                            logger.info(f"Dropped event during creation")
+                            if completed_event.event_status == "dropped":
+                                logger.info(f"New event dropped locally during creation")
                     else:
                         # Last group and recent - create as ongoing
                         logger.info("Creating new ongoing event (recent)")
@@ -160,15 +156,13 @@ class IncrementalAnalyzer:
             for ongoing in ongoing_events:
                 logger.info(f"Completing remaining ongoing event {ongoing.event_id} (end of batch)")
                 completed = await self._complete_event(ongoing, username=username)
-                if completed:  # Only append if not dropped
+                if completed:
                     processed_events.append(completed)
+                    if completed.event_status == "dropped":
+                        logger.info(f"Remaining event {ongoing.event_id} dropped locally")
                 else:
-                    # Event was dropped - mark it as dropped in database
-                    logger.info(f"Marking remaining event {ongoing.event_id} as dropped")
-                    dropped_data = ongoing.model_dump()
-                    dropped_data['event_status'] = 'dropped'
-                    dropped_event = EventAnalysis(**dropped_data)
-                    processed_events.append(dropped_event)
+                    # Event was dropped - skip it
+                    logger.info(f"Skipping remaining event {ongoing.event_id} - dropped locally")
 
             # Save all processed events
             await self._save_events(username, processed_events)
@@ -494,12 +488,13 @@ class IncrementalAnalyzer:
         if hasattr(ongoing_event, 'transcriptions') and ongoing_event.transcriptions:
             segment_count += len(ongoing_event.transcriptions)
         
-        # Drop if very low transcript content
-        if word_count < 20 and segment_count < 3:
-            logger.info(f"❌ LOCAL_FILTER_DROP: Ongoing event {ongoing_event.event_id} dropped locally (words={word_count}, segments={segment_count})")
-            return None  # Signal to drop
+        # Track if this should be dropped locally
+        should_drop_locally = word_count < 20 and segment_count < 3
         
-        logger.info(f"✅ LOCAL_FILTER_PASS: Ongoing event {ongoing_event.event_id} passed local filter (words={word_count}, segments={segment_count}), sending to LLM")
+        if should_drop_locally:
+            logger.info(f"❌ LOCAL_FILTER_DROP: Ongoing event {ongoing_event.event_id} will be dropped locally (words={word_count}, segments={segment_count})")
+        else:
+            logger.info(f"✅ LOCAL_FILTER_PASS: Ongoing event {ongoing_event.event_id} passed local filter (words={word_count}, segments={segment_count}), sending to LLM")
         
         # Load and format prompt
         with open("src/nirva_service/prompts/process_completed.md", "r") as f:
@@ -538,7 +533,7 @@ class IncrementalAnalyzer:
         ongoing_event.event_title = response.event_title
         ongoing_event.event_summary = response.event_summary
         ongoing_event.event_story = response.event_story
-        ongoing_event.event_status = "completed"
+        ongoing_event.event_status = "dropped" if should_drop_locally else "completed"
         ongoing_event.location = response.location
         ongoing_event.people_involved = response.people_involved
         ongoing_event.activity_type = response.activity_type
@@ -575,11 +570,13 @@ class IncrementalAnalyzer:
         logger.info(f"📊 Processing transcript group: {time_range}, {chunks_count} chunks, {word_count} words")
         logger.debug(f"📝 Transcript preview: {transcript_text[:100]}...")
         
-        if word_count < 20:
-            logger.info(f"❌ LOCAL_FILTER_DROP: Group {time_range} dropped locally (words={word_count} < 20)")
-            return None
+        # Track if this should be dropped locally
+        should_drop_locally = word_count < 20
         
-        logger.info(f"✅ LOCAL_FILTER_PASS: Group {time_range} passed local filter, sending to LLM")
+        if should_drop_locally:
+            logger.info(f"❌ LOCAL_FILTER_DROP: Group {time_range} will be dropped locally (words={word_count} < 20)")
+        else:
+            logger.info(f"✅ LOCAL_FILTER_PASS: Group {time_range} passed local filter, sending to LLM")
         
         # Load completion prompt template
         with open("src/nirva_service/prompts/process_completed.md", "r") as f:
@@ -609,7 +606,7 @@ class IncrementalAnalyzer:
             event_title=response.event_title,
             event_summary=response.event_summary,
             event_story=response.event_story,
-            event_status="completed",  # Mark as completed immediately
+            event_status="dropped" if should_drop_locally else "completed",
             start_timestamp=raw_group["start_time"],
             end_timestamp=raw_group["end_time"],
             last_processed_at=datetime.utcnow(),

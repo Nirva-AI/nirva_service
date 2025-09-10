@@ -76,7 +76,7 @@ class EventAnalysis(BaseModel):
     )
 
     # New fields for ongoing/completed event processing
-    event_status: Literal["ongoing", "completed"] = Field(
+    event_status: Literal["ongoing", "completed", "dropped"] = Field(
         default="completed",
         description="Status of the event - 'ongoing' if still being processed, 'completed' when finalized",
     )
