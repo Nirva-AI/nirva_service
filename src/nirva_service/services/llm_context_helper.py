@@ -32,7 +32,7 @@ def inject_user_context(prompt: str, username: str) -> str:
         
         timezone_str = context.get("timezone", "UTC")
         
-        # Get current time in user's timezone
+        # Get current time in user's timezone (timezone should already be normalized)
         try:
             tz = pytz.timezone(timezone_str)
             local_time = datetime.now(tz)

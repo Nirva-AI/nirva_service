@@ -40,21 +40,8 @@ def parse_args():
 
 
 def get_timezone(tz_name):
-    """Get timezone object from name"""
-    tz_map = {
-        'PDT': 'America/Los_Angeles',
-        'PST': 'America/Los_Angeles', 
-        'EDT': 'America/New_York',
-        'EST': 'America/New_York',
-        'UTC': 'UTC'
-    }
-    
-    tz_name = tz_name.upper()
-    if tz_name in tz_map:
-        return pytz.timezone(tz_map[tz_name])
-    else:
-        # Try to use it directly
-        return pytz.timezone(tz_name)
+    """Get timezone object from name - expects proper IANA timezone names"""
+    return pytz.timezone(tz_name)
 
 
 def reset_events_and_transcripts(username, start_date, end_date, timezone_name, execute=False):
