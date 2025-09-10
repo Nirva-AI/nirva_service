@@ -67,6 +67,8 @@ class IncrementalAnalyzer:
 
             # Group transcripts into raw events based on time gaps
             raw_event_groups = self._group_into_raw_events(transcript_chunks, username)
+            
+            logger.info(f"📋 GROUPING_RESULT: {len(transcript_chunks)} individual transcripts → {len(raw_event_groups)} groups for processing")
 
             # Get existing events for this user (ongoing ones)
             ongoing_events = await self._get_ongoing_events(username)
@@ -494,8 +496,10 @@ class IncrementalAnalyzer:
         
         # Drop if very low transcript content
         if word_count < 20 and segment_count < 3:
-            logger.info(f"Dropping event {ongoing_event.event_id}: insufficient transcript content (words={word_count}, segments={segment_count})")
+            logger.info(f"❌ LOCAL_FILTER_DROP: Ongoing event {ongoing_event.event_id} dropped locally (words={word_count}, segments={segment_count})")
             return None  # Signal to drop
+        
+        logger.info(f"✅ LOCAL_FILTER_PASS: Ongoing event {ongoing_event.event_id} passed local filter (words={word_count}, segments={segment_count}), sending to LLM")
         
         # Load and format prompt
         with open("src/nirva_service/prompts/process_completed.md", "r") as f:
@@ -525,12 +529,15 @@ class IncrementalAnalyzer:
         )
 
         # Call LLM
+        logger.info(f"🤖 Sending ongoing event {ongoing_event.event_id} to LLM for completion...")
         response = await self._call_llm_structured(prompt, CompletedEventOutput, username)
         
         # Check if LLM recommends dropping
         if response.should_drop:
-            logger.info(f"LLM dropping event {ongoing_event.event_id}: {response.drop_reason}")
+            logger.info(f"❌ LLM_DROP: Ongoing event {ongoing_event.event_id} dropped by LLM - {response.drop_reason}")
             return None  # Signal to drop
+        
+        logger.info(f"✅ LLM_ACCEPT: Ongoing event {ongoing_event.event_id} accepted by LLM, completing event")
 
         # Update event with completed data
         ongoing_event.event_title = response.event_title
@@ -567,9 +574,17 @@ class IncrementalAnalyzer:
         
         # Pre-filter: Check transcript content volume
         word_count = len(transcript_text.split())
+        chunks_count = len(raw_group.get("chunks", []))
+        time_range = f"{raw_group['start_time'].strftime('%H:%M:%S')}-{raw_group['end_time'].strftime('%H:%M:%S')}"
+        
+        logger.info(f"📊 Processing transcript group: {time_range}, {chunks_count} chunks, {word_count} words")
+        logger.debug(f"📝 Transcript preview: {transcript_text[:100]}...")
+        
         if word_count < 20:
-            logger.info(f"Dropping completed event: insufficient content (words={word_count})")
+            logger.info(f"❌ LOCAL_FILTER_DROP: Group {time_range} dropped locally (words={word_count} < 20)")
             return None
+        
+        logger.info(f"✅ LOCAL_FILTER_PASS: Group {time_range} passed local filter, sending to LLM")
         
         # Load completion prompt template
         with open("src/nirva_service/prompts/process_completed.md", "r") as f:
@@ -588,12 +603,16 @@ class IncrementalAnalyzer:
         prompt = inject_user_context(prompt, username)
         
         # Call LLM for completion analysis
+        logger.info(f"🤖 Sending group {time_range} to LLM for analysis...")
         response = await self._call_llm_structured(prompt, CompletedEventOutput, username)
         
         # Check if should be dropped
         if hasattr(response, 'should_drop') and response.should_drop:
-            logger.info(f"LLM decided to drop completed event: {getattr(response, 'drop_reason', 'No reason given')}")
+            drop_reason = getattr(response, 'drop_reason', 'No reason given')
+            logger.info(f"❌ LLM_DROP: Group {time_range} dropped by LLM - {drop_reason}")
             return None
+        
+        logger.info(f"✅ LLM_ACCEPT: Group {time_range} accepted by LLM, creating event")
         
         # Create completed EventAnalysis object
         event = EventAnalysis(
