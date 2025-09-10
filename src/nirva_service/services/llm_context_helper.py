@@ -27,29 +27,37 @@ def inject_user_context(prompt: str, username: str) -> str:
         context = nirva_service.db.redis_user_context.get_user_context(username)
         
         if not context:
-            logger.debug(f"No context found for user {username}, using original prompt")
+            logger.warning(f"🚨 TIMEZONE_DEBUG: No context found for user {username}, using original prompt")
             return prompt
         
         timezone_str = context.get("timezone", "UTC")
+        logger.info(f"🔍 TIMEZONE_DEBUG: Retrieved context for user {username}: {context}")
+        
+        # Validate timezone format
+        if timezone_str in ["PDT", "PST", "EDT", "EST"]:  # Common abbreviations that should be IANA
+            logger.error(f"🚨 TIMEZONE_DEBUG: Invalid timezone abbreviation '{timezone_str}' for user {username}. Should be IANA format (e.g., 'America/Los_Angeles')")
         
         # Get current time in user's timezone (timezone should already be normalized)
         try:
             tz = pytz.timezone(timezone_str)
             local_time = datetime.now(tz)
             
-            # Format local time context
+            # Format local time context with more detailed information
             time_context = (
-                f"Current local time for user: {local_time.strftime('%Y-%m-%d %H:%M:%S %Z')}\n\n"
+                f"Current local time for user: {local_time.strftime('%Y-%m-%d %H:%M:%S %Z')}\n"
+                f"(Time zone: {timezone_str}, Hour: {local_time.hour})\n\n"
             )
             
             # Prepend context to prompt
             enhanced_prompt = time_context + prompt
             
-            logger.debug(f"Injected time context for user {username}: {timezone_str}")
+            logger.info(f"✅ TIMEZONE_DEBUG: Successfully injected time context for user {username}")
+            logger.info(f"📍 TIMEZONE_DEBUG: Timezone: {timezone_str}, Local time: {local_time.strftime('%H:%M:%S')}, Hour: {local_time.hour}")
+            
             return enhanced_prompt
             
         except pytz.exceptions.UnknownTimeZoneError:
-            logger.warning(f"Unknown timezone {timezone_str} for user {username}")
+            logger.error(f"🚨 TIMEZONE_DEBUG: Unknown timezone '{timezone_str}' for user {username}. Context: {context}")
             return prompt
             
     except Exception as e:

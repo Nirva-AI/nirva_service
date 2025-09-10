@@ -185,6 +185,62 @@ async def update_context(
     }
 
 
+@login_router.get(path="/debug_context/v1/")
+async def debug_context(
+    username: str = Depends(get_authenticated_user),
+) -> Dict[str, Any]:
+    """Debug endpoint to check user's current timezone context and time."""
+    import pytz
+    from datetime import datetime
+    
+    # Get stored context
+    context = nirva_service.db.redis_user_context.get_user_context(username)
+    
+    if not context:
+        return {
+            "status": "error",
+            "message": "No context found for user",
+            "username": username,
+        }
+    
+    timezone_str = context.get("timezone", "UTC")
+    
+    # Get current time in user's timezone
+    try:
+        tz = pytz.timezone(timezone_str)
+        local_time = datetime.now(tz)
+        utc_time = datetime.utcnow()
+        
+        return {
+            "status": "success",
+            "username": username,
+            "stored_context": context,
+            "timezone_validation": {
+                "timezone": timezone_str,
+                "is_valid_iana": timezone_str in pytz.all_timezones,
+                "is_abbreviation": timezone_str in ["PDT", "PST", "EDT", "EST", "CDT", "CST", "MDT", "MST"],
+            },
+            "time_info": {
+                "utc_time": utc_time.strftime("%Y-%m-%d %H:%M:%S UTC"),
+                "local_time": local_time.strftime("%Y-%m-%d %H:%M:%S %Z"),
+                "local_hour": local_time.hour,
+                "meal_time_context": {
+                    "is_breakfast_time": 6 <= local_time.hour <= 10,
+                    "is_lunch_time": 11 <= local_time.hour <= 14,
+                    "is_dinner_time": 17 <= local_time.hour <= 21,
+                },
+            },
+        }
+        
+    except pytz.exceptions.UnknownTimeZoneError:
+        return {
+            "status": "error",
+            "message": f"Unknown timezone: {timezone_str}",
+            "username": username,
+            "stored_context": context,
+        }
+
+
 ###################################################################################################################################################################
 ###################################################################################################################################################################
 ###################################################################################################################################################################

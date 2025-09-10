@@ -594,6 +594,10 @@ class IncrementalAnalyzer:
         # Inject user context
         prompt = inject_user_context(prompt, username)
         
+        # Log the final prompt being sent to LLM for debugging
+        logger.info(f"🔍 PROMPT_DEBUG: Final prompt for group {time_range} (first 300 chars):")
+        logger.info(f"📄 PROMPT_DEBUG: {prompt[:300]}...")
+        
         # Call LLM for completion analysis
         logger.info(f"🤖 Sending group {time_range} to LLM for analysis...")
         response = await self._call_llm_structured(prompt, CompletedEventOutput, username)
@@ -643,6 +647,13 @@ class IncrementalAnalyzer:
         client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
         try:
+            # Prepare enhanced prompt with user context
+            enhanced_prompt = inject_user_context(prompt, username)
+            
+            # Log the full prompt being sent to LLM for debugging
+            logger.info(f"🔍 LLM_PROMPT_DEBUG: Sending prompt to {response_model.__name__} (first 400 chars):")
+            logger.info(f"📄 LLM_PROMPT_DEBUG: {enhanced_prompt[:400]}...")
+            
             # Use the latest structured output API with parse method
             completion = await client.beta.chat.completions.parse(
                 model="gpt-4.1",  # Latest model supporting structured outputs
@@ -651,7 +662,7 @@ class IncrementalAnalyzer:
                         "role": "system",
                         "content": "You are an AI assistant that analyzes transcripts and returns structured data.",
                     },
-                    {"role": "user", "content": inject_user_context(prompt, username)},
+                    {"role": "user", "content": enhanced_prompt},
                 ],
                 response_format=response_model,
                 temperature=0.1,
