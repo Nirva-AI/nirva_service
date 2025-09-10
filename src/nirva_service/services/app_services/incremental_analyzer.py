@@ -532,11 +532,6 @@ class IncrementalAnalyzer:
         logger.info(f"🤖 Sending ongoing event {ongoing_event.event_id} to LLM for completion...")
         response = await self._call_llm_structured(prompt, CompletedEventOutput, username)
         
-        # Check if LLM recommends dropping
-        if response.should_drop:
-            logger.info(f"❌ LLM_DROP: Ongoing event {ongoing_event.event_id} dropped by LLM - {response.drop_reason}")
-            return None  # Signal to drop
-        
         logger.info(f"✅ LLM_ACCEPT: Ongoing event {ongoing_event.event_id} accepted by LLM, completing event")
 
         # Update event with completed data
@@ -605,12 +600,6 @@ class IncrementalAnalyzer:
         # Call LLM for completion analysis
         logger.info(f"🤖 Sending group {time_range} to LLM for analysis...")
         response = await self._call_llm_structured(prompt, CompletedEventOutput, username)
-        
-        # Check if should be dropped
-        if hasattr(response, 'should_drop') and response.should_drop:
-            drop_reason = getattr(response, 'drop_reason', 'No reason given')
-            logger.info(f"❌ LLM_DROP: Group {time_range} dropped by LLM - {drop_reason}")
-            return None
         
         logger.info(f"✅ LLM_ACCEPT: Group {time_range} accepted by LLM, creating event")
         

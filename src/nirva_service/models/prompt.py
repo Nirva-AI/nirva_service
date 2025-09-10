@@ -76,9 +76,9 @@ class EventAnalysis(BaseModel):
     )
 
     # New fields for ongoing/completed event processing
-    event_status: Literal["ongoing", "completed", "dropped"] = Field(
+    event_status: Literal["ongoing", "completed"] = Field(
         default="completed",
-        description="Status of the event - 'ongoing' if still being processed, 'completed' when finalized, 'dropped' if insufficient content",
+        description="Status of the event - 'ongoing' if still being processed, 'completed' when finalized",
     )
     event_story: Optional[str] = Field(
         default=None,
@@ -126,16 +126,6 @@ class OngoingEventOutput(BaseModel):
 class CompletedEventOutput(BaseModel):
     """LLM output structure for completed events"""
 
-    # Quality assessment fields
-    should_drop: bool = Field(
-        default=False,
-        description="Whether this event should be dropped due to low quality/meaningless content"
-    )
-    drop_reason: Optional[str] = Field(
-        default=None,
-        description="Explanation of why the event should be dropped (only if should_drop is True)"
-    )
-    
     event_title: str = Field(
         description="Final, polished title of the completed event (5-10 words)"
     )
