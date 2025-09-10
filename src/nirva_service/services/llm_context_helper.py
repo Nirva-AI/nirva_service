@@ -27,15 +27,14 @@ def inject_user_context(prompt: str, username: str) -> str:
         context = nirva_service.db.redis_user_context.get_user_context(username)
         
         if not context:
-            logger.warning(f"🚨 TIMEZONE_DEBUG: No context found for user {username}, using original prompt")
+            logger.warning(f"No context found for user {username}, using original prompt")
             return prompt
         
         timezone_str = context.get("timezone", "UTC")
-        logger.info(f"🔍 TIMEZONE_DEBUG: Retrieved context for user {username}: {context}")
         
         # Validate timezone format
         if timezone_str in ["PDT", "PST", "EDT", "EST"]:  # Common abbreviations that should be IANA
-            logger.error(f"🚨 TIMEZONE_DEBUG: Invalid timezone abbreviation '{timezone_str}' for user {username}. Should be IANA format (e.g., 'America/Los_Angeles')")
+            logger.warning(f"Invalid timezone abbreviation '{timezone_str}' for user {username}. Should be IANA format (e.g., 'America/Los_Angeles')")
         
         # Get current time in user's timezone (timezone should already be normalized)
         try:
@@ -51,13 +50,11 @@ def inject_user_context(prompt: str, username: str) -> str:
             # Prepend context to prompt
             enhanced_prompt = time_context + prompt
             
-            logger.info(f"✅ TIMEZONE_DEBUG: Successfully injected time context for user {username}")
-            logger.info(f"📍 TIMEZONE_DEBUG: Timezone: {timezone_str}, Local time: {local_time.strftime('%H:%M:%S')}, Hour: {local_time.hour}")
             
             return enhanced_prompt
             
         except pytz.exceptions.UnknownTimeZoneError:
-            logger.error(f"🚨 TIMEZONE_DEBUG: Unknown timezone '{timezone_str}' for user {username}. Context: {context}")
+            logger.error(f"Unknown timezone '{timezone_str}' for user {username}. Context: {context}")
             return prompt
             
     except Exception as e:
