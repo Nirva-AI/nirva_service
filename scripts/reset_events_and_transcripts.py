@@ -14,9 +14,16 @@ import sys
 import argparse
 from datetime import datetime
 import pytz
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+script_dir = os.path.dirname(__file__)
+project_root = os.path.join(script_dir, '..')
+env_path = os.path.join(project_root, '.env')
+load_dotenv(env_path)
 
 # Add src to path so we can import nirva modules
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.append(os.path.join(project_root, 'src'))
 
 from nirva_service.db.pgsql_client import SessionLocal
 from nirva_service.db.pgsql_object import EventDB, TranscriptionResultDB
