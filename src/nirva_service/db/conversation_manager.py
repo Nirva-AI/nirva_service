@@ -123,6 +123,116 @@ class ConversationManager:
             logger.debug(f"Added {role} message to conversation for user {user_id}")
             return message
     
+    def add_voice_message(
+        self,
+        user_id: UUID,
+        role: MessageRole,
+        content: str,
+        call_type: str = "voice_message",
+        call_session_id: Optional[UUID] = None,
+        audio_file_id: Optional[UUID] = None,
+        duration_seconds: Optional[float] = None,
+        transcription_text: Optional[str] = None,
+        transcription_confidence: Optional[float] = None,
+        real_time_processing: bool = False,
+        voice_analysis: Optional[Dict[str, Any]] = None,
+        message_metadata: Optional[Dict[str, Any]] = None,
+        context_snapshot: Optional[Dict[str, Any]] = None,
+        response_time_ms: Optional[int] = None
+    ) -> Tuple[ChatMessageDB, VoiceMessageDB]:
+        """
+        Add a voice message to the user's conversation.
+        
+        Returns both the chat message and voice message metadata.
+        """
+        with SessionLocal() as db:
+            # Add the regular chat message first
+            message = self._add_message_in_session(
+                db=db,
+                user_id=user_id,
+                role=role,
+                content=content,
+                message_type=MessageType.VOICE,
+                message_metadata=message_metadata,
+                context_snapshot=context_snapshot,
+                response_time_ms=response_time_ms
+            )
+            
+            # Create voice message metadata
+            voice_message = VoiceMessageDB(
+                message_id=message.id,
+                audio_file_id=audio_file_id,
+                call_type=call_type,
+                call_session_id=call_session_id,
+                duration_seconds=duration_seconds,
+                transcription_text=transcription_text or content,
+                transcription_confidence=transcription_confidence,
+                real_time_processing=real_time_processing,
+                voice_analysis=voice_analysis or {},
+                processing_status="completed" if transcription_text else "pending"
+            )
+            
+            db.add(voice_message)
+            db.commit()
+            db.refresh(voice_message)
+            
+            logger.debug(f"Added voice message ({call_type}) to conversation for user {user_id}")
+            return message, voice_message
+    
+    def _add_message_in_session(
+        self,
+        db: Session,
+        user_id: UUID,
+        role: MessageRole,
+        content: str,
+        message_type: MessageType = MessageType.TEXT,
+        attachments: Optional[List[Dict[str, Any]]] = None,
+        message_metadata: Optional[Dict[str, Any]] = None,
+        context_snapshot: Optional[Dict[str, Any]] = None,
+        response_time_ms: Optional[int] = None
+    ) -> ChatMessageDB:
+        """
+        Add a message within an existing database session.
+        Helper method for complex operations like voice messages.
+        """
+        # Ensure conversation exists in this session
+        conversation = db.query(UserConversationDB).filter(
+            UserConversationDB.user_id == user_id
+        ).first()
+        
+        if not conversation:
+            # Create new conversation in this session
+            conversation = UserConversationDB(
+                user_id=user_id,
+                title="Chat with Nirva",
+                total_messages=0,
+                personality_settings={},
+                conversation_summary=""
+            )
+            db.add(conversation)
+            db.flush()  # Ensure it's in the session
+        
+        # Create new message
+        message = ChatMessageDB(
+            user_id=user_id,
+            role=role,
+            content=content,
+            message_type=message_type,
+            attachments=attachments or [],
+            message_metadata=message_metadata or {},
+            context_snapshot=context_snapshot or {},
+            response_time_ms=response_time_ms
+        )
+        
+        db.add(message)
+        
+        # Update conversation metadata
+        conversation.total_messages += 1
+        conversation.last_activity = datetime.now(timezone.utc)
+        conversation.updated_at = datetime.now(timezone.utc)
+        
+        return message
+    
     def get_conversation_history(
         self,
         user_id: UUID,

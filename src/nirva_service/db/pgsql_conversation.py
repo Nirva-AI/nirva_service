@@ -10,7 +10,7 @@ from typing import Optional, List, Dict, Any
 from uuid import UUID, uuid4
 from enum import Enum
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, func, JSON, Integer, Index
+from sqlalchemy import DateTime, ForeignKey, String, Text, func, JSON, Integer, Index, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship, foreign
 
 from .pgsql_object import Base, UUIDBase
@@ -222,7 +222,7 @@ class MessageReactionDB(UUIDBase):
 # Voice message metadata (for voice message type)
 class VoiceMessageDB(UUIDBase):
     """
-    Extended metadata for voice messages
+    Extended metadata for voice messages and live voice calls
     """
     __tablename__ = "voice_messages"
     
@@ -236,15 +236,34 @@ class VoiceMessageDB(UUIDBase):
         ForeignKey("audio_files.id"), nullable=True, index=True
     )
     
+    # Voice message type and session info
+    call_type: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="voice_message"
+    )  # voice_message, live_call, call_segment
+    
+    call_session_id: Mapped[Optional[UUID]] = mapped_column(
+        nullable=True, index=True
+    )  # Groups related call segments together
+    
     # Voice message metadata
     duration_seconds: Mapped[Optional[float]] = mapped_column(nullable=True)
     transcription_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     transcription_confidence: Mapped[Optional[float]] = mapped_column(nullable=True)
     
+    # Real-time processing flags
+    real_time_processing: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )  # True for live calls, False for post-processing
+    
     # Processing status
     processing_status: Mapped[str] = mapped_column(
         String(20), nullable=False, default="pending"
     )  # pending, processing, completed, failed
+    
+    # Voice analysis metadata
+    voice_analysis: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+        JSON, default=dict, nullable=True
+    )  # Tone, emotion, background noise, etc.
     
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(

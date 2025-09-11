@@ -1,17 +1,18 @@
 """
-Enhanced Chat Actions - Advanced Nirva Chat System
+Voice Chat Actions - Voice Message and Call Endpoints
 
-This module implements the enhanced chat endpoints that use persistent conversation storage
-and context awareness, replacing the previous stateless chat system.
+This module implements voice message endpoints that integrate with the enhanced chat system,
+supporting both standalone voice messages and real-time voice calls.
 """
 
 import datetime
 import uuid
 from typing import List, Optional, Dict, Any
 from uuid import UUID
+import io
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi.responses import StreamingResponse
 from loguru import logger
 
 import nirva_service.db.redis_user
@@ -36,13 +37,14 @@ from nirva_service.db.pgsql_conversation import (
 )
 from nirva_service.services.mental_state_service import MentalStateCalculator
 from nirva_service.db.pgsql_events import get_events_in_range
+from nirva_service.services.audio_processing.deepgram_service import get_deepgram_service
 from nirva_service.services.conversation_context_manager import conversation_context_manager
 
 from .app_service_server import AppserviceServerInstance
 from .oauth_user import get_authenticated_user
 
 ###################################################################################################################################################################
-enhanced_chat_router = APIRouter()
+voice_chat_router = APIRouter()
 
 
 ###################################################################################################################################################################
@@ -61,27 +63,14 @@ def _get_user_id_from_username(username: str) -> UUID:
         )
 
 
-def _convert_api_role_to_db_role(api_role: MessageRole) -> DBMessageRole:
-    """
-    Convert API message role to database message role.
-    """
-    if api_role == MessageRole.SYSTEM:
-        return DBMessageRole.SYSTEM
-    elif api_role == MessageRole.HUMAN:
-        return DBMessageRole.HUMAN
-    elif api_role == MessageRole.AI:
-        return DBMessageRole.AI
-    else:
-        raise ValueError(f"Unknown message role: {api_role}")
-
-
-def _build_context_snapshot(
+def _build_voice_context_snapshot(
     username: str,
     display_name: str,
-    user_id: UUID
+    user_id: UUID,
+    voice_analysis: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
-    Build context snapshot for the message including mental state and recent events.
+    Build context snapshot for voice messages including mental state and voice analysis.
     """
     current_time = datetime.datetime.now(datetime.timezone.utc)
     context = {
@@ -90,7 +79,12 @@ def _build_context_snapshot(
         "timestamp": current_time.isoformat(),
         "mental_state_available": False,
         "recent_events_available": False,
+        "voice_message": True,
     }
+    
+    # Add voice analysis if available
+    if voice_analysis:
+        context["voice_analysis"] = voice_analysis
     
     try:
         # Get current mental state
@@ -157,61 +151,35 @@ def _build_context_snapshot(
     return context
 
 
-def _assemble_conversation_history_for_ai(
-    conversation_history: List[ChatMessage],
-    system_message_content: str,
-    max_messages: int = 20
-) -> RequestTaskMessageListType:
-    """
-    Assemble conversation history for AI processing.
-    Takes recent messages and adds system message.
-    """
-    ret_messages: RequestTaskMessageListType = []
-    
-    # Add system message first
-    ret_messages.append(SystemMessage(content=system_message_content))
-    
-    # Add recent conversation history (limit to avoid context overflow)
-    recent_messages = conversation_history[-max_messages:] if len(conversation_history) > max_messages else conversation_history
-    
-    for msg in recent_messages:
-        if msg.role == MessageRole.SYSTEM:
-            # Skip additional system messages to avoid duplicates
-            continue
-        elif msg.role == MessageRole.HUMAN:
-            ret_messages.append(HumanMessage(content=msg.content))
-        elif msg.role == MessageRole.AI:
-            ret_messages.append(AIMessage(content=msg.content))
-
-    return ret_messages
-
-
 ###################################################################################################################################################################
 ###################################################################################################################################################################
 ###################################################################################################################################################################
-@enhanced_chat_router.post(path="/action/chat/v2/", response_model=ChatActionResponse)
-async def handle_enhanced_chat_action(
-    request_data: ChatActionRequest,
+@voice_chat_router.post(path="/voice/message/", response_model=ChatActionResponse)
+async def handle_voice_message(
     appservice_server: AppserviceServerInstance,
     authenticated_user: str = Depends(get_authenticated_user),
+    audio_file: UploadFile = File(...),
+    call_type: str = Form(default="voice_message"),
+    call_session_id: Optional[str] = Form(default=None),
 ) -> ChatActionResponse:
     """
-    Enhanced chat endpoint with persistent conversation storage and context awareness.
+    Handle voice message upload with transcription and AI response.
     
-    This replaces the v1 chat endpoint with:
-    - Persistent conversation storage (single conversation per user)
-    - Server-side conversation history management
-    - Context awareness (mental state, recent events)
-    - Improved error handling and logging
+    This endpoint:
+    1. Accepts audio file upload
+    2. Transcribes audio using Deepgram
+    3. Processes with enhanced chat brain (same as text chat)
+    4. Returns AI response
+    5. Stores both voice message and AI response in conversation
     """
-    logger.info(f"/action/chat/v2/: user={authenticated_user}, content_length={len(request_data.human_message.content)}")
+    logger.info(f"/voice/message/: user={authenticated_user}, file={audio_file.filename}, call_type={call_type}")
 
     try:
         # Validate input
-        if len(request_data.human_message.content.strip()) == 0:
+        if not audio_file.content_type or not audio_file.content_type.startswith('audio/'):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Message content cannot be empty",
+                detail="File must be an audio file",
             )
 
         # Get user information
@@ -221,31 +189,80 @@ async def handle_enhanced_chat_action(
         if not display_name:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"User {authenticated_user} must set a display name before chatting",
+                detail=f"User {authenticated_user} must set a display name before using voice chat",
             )
 
-        # === STEP 1: Store the human message in persistent storage ===
-        logger.debug(f"Storing human message for user {authenticated_user}")
+        # === STEP 1: Transcribe audio ===
+        logger.debug(f"Transcribing audio for user {authenticated_user}")
         
-        context_snapshot = _build_context_snapshot(authenticated_user, display_name, user_id)
+        # Read audio file
+        audio_content = await audio_file.read()
         
-        human_message_db = conversation_manager.add_message(
+        # Get Deepgram service and transcribe
+        deepgram_service = get_deepgram_service()
+        transcription_result = await deepgram_service.transcribe_audio(audio_content)
+        
+        transcription_text = transcription_result.get('transcription', '')
+        confidence = transcription_result.get('confidence', 0.0)
+        voice_analysis = {
+            "sentiment_data": transcription_result.get('sentiment_data'),
+            "topics_data": transcription_result.get('topics_data'),
+            "intents_data": transcription_result.get('intents_data'),
+            "detected_language": transcription_result.get('language', 'en'),
+            "confidence": confidence
+        }
+        
+        if not transcription_text.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Could not transcribe audio - no speech detected",
+            )
+
+        logger.info(f"Transcription: '{transcription_text[:100]}...' (confidence: {confidence:.2f})")
+
+        # === STEP 2: Store voice message ===
+        logger.debug(f"Storing voice message for user {authenticated_user}")
+        
+        # Build context snapshot with voice analysis
+        context_snapshot = _build_voice_context_snapshot(
+            authenticated_user, 
+            display_name, 
+            user_id,
+            voice_analysis
+        )
+        
+        # Parse call_session_id if provided
+        parsed_call_session_id = None
+        if call_session_id:
+            try:
+                parsed_call_session_id = UUID(call_session_id)
+            except ValueError:
+                logger.warning(f"Invalid call_session_id format: {call_session_id}")
+
+        # Store voice message
+        human_message_db, voice_message_db = conversation_manager.add_voice_message(
             user_id=user_id,
             role=DBMessageRole.HUMAN,
-            content=request_data.human_message.content,
-            message_type=DBMessageType.TEXT,
+            content=transcription_text,
+            call_type=call_type,
+            call_session_id=parsed_call_session_id,
+            duration_seconds=voice_analysis.get('duration_seconds'),
+            transcription_text=transcription_text,
+            transcription_confidence=confidence,
+            real_time_processing=False,
+            voice_analysis=voice_analysis,
             message_metadata={
-                "client_id": request_data.human_message.id,
-                "client_timestamp": request_data.human_message.time_stamp,
-                "source": "mobile_app"
+                "original_filename": audio_file.filename,
+                "audio_content_type": audio_file.content_type,
+                "source": "voice_message_upload"
             },
             context_snapshot=context_snapshot
         )
 
-        # === STEP 2: Get conversation history for AI context ===
+        # === STEP 3: Get conversation history for AI context ===
         logger.debug(f"Retrieving conversation history for user {authenticated_user}")
         
-        # Get recent conversation history (we ignore client-provided history in favor of server truth)
+        # Get recent conversation history
         conversation_messages, total_count = conversation_manager.get_conversation_history(
             user_id=user_id,
             limit=50  # Last 50 messages for context
@@ -256,17 +273,10 @@ async def handle_enhanced_chat_action(
         
         logger.info(f"Using {len(api_messages)} messages from conversation history (total: {total_count})")
 
-        # === STEP 3: Prepare AI request ===
+        # === STEP 4: Process with AI ===
+        logger.debug(f"Processing AI request for voice message")
         
-        # Build enhanced prompt with user context
-        enhanced_prompt = builtin_prompt.user_session_chat_message(
-            username=authenticated_user,
-            display_name=display_name,
-            content=request_data.human_message.content,
-            date_time=request_data.human_message.time_stamp,
-        )
-
-        # === STEP 2.5: Get enhanced context from conversation memory ===
+        # === STEP 4.1: Get enhanced context from conversation memory ===
         enhanced_context = conversation_context_manager.get_enhanced_context_for_ai(user_id)
         
         # Merge enhanced context into context snapshot
@@ -275,6 +285,14 @@ async def handle_enhanced_chat_action(
             "personality_insights": enhanced_context.get("personality_insights", {}),
             "context_available": enhanced_context.get("context_available", {})
         })
+        
+        # Build enhanced prompt with voice context
+        enhanced_prompt = builtin_prompt.user_session_chat_message(
+            username=authenticated_user,
+            display_name=display_name,
+            content=f"[Voice Message] {transcription_text}",
+            date_time=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        )
 
         # System message with context awareness
         system_message_content = builtin_prompt.user_session_system_message(
@@ -284,18 +302,17 @@ async def handle_enhanced_chat_action(
         )
 
         # Assemble conversation history for AI
+        from nirva_service.services.app_services.enhanced_chat_actions import _assemble_conversation_history_for_ai
         langchain_messages = _assemble_conversation_history_for_ai(
             api_messages,
             system_message_content,
             max_messages=20  # Limit context to prevent overflow
         )
 
-        # Add current user message
+        # Add current voice message
+        from langchain_core.messages import HumanMessage
         langchain_messages.append(HumanMessage(content=enhanced_prompt))
 
-        # === STEP 4: Process with AI ===
-        logger.debug(f"Processing AI request with {len(langchain_messages)} messages")
-        
         request_start_time = datetime.datetime.now(datetime.timezone.utc)
         
         request_task = LanggraphRequestTask(
@@ -324,7 +341,7 @@ async def handle_enhanced_chat_action(
         # Calculate response time
         response_time_ms = int((datetime.datetime.now(datetime.timezone.utc) - request_start_time).total_seconds() * 1000)
 
-        # === STEP 5: Store AI response in persistent storage ===
+        # === STEP 5: Store AI response ===
         logger.debug(f"Storing AI response for user {authenticated_user}")
         
         ai_response_content = request_task.last_response_message_content
@@ -336,9 +353,11 @@ async def handle_enhanced_chat_action(
             message_type=DBMessageType.TEXT,
             message_metadata={
                 "response_time_ms": response_time_ms,
-                "model_used": "gpt-4o-mini",  # TODO: Get from actual request
+                "model_used": "gpt-4o-mini",
                 "conversation_length": len(langchain_messages),
-                "source": "enhanced_chat_v2"
+                "source": "voice_message_response",
+                "responding_to_voice": True,
+                "voice_message_id": str(voice_message_db.id)
             },
             context_snapshot=context_snapshot,
             response_time_ms=response_time_ms
@@ -348,12 +367,12 @@ async def handle_enhanced_chat_action(
         logger.debug(f"Scheduling conversation memory update for user {authenticated_user}")
         
         try:
-            # Get the latest messages for context learning (human message + AI response)
+            # Get the latest messages for context learning (voice message + AI response)
             latest_messages = [
                 ChatMessage(
                     id=str(human_message_db.id),
                     role=MessageRole.HUMAN,
-                    content=request_data.human_message.content,
+                    content=f"[Voice Message] {transcription_text}",
                     time_stamp=human_message_db.timestamp.isoformat()
                 ),
                 ChatMessage(
@@ -382,13 +401,7 @@ async def handle_enhanced_chat_action(
         except Exception as e:
             logger.warning(f"Failed to schedule conversation memory update for {authenticated_user}: {e}")
 
-        # === STEP 7: Log conversation for debugging ===
-        if logger.level("DEBUG").no >= logger._core.min_level:
-            logger.debug("Full conversation context:")
-            for i, msg in enumerate(langchain_messages[-5:]):  # Last 5 messages for context
-                logger.debug(f"  [{i}] {msg.__class__.__name__}: {msg.content[:100]}...")
-
-        # === STEP 8: Return response ===
+        # === STEP 7: Return response ===
         response = ChatActionResponse(
             ai_message=ChatMessage(
                 id=str(ai_message_db.id),
@@ -398,7 +411,7 @@ async def handle_enhanced_chat_action(
             ),
         )
 
-        logger.info(f"Chat completed: user={authenticated_user}, response_time={response_time_ms}ms, human_msg_id={human_message_db.id}, ai_msg_id={ai_message_db.id}")
+        logger.info(f"Voice message completed: user={authenticated_user}, response_time={response_time_ms}ms, voice_msg_id={voice_message_db.id}, ai_msg_id={ai_message_db.id}")
         
         return response
 
@@ -406,110 +419,83 @@ async def handle_enhanced_chat_action(
         # Re-raise HTTP exceptions as-is
         raise
     except Exception as e:
-        logger.error(f"Chat request failed for user {authenticated_user}: {e}")
+        logger.error(f"Voice message processing failed for user {authenticated_user}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Chat processing failed: {str(e)}",
+            detail=f"Voice message processing failed: {str(e)}",
         )
 
 
 ###################################################################################################################################################################
-# Additional endpoints for conversation management
-###################################################################################################################################################################
-
-@enhanced_chat_router.get(path="/conversation/history/")
-async def get_conversation_history(
-    limit: int = 50,
+@voice_chat_router.get(path="/voice/history/")
+async def get_voice_conversation_history(
+    limit: int = 20,
     offset: int = 0,
+    call_type: Optional[str] = None,
     authenticated_user: str = Depends(get_authenticated_user),
 ):
     """
-    Get conversation history for the authenticated user.
+    Get voice message history for the authenticated user.
+    Optionally filter by call_type (voice_message, live_call, call_segment).
     """
     try:
         user_id = _get_user_id_from_username(authenticated_user)
         
+        # Get conversation history filtered by voice messages
+        from nirva_service.db.pgsql_conversation import MessageType
         messages, total_count = conversation_manager.get_conversation_history(
             user_id=user_id,
             limit=limit,
-            offset=offset
+            offset=offset,
+            message_types=[MessageType.VOICE]
         )
+        
+        # TODO: Add call_type filtering if needed
         
         api_messages = conversation_manager.convert_to_api_messages(messages)
         
         return {
-            "messages": api_messages,
+            "voice_messages": api_messages,
             "total_count": total_count,
             "limit": limit,
             "offset": offset,
-            "has_more": (offset + len(messages)) < total_count
+            "has_more": (offset + len(messages)) < total_count,
+            "call_type_filter": call_type
         }
         
     except Exception as e:
-        logger.error(f"Failed to get conversation history for {authenticated_user}: {e}")
+        logger.error(f"Failed to get voice conversation history for {authenticated_user}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retrieve conversation history: {str(e)}"
+            detail=f"Failed to retrieve voice conversation history: {str(e)}"
         )
 
 
-@enhanced_chat_router.get(path="/conversation/stats/")
-async def get_conversation_stats(
+###################################################################################################################################################################
+@voice_chat_router.get(path="/voice/sessions/")
+async def get_voice_call_sessions(
+    limit: int = 10,
     authenticated_user: str = Depends(get_authenticated_user),
 ):
     """
-    Get conversation statistics for the authenticated user.
+    Get voice call sessions for the authenticated user.
+    Groups voice messages by call_session_id.
     """
     try:
         user_id = _get_user_id_from_username(authenticated_user)
-        stats = conversation_manager.get_conversation_stats(user_id)
-        return stats
         
-    except Exception as e:
-        logger.error(f"Failed to get conversation stats for {authenticated_user}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retrieve conversation statistics: {str(e)}"
-        )
-
-
-@enhanced_chat_router.post(path="/conversation/search/")
-async def search_conversation(
-    query: str,
-    limit: int = 20,
-    authenticated_user: str = Depends(get_authenticated_user),
-):
-    """
-    Search conversation history for the authenticated user.
-    """
-    try:
-        if len(query.strip()) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Search query cannot be empty"
-            )
-            
-        user_id = _get_user_id_from_username(authenticated_user)
-        
-        messages = conversation_manager.search_messages(
-            user_id=user_id,
-            query=query,
-            limit=limit
-        )
-        
-        api_messages = conversation_manager.convert_to_api_messages(messages)
+        # TODO: Implement call session grouping
+        # For now, return placeholder
         
         return {
-            "messages": api_messages,
-            "query": query,
-            "result_count": len(api_messages)
+            "call_sessions": [],
+            "total_sessions": 0,
+            "limit": limit
         }
         
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.error(f"Failed to search conversation for {authenticated_user}: {e}")
+        logger.error(f"Failed to get voice call sessions for {authenticated_user}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to search conversation: {str(e)}"
+            detail=f"Failed to retrieve voice call sessions: {str(e)}"
         )

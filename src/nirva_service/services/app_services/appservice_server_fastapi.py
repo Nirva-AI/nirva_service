@@ -9,6 +9,7 @@ from .analyze_actions import analyze_action_router
 from .audio_download import audio_download_router
 from .chat_actions import chat_action_router
 from .enhanced_chat_actions import enhanced_chat_router
+from .voice_chat_actions import voice_chat_router
 from .login import login_router
 from .url_config import url_config_router
 from .upload_auth import upload_auth_router
@@ -44,6 +45,7 @@ app.include_router(router=url_config_router)
 app.include_router(router=login_router)
 app.include_router(router=chat_action_router)
 app.include_router(router=enhanced_chat_router)  # Enhanced chat with persistence
+app.include_router(router=voice_chat_router)  # Voice message and call endpoints
 app.include_router(router=analyze_action_router)
 app.include_router(router=upload_auth_router)
 app.include_router(router=transcription_router)
