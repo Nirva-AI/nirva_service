@@ -278,7 +278,7 @@ class MentalStateCalculator:
                 # Use actual event scores as deltas from neutral (1-100 scale)
                 energy_delta = event.energy_level - 55  # Neutral is 55 for energy
                 stress_delta = (event.stress_level - 42) * 0.75  # Neutral is 42 for stress, dampened
-                mood_delta = event.mood_level - 62  # Neutral is 62 for mood
+                mood_delta = event.mood_score - 62  # Neutral is 62 for mood
             
             # Lingering effects after event
             elif event.end_timestamp < timestamp:
@@ -290,7 +290,7 @@ class MentalStateCalculator:
                 
                 energy_impact = (event.energy_level - 55) * energy_decay  # 1-100 scale
                 stress_impact = (event.stress_level - 42) * 0.75 * stress_decay  # 1-100 scale, dampened
-                mood_impact = (event.mood_level - 62) * 0.8 * stress_decay  # 1-100 scale, gentle decay
+                mood_impact = (event.mood_score - 62) * 0.8 * stress_decay  # 1-100 scale, gentle decay
                 
                 # Apply impacts
                 energy_delta += energy_impact
