@@ -17,6 +17,10 @@ from .pgsql_journal_file import *
 from .pgsql_object import *
 from .pgsql_user import *
 
+# Import advanced chat system components
+from .pgsql_conversation import *
+from .conversation_manager import *
+
 # Import main database components
 from .redis_client import *
 from .redis_task import *
