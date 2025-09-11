@@ -26,13 +26,16 @@ async def get_url_config(
             "login": base + "login/v1/",
             "refresh": base + "refresh/v1/",
             "logout": base + "logout/v1/",
-            "chat": base + "action/chat/v1/",
+            "chat": base + "action/chat/v2/",
             "analyze": base + "action/analyze/v1/",
             "upload_transcript": base + "action/upload_transcript/v1/",
             "task_status": base + "action/task/status/v1/{task_id}/",
             "get_journal_file": base + "action/get_journal_file/v1/{time_stamp}/",
             "get_events": base + "action/analyze/events/get/v1/",
             "incremental_analyze": base + "action/analyze/incremental/v1/",
+            "conversation_history": base + "conversation/history/",
+            "conversation_stats": base + "conversation/stats/",
+            "conversation_search": base + "conversation/search/",
         },
     )
 

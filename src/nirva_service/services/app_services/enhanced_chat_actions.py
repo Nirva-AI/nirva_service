@@ -10,7 +10,7 @@ import uuid
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Form
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from loguru import logger
 
@@ -475,8 +475,8 @@ async def get_conversation_stats(
 
 @enhanced_chat_router.post(path="/conversation/search/")
 async def search_conversation(
-    query: str,
-    limit: int = 20,
+    query: str = Form(...),
+    limit: int = Form(20),
     authenticated_user: str = Depends(get_authenticated_user),
 ):
     """

@@ -15,6 +15,7 @@ class MentalStatePoint(BaseModel):
     timestamp: datetime = Field(description="Timestamp of the measurement")
     energy_score: float = Field(ge=0, le=100, description="Energy level from 0-100")
     stress_score: float = Field(ge=0, le=100, description="Stress level from 0-100")
+    mood_score: float = Field(ge=0, le=100, description="Mood level from 0-100")
     confidence: float = Field(ge=0, le=1, default=0.5, description="Confidence in the scores")
     data_source: Literal["event", "interpolated", "baseline"] = Field(
         description="Source of the data point"
@@ -28,8 +29,10 @@ class DailyMentalStateStats(BaseModel):
     """Daily statistics for mental state."""
     avg_energy: float = Field(description="Average energy for the day")
     avg_stress: float = Field(description="Average stress for the day")
+    avg_mood: float = Field(description="Average mood for the day")
     peak_energy_time: str = Field(description="Time of peak energy")
     peak_stress_time: str = Field(description="Time of peak stress")
+    peak_mood_time: str = Field(description="Time of peak mood")
     optimal_state_minutes: int = Field(description="Minutes spent in optimal state (high energy, low stress)")
     burnout_risk_minutes: int = Field(description="Minutes spent in burnout risk state (low energy, high stress)")
     recovery_periods: int = Field(description="Number of recovery periods detected")

@@ -128,10 +128,10 @@ class MentalStateCalculator:
         3. Personal adjustments (learned from user's history)
         """
         # Layer 1: Natural baseline
-        base_energy, base_stress = self.get_natural_baseline(timestamp)
+        base_energy, base_stress, base_mood = self.get_natural_baseline(timestamp)
         
         # Layer 2: Event impacts
-        energy_delta, stress_delta, event_id = self.calculate_event_impacts(
+        energy_delta, stress_delta, mood_delta, event_id = self.calculate_event_impacts(
             username, timestamp
         )
         
@@ -141,18 +141,20 @@ class MentalStateCalculator:
         # Combine layers
         final_energy = base_energy + energy_delta + personal_adj['energy']
         final_stress = base_stress + stress_delta + personal_adj['stress']
+        final_mood = base_mood + mood_delta + personal_adj.get('mood', 0)
         
         # Apply interaction effects
-        final_energy, final_stress = self.apply_interaction_effects(
-            final_energy, final_stress
+        final_energy, final_stress, final_mood = self.apply_interaction_effects(
+            final_energy, final_stress, final_mood
         )
         
         # Apply stress smoothing to prevent sharp transitions
         final_stress = self._smooth_stress_transition(username, final_stress, timestamp)
         
-        # Clamp values to valid range (0-100 for energy, 8-100 for stress)
+        # Clamp values to valid range (0-100 for all scores)
         final_energy = max(0, min(100, final_energy))
         final_stress = max(8, min(100, final_stress))  # Minimum stress floor of 8
+        final_mood = max(0, min(100, final_mood))
         
         # Calculate confidence
         confidence = self.calculate_confidence(
@@ -163,22 +165,23 @@ class MentalStateCalculator:
         # Determine data source
         if event_id:
             data_source = "event"
-        elif abs(energy_delta) > 0.1 or abs(stress_delta) > 0.1:
+        elif abs(energy_delta) > 0.1 or abs(stress_delta) > 0.1 or abs(mood_delta) > 0.1:
             data_source = "interpolated"
         else:
             data_source = "baseline"
         
         return MentalStatePoint(
             timestamp=timestamp,
-            energy_score=round(final_energy, 0),  # Now 0-100 scale
-            stress_score=round(final_stress, 0),  # Now 0-100 scale
+            energy_score=round(final_energy, 0),  # 0-100 scale
+            stress_score=round(final_stress, 0),  # 0-100 scale
+            mood_score=round(final_mood, 0),      # 0-100 scale
             confidence=round(confidence, 2),
             data_source=data_source,
             event_id=event_id
         )
     
-    def get_natural_baseline(self, timestamp: datetime) -> Tuple[float, float]:
-        """Get universal human energy and stress patterns."""
+    def get_natural_baseline(self, timestamp: datetime) -> Tuple[float, float, float]:
+        """Get universal human energy, stress, and mood patterns."""
         hour = timestamp.hour + timestamp.minute / 60.0  # Decimal hour
         day_of_week = timestamp.weekday()
         
@@ -211,22 +214,40 @@ class MentalStateCalculator:
             23: 20   # Prepare for sleep
         }
         
+        # Daily mood pattern (0-100 scale) - correlates with energy but more stable
+        mood_curve = {
+            0: 45,   # Midnight - moderate
+            3: 40,   # Deep sleep - lower but not as low as energy
+            6: 50,   # Wake up - neutral
+            9: 70,   # Morning optimism
+            11: 75,  # Peak morning mood
+            13: 65,  # Post-lunch stable
+            14: 60,  # Slight afternoon dip
+            16: 70,  # Afternoon recovery
+            18: 65,  # Early evening satisfaction
+            20: 60,  # Evening content
+            21: 55,  # Wind down
+            23: 50   # Prepare for sleep
+        }
+        
         # Interpolate for exact hour
         base_energy = self._interpolate_curve(energy_curve, hour)
         base_stress = self._interpolate_curve(stress_curve, hour)
+        base_mood = self._interpolate_curve(mood_curve, hour)
         
         # Weekend adjustment
         if day_of_week >= 5:  # Saturday = 5, Sunday = 6
             base_stress *= 0.8  # 20% less stress (more gradual)
             base_energy *= 1.1  # 10% more energy
+            base_mood *= 1.15   # 15% better mood on weekends
         
-        return base_energy, base_stress
+        return base_energy, base_stress, base_mood
     
     def calculate_event_impacts(
         self, 
         username: str, 
         timestamp: datetime
-    ) -> Tuple[float, float, Optional[str]]:
+    ) -> Tuple[float, float, float, Optional[str]]:
         """Calculate how events affect mental state."""
         # Ensure timestamp is timezone-aware
         if timestamp.tzinfo is None:
@@ -244,6 +265,7 @@ class MentalStateCalculator:
         
         energy_delta = 0.0
         stress_delta = 0.0
+        mood_delta = 0.0
         current_event_id = None
         
         for event in events:
@@ -256,6 +278,7 @@ class MentalStateCalculator:
                 # Use actual event scores as deltas from neutral (1-100 scale)
                 energy_delta = event.energy_level - 55  # Neutral is 55 for energy
                 stress_delta = (event.stress_level - 42) * 0.75  # Neutral is 42 for stress, dampened
+                mood_delta = event.mood_level - 62  # Neutral is 62 for mood
             
             # Lingering effects after event
             elif event.end_timestamp < timestamp:
@@ -267,10 +290,12 @@ class MentalStateCalculator:
                 
                 energy_impact = (event.energy_level - 55) * energy_decay  # 1-100 scale
                 stress_impact = (event.stress_level - 42) * 0.75 * stress_decay  # 1-100 scale, dampened
+                mood_impact = (event.mood_level - 62) * 0.8 * stress_decay  # 1-100 scale, gentle decay
                 
                 # Apply impacts
                 energy_delta += energy_impact
                 stress_delta += stress_impact
+                mood_delta += mood_impact
             
             # Anticipation effects (upcoming events)
             elif event.start_timestamp > timestamp:
@@ -279,12 +304,15 @@ class MentalStateCalculator:
                     # Anticipation affects stress more than energy (1-100 scale)
                     if event.activity_type == 'work':
                         stress_delta += 5  # Add 5 stress points
+                        mood_delta -= 2  # Slight mood decrease
                     elif event.activity_type == 'social':
                         energy_delta += 3  # Add 3 energy points
+                        mood_delta += 4  # Social anticipation boosts mood
                         if event.interaction_dynamic == 'tense':
                             stress_delta += 4  # Add 4 stress points
+                            mood_delta -= 3  # Override positive mood anticipation
         
-        return energy_delta, stress_delta, current_event_id
+        return energy_delta, stress_delta, mood_delta, current_event_id
     
     def get_personal_adjustment(
         self, 
@@ -300,50 +328,74 @@ class MentalStateCalculator:
         )
         
         if len(historical_points) < 3:  # Need minimum data
-            return {'energy': 0, 'stress': 0}
+            return {'energy': 0, 'stress': 0, 'mood': 0}
         
         # Calculate how this user differs from baseline
         avg_energy = mean([p.energy_score for p in historical_points])
         avg_stress = mean([p.stress_score for p in historical_points])
+        avg_mood = mean([p.mood_score for p in historical_points])
         
-        expected_energy, expected_stress = self.get_natural_baseline(timestamp)
+        expected_energy, expected_stress, expected_mood = self.get_natural_baseline(timestamp)
         
         # Personal deviation from normal patterns (30% weight)
         energy_adjustment = (avg_energy - expected_energy) * 0.3
         stress_adjustment = (avg_stress - expected_stress) * 0.3
+        mood_adjustment = (avg_mood - expected_mood) * 0.3
         
         return {
             'energy': energy_adjustment,
-            'stress': stress_adjustment
+            'stress': stress_adjustment,
+            'mood': mood_adjustment
         }
     
     def apply_interaction_effects(
         self, 
         energy: float, 
-        stress: float
-    ) -> Tuple[float, float]:
-        """Apply feedback loops between energy and stress."""
-        # High stress drains energy (1-100 scale)
+        stress: float,
+        mood: float
+    ) -> Tuple[float, float, float]:
+        """Apply feedback loops between energy, stress, and mood."""
+        # High stress drains energy and mood (1-100 scale)
         if stress > 70:
             energy_drain = (stress - 70) * 0.3
+            mood_drain = (stress - 70) * 0.25  # Stress affects mood but less than energy
             energy -= energy_drain
+            mood -= mood_drain
         
-        # Very low energy increases stress vulnerability
+        # Very low energy increases stress vulnerability and dampens mood
         if energy < 30:
             stress_increase = (30 - energy) * 0.2
+            mood_decrease = (30 - energy) * 0.15
+            stress += stress_increase
+            mood -= mood_decrease
+        
+        # Good mood boosts energy and reduces stress
+        if mood > 75:
+            energy_boost = (mood - 75) * 0.2
+            stress_reduction = (mood - 75) * 0.15
+            energy += energy_boost
+            stress -= stress_reduction
+        
+        # Poor mood drains energy and increases stress vulnerability
+        if mood < 30:
+            energy_drain = (30 - mood) * 0.15
+            stress_increase = (30 - mood) * 0.1
+            energy -= energy_drain
             stress += stress_increase
         
-        # Optimal zone boost (high energy, low stress)
-        if energy > 70 and stress < 30:
+        # Optimal zone boost (high energy, low stress, good mood)
+        if energy > 70 and stress < 30 and mood > 65:
             energy *= 1.1  # 10% boost
-            stress *= 0.95  # 5% reduction (gentler)
+            stress *= 0.95  # 5% reduction
+            mood *= 1.05  # 5% mood boost
         
-        # Danger zone spiral (low energy, high stress)
-        if energy < 30 and stress > 70:
+        # Danger zone spiral (low energy, high stress, poor mood)
+        if energy < 30 and stress > 70 and mood < 40:
             energy *= 0.9  # 10% worse
             stress *= 1.1  # 10% worse
+            mood *= 0.95  # 5% worse
         
-        return energy, stress
+        return energy, stress, mood
     
     def calculate_confidence(
         self, 
