@@ -34,6 +34,8 @@ from nirva_service.db.pgsql_conversation import (
     MessageRole as DBMessageRole,
     MessageType as DBMessageType,
 )
+from nirva_service.services.mental_state_service import MentalStateCalculator
+from nirva_service.db.pgsql_events import get_events_in_range
 
 from .app_service_server import AppserviceServerInstance
 from .oauth_user import get_authenticated_user
@@ -78,16 +80,80 @@ def _build_context_snapshot(
     user_id: UUID
 ) -> Dict[str, Any]:
     """
-    Build context snapshot for the message.
-    This will be enhanced to include mental state and events.
+    Build context snapshot for the message including mental state and recent events.
     """
-    return {
+    current_time = datetime.datetime.now(datetime.timezone.utc)
+    context = {
         "username": username,
         "display_name": display_name,
-        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-        "mental_state_available": False,  # TODO: Integrate with mental state API
-        "recent_events_available": False,  # TODO: Integrate with events API
+        "timestamp": current_time.isoformat(),
+        "mental_state_available": False,
+        "recent_events_available": False,
     }
+    
+    try:
+        # Get current mental state
+        calculator = MentalStateCalculator()
+        
+        # Get the latest mental state point (last 2 hours)
+        start_time = current_time - datetime.timedelta(hours=2)
+        timeline = calculator.calculate_timeline(
+            username=username,
+            start_time=start_time,
+            interval_minutes=30,
+            end_time=current_time
+        )
+        
+        if timeline:
+            # Get the most recent mental state
+            latest_state = timeline[-1]
+            context.update({
+                "mental_state_available": True,
+                "current_energy": latest_state.energy_score,
+                "current_stress": latest_state.stress_score,
+                "mental_state_confidence": latest_state.confidence,
+                "mental_state_source": latest_state.data_source,
+                "mental_state_timestamp": latest_state.timestamp.isoformat(),
+            })
+            
+            logger.debug(f"Mental state for {username}: energy={latest_state.energy_score}, stress={latest_state.stress_score}")
+        
+    except Exception as e:
+        logger.warning(f"Failed to get mental state for {username}: {e}")
+    
+    try:
+        # Get recent events (last 24 hours)
+        end_time = current_time
+        start_time = current_time - datetime.timedelta(hours=24)
+        
+        recent_events = get_events_in_range(
+            username=username,
+            start_time=start_time,
+            end_time=end_time
+        )
+        
+        if recent_events:
+            context.update({
+                "recent_events_available": True,
+                "recent_events_count": len(recent_events),
+                "recent_events": [
+                    {
+                        "event_type": event.activity_type,
+                        "description": event.one_sentence_summary or event.event_summary,
+                        "energy_level": event.energy_level,
+                        "stress_level": event.stress_level,
+                        "timestamp": event.start_timestamp.isoformat() if event.start_timestamp else None,
+                    }
+                    for event in recent_events[:5]  # Limit to 5 most recent
+                ]
+            })
+            
+            logger.debug(f"Found {len(recent_events)} recent events for {username}")
+        
+    except Exception as e:
+        logger.warning(f"Failed to get recent events for {username}: {e}")
+    
+    return context
 
 
 def _assemble_conversation_history_for_ai(
@@ -203,6 +269,7 @@ async def handle_enhanced_chat_action(
         system_message_content = builtin_prompt.user_session_system_message(
             authenticated_user,
             display_name,
+            context_snapshot
         )
 
         # Assemble conversation history for AI

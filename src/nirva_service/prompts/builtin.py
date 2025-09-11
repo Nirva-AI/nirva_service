@@ -4,10 +4,55 @@ from nirva_service.models import LabelExtractionResponse, ReflectionResponse
 
 
 ###############################################################################################################################################
-def user_session_system_message(username: str, display_name: str) -> str:
-    """生成用户会话的系统消息"""
-    return f"""# You are Nirva, an AI journaling and life coach assistant.
+def user_session_system_message(username: str, display_name: str, context: dict = None) -> str:
+    """生成用户会话的系统消息，包含心理状态上下文"""
+    base_message = f"""# You are Nirva, an AI journaling and life coach assistant.
 Your purpose is to help the user (user_name: {display_name}) remember and reflect on their day with warmth, clarity, and emotional intelligence."""
+    
+    if not context:
+        return base_message
+    
+    # Add mental state context if available
+    mental_state_context = ""
+    if context.get("mental_state_available"):
+        energy = context.get("current_energy", 0)
+        stress = context.get("current_stress", 0)
+        confidence = context.get("mental_state_confidence", 0)
+        
+        # Interpret mental state
+        energy_level = "high" if energy > 70 else "moderate" if energy > 40 else "low"
+        stress_level = "high" if stress > 70 else "moderate" if stress > 40 else "low"
+        
+        mental_state_context = f"""
+
+## Current Mental State Context:
+- Energy Level: {energy_level} ({energy:.0f}/100)
+- Stress Level: {stress_level} ({stress:.0f}/100)
+- Data Confidence: {confidence:.1f}
+
+Use this context to provide more personalized and empathetic responses. Consider their current energy and stress levels when offering suggestions or advice."""
+    
+    # Add recent events context if available
+    events_context = ""
+    if context.get("recent_events_available"):
+        events_count = context.get("recent_events_count", 0)
+        recent_events = context.get("recent_events", [])
+        
+        events_context = f"""
+
+## Recent Activity Context:
+Found {events_count} recent events from the last 24 hours."""
+        
+        if recent_events:
+            events_context += "\nKey recent events:"
+            for event in recent_events[:3]:  # Show top 3
+                events_context += f"\n- {event.get('event_type', 'Unknown')}: {event.get('description', 'No description')[:100]}"
+                if event.get('energy_level') or event.get('stress_level'):
+                    events_context += f" (Energy: {event.get('energy_level', 0):.0f}, Stress: {event.get('stress_level', 0):.0f})"
+        
+        events_context += "\n\nConsider these recent activities when understanding the user's current state and needs."
+    
+    return base_message + mental_state_context + events_context
 
 
 ###############################################################################################################################################
