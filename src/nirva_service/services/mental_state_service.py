@@ -602,8 +602,10 @@ class MentalStateCalculator:
         return DailyMentalStateStats(
             avg_energy=50.0,  # Neutral on 1-100 scale
             avg_stress=50.0,  # Neutral on 1-100 scale
+            avg_mood=65.0,  # Neutral positive mood on 1-100 scale
             peak_energy_time="N/A",
             peak_stress_time="N/A",
+            peak_mood_time="N/A",
             optimal_state_minutes=0,
             burnout_risk_minutes=0,
             recovery_periods=0
@@ -618,8 +620,10 @@ class MentalStateCalculator:
             return DailyMentalStateStats(
                 avg_energy=0,
                 avg_stress=0,
+                avg_mood=0,
                 peak_energy_time="00:00",
                 peak_stress_time="00:00",
+                peak_mood_time="00:00",
                 optimal_state_minutes=0,
                 burnout_risk_minutes=0,
                 recovery_periods=0
@@ -627,10 +631,12 @@ class MentalStateCalculator:
         
         energies = [p.energy_score for p in points]
         stresses = [p.stress_score for p in points]
+        moods = [p.mood_score for p in points]
         
         # Find peaks
         peak_energy_idx = energies.index(max(energies))
         peak_stress_idx = stresses.index(max(stresses))
+        peak_mood_idx = moods.index(max(moods))
         
         # Count state minutes (each point represents 30 minutes)
         optimal_count = sum(1 for p in points if p.energy_score > 70 and p.stress_score < 30)
@@ -645,8 +651,10 @@ class MentalStateCalculator:
         return DailyMentalStateStats(
             avg_energy=round(mean(energies), 1),
             avg_stress=round(mean(stresses), 1),
+            avg_mood=round(mean(moods), 1),
             peak_energy_time=points[peak_energy_idx].timestamp.strftime("%H:%M"),
             peak_stress_time=points[peak_stress_idx].timestamp.strftime("%H:%M"),
+            peak_mood_time=points[peak_mood_idx].timestamp.strftime("%H:%M"),
             optimal_state_minutes=optimal_count * 30,
             burnout_risk_minutes=burnout_count * 30,
             recovery_periods=recovery_count
