@@ -223,7 +223,115 @@ Authorization: Bearer <your_jwt_token>
 
 ## 4. Chat Endpoints
 
-### 4.1 Chat Action
+### 4.1 Enhanced Chat v2 (Recommended)
+**Endpoint**: `POST /action/chat/v2/`  
+**Server**: AppService (Port 8000)
+
+**Features**:
+- Server-side conversation management
+- Persistent conversation storage
+- Context-aware AI responses
+- Mental state integration
+
+**Request Body**:
+```json
+{
+  "human_message": {
+    "id": "client-message-id",
+    "role": 1,
+    "content": "User message text",
+    "time_stamp": "2025-09-11T21:00:00"
+  },
+  "chat_history": []
+}
+```
+
+**Notes**: 
+- `chat_history` is always empty - server manages conversation persistence
+- Server automatically includes context (mental state, recent events, conversation memory)
+
+**Response**:
+```json
+{
+  "ai_message": {
+    "id": "server-generated-uuid",
+    "role": 2,
+    "content": "AI response with context awareness",
+    "time_stamp": "2025-09-12T05:06:12.627973+00:00",
+    "tags": null
+  }
+}
+```
+
+### 4.2 Conversation History
+**Endpoint**: `GET /conversation/history/`  
+**Server**: AppService (Port 8000)
+
+**Query Parameters**:
+- `limit` (optional): Number of messages to return (default: 50)
+- `offset` (optional): Number of messages to skip (default: 0)
+
+**Response**:
+```json
+{
+  "messages": [
+    {
+      "id": "message-uuid",
+      "role": 1,
+      "content": "Message content",
+      "time_stamp": "2025-09-12T05:02:00.638605+00:00",
+      "tags": null
+    }
+  ],
+  "total_count": 25,
+  "limit": 50,
+  "offset": 0,
+  "has_more": false
+}
+```
+
+### 4.3 Conversation Search
+**Endpoint**: `POST /conversation/search/`  
+**Server**: AppService (Port 8000)
+
+**Request Body** (Form Data):
+```
+query=search_term&limit=10
+```
+
+**Response**:
+```json
+{
+  "messages": [
+    {
+      "id": "message-uuid",
+      "role": 1,
+      "content": "Message containing search term",
+      "time_stamp": "2025-09-12T05:02:00.638605+00:00",
+      "tags": null
+    }
+  ],
+  "query": "search_term",
+  "result_count": 5
+}
+```
+
+### 4.4 Conversation Statistics
+**Endpoint**: `GET /conversation/stats/`  
+**Server**: AppService (Port 8000)
+
+**Response**:
+```json
+{
+  "total_messages": 25,
+  "first_message": "2025-09-12T05:02:00.638605+00:00",
+  "last_activity": "2025-09-12T05:06:12.627973+00:00",
+  "message_types": {"text": 25},
+  "created_at": "2025-09-12T05:02:00.638605+00:00"
+}
+```
+
+### 4.5 Legacy Chat v1 (Deprecated)
 **Endpoint**: `POST /action/chat/v1/`  
 **Server**: Chat Server (Port 8200)
 
@@ -261,6 +369,8 @@ Authorization: Bearer <your_jwt_token>
 }
 ```
 
+**Notes**: This endpoint is deprecated. Use Enhanced Chat v2 for new integrations.
+
 ## 5. Configuration Endpoints
 
 ### 5.1 Get URL Configuration
@@ -273,8 +383,15 @@ Authorization: Bearer <your_jwt_token>
   "api_version": "v1.0.0",
   "endpoints": {
     "analyze": "/action/analyze/v1/",
-    "chat": "/action/chat/v1/",
-    "login": "/login/v1/"
+    "chat": "/action/chat/v2/",
+    "login": "/login/v1/",
+    "conversation_history": "/conversation/history/",
+    "conversation_stats": "/conversation/stats/",
+    "conversation_search": "/conversation/search/",
+    "upload_transcript": "/action/upload_transcript/v1/",
+    "get_events": "/action/analyze/events/get/v1/",
+    "task_status": "/action/task/status/v1/{task_id}/",
+    "get_journal_file": "/action/get_journal_file/v1/{time_stamp}/"
   },
   "deprecated": false,
   "notice": ""
@@ -394,6 +511,59 @@ incremental_response = requests.post(
     },
     headers=headers
 )
+```
+
+### 8.3 Enhanced Chat v2 Workflow
+
+```python
+import requests
+
+# 1. Login to get token
+login_response = requests.post("http://localhost:8000/login/v1/", json={
+    "username": "yytestbot",
+    "password": "test123"
+})
+token = login_response.json()["access_token"]
+headers = {"Authorization": f"Bearer {token}"}
+
+# 2. Send message to enhanced chat v2 (server manages history)
+chat_response = requests.post(
+    "http://localhost:8000/action/chat/v2/",
+    json={
+        "human_message": {
+            "id": "client-msg-123",
+            "role": 1,
+            "content": "How are you doing today?",
+            "time_stamp": "2025-09-11T21:00:00"
+        },
+        "chat_history": []  # Always empty - server manages this
+    },
+    headers=headers
+)
+ai_response = chat_response.json()["ai_message"]
+
+# 3. Get conversation history
+history_response = requests.get(
+    "http://localhost:8000/conversation/history/?limit=10",
+    headers=headers
+)
+conversation_history = history_response.json()["messages"]
+
+# 4. Search conversation messages
+search_response = requests.post(
+    "http://localhost:8000/conversation/search/",
+    data={"query": "today", "limit": 5},
+    headers={"Authorization": f"Bearer {token}", 
+             "Content-Type": "application/x-www-form-urlencoded"}
+)
+search_results = search_response.json()["messages"]
+
+# 5. Get conversation statistics
+stats_response = requests.get(
+    "http://localhost:8000/conversation/stats/",
+    headers=headers
+)
+conversation_stats = stats_response.json()
 ```
 
 ## 9. Rate Limits and Best Practices
