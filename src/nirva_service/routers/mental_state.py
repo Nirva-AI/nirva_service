@@ -6,8 +6,9 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from loguru import logger
 
-from ..models.mental_state import MentalStateInsights
+from ..models.mental_state import MentalStateInsights, TimeAllocationResponse
 from ..services.mental_state_service import MentalStateCalculator
+from ..services.time_allocation_service import TimeAllocationCalculator
 from ..dependencies.auth import get_current_user_id
 
 router = APIRouter(prefix="/api/insights", tags=["mental_state"])
@@ -55,4 +56,37 @@ async def get_mental_state_insights(
         
     except Exception as e:
         logger.error(f"Error generating mental state insights: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/time-allocation", response_model=TimeAllocationResponse)
+async def get_time_allocation_insights(
+    date: Optional[str] = Query(None, description="Date in YYYY-MM-DD format"),
+    timezone: str = Query("UTC", description="User's timezone"),
+    username: str = Depends(get_current_user_id)
+) -> TimeAllocationResponse:
+    """
+    Get complete time allocation insights for the UI.
+    
+    Returns:
+    - Current insights (today's data)
+    - Day view (today's time allocation)
+    - Week view (past 7 days timeline)
+    - Month view (past 30 days in weekly chunks)
+    - Detected patterns
+    """
+    try:
+        # Get time allocation insights
+        calculator = TimeAllocationCalculator()
+        allocation_insights = calculator.get_time_allocation_insights(
+            username=username,
+            date=date,
+            timezone_str=timezone
+        )
+        
+        logger.info(f"Generated time allocation insights for user {username}")
+        return allocation_insights
+        
+    except Exception as e:
+        logger.error(f"Error generating time allocation insights: {e}")
         raise HTTPException(status_code=500, detail=str(e))

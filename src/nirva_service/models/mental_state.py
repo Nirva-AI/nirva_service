@@ -59,3 +59,46 @@ class MentalStateInsights(BaseModel):
     patterns: List[MentalStatePattern] = Field(description="Detected patterns")
     recommendations: List[str] = Field(description="Personalized recommendations")
     risk_indicators: Dict[str, Any] = Field(description="Risk indicators and warnings")
+
+
+@final
+@register_base_model_class
+class TimeAllocationData(BaseModel):
+    """Single activity time allocation data."""
+    activity_type: str = Field(description="Type of activity")
+    total_hours: float = Field(ge=0, description="Total hours spent on this activity")
+    percentage: float = Field(ge=0, le=100, description="Percentage of total awake time")
+    average_session_duration: float = Field(ge=0, description="Average duration per session in hours")
+    session_count: int = Field(ge=0, description="Number of sessions for this activity")
+
+
+@final
+@register_base_model_class
+class TimeAllocationInsights(BaseModel):
+    """Insights about time allocation patterns."""
+    total_awake_hours: float = Field(description="Total tracked awake hours")
+    most_active_category: str = Field(description="Activity with most time allocation")
+    productivity_score: float = Field(ge=0, le=100, description="Overall productivity score")
+    balance_score: float = Field(ge=0, le=100, description="Work-life balance score")
+    top_activities: List[TimeAllocationData] = Field(description="Top activities by time spent")
+    recommendations: List[str] = Field(description="Personalized time allocation recommendations")
+
+
+@final
+@register_base_model_class
+class TimeAllocationTimeline(BaseModel):
+    """Time allocation data over different time periods."""
+    date: str = Field(description="Date for this timeline data")
+    daily_data: List[TimeAllocationData] = Field(description="Daily activity breakdown")
+    insights: TimeAllocationInsights = Field(description="Insights for this period")
+
+
+@final
+@register_base_model_class
+class TimeAllocationResponse(BaseModel):
+    """Complete time allocation response for the UI."""
+    current_insights: TimeAllocationInsights = Field(description="Current period insights")
+    day_view: List[TimeAllocationData] = Field(description="Today's time allocation data")
+    week_view: List[TimeAllocationTimeline] = Field(description="Week timeline data")
+    month_view: List[TimeAllocationTimeline] = Field(description="Month timeline data")
+    patterns: List[str] = Field(description="Detected time allocation patterns")
