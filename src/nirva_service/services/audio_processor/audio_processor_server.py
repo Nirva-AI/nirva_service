@@ -305,8 +305,8 @@ async def apply_vad_processing(audio_file_id: str, bucket: str, key: str) -> Non
             return_seconds=True,
             min_speech_duration_ms=250,  # Minimum 250ms speech
             min_silence_duration_ms=100,  # Minimum 100ms silence to split
-            threshold=0.5,
-            speech_pad_ms=30
+            threshold=0.2,  # Lowered for distant speakers
+            speech_pad_ms=100  # Increased padding
         )
         
         # Update database with VAD results
