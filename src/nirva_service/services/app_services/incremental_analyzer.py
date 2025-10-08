@@ -40,7 +40,7 @@ class IncrementalAnalyzer:
         new_transcript: str,
     ) -> IncrementalAnalyzeResponse:
         """
-        Process new transcripts incrementally.
+        Process new transcripts incrementally with enhanced delayed transcription handling.
 
         Args:
             username: Username
@@ -69,6 +69,13 @@ class IncrementalAnalyzer:
             raw_event_groups = self._group_into_raw_events(transcript_chunks, username)
             
             logger.info(f"📋 GROUPING_RESULT: {len(transcript_chunks)} individual transcripts → {len(raw_event_groups)} groups for processing")
+
+            # Check if any transcript groups fall into gaps between existing events (delayed transcriptions)
+            reanalysis_range = await self._detect_reanalysis_range(username, raw_event_groups)
+            
+            if reanalysis_range:
+                logger.info(f"🔄 REANALYSIS_DETECTED: Range {reanalysis_range['start_time']} to {reanalysis_range['end_time']} needs re-processing")
+                return await self._reprocess_time_range(username, reanalysis_range)
 
             # Get existing events for this user (ongoing ones)
             ongoing_events = await self._get_ongoing_events(username)
@@ -718,3 +725,306 @@ class IncrementalAnalyzer:
         """
         events = get_user_events(username)
         return len(events)
+
+    async def _detect_reanalysis_range(
+        self, username: str, raw_event_groups: List[Dict[str, Any]]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Detect if delayed transcriptions fall between existing events and need re-analysis.
+        
+        Args:
+            username: Username to check events for
+            raw_event_groups: New transcript groups being processed
+            
+        Returns:
+            Dictionary with reanalysis range info or None if no reanalysis needed
+        """
+        if not raw_event_groups:
+            return None
+            
+        # Get all existing completed events for this user
+        all_events = get_user_events(username)
+        completed_events = [
+            event for event in all_events 
+            if event.event_status == "completed" and 
+            hasattr(event, 'start_timestamp') and hasattr(event, 'end_timestamp') and
+            event.start_timestamp and event.end_timestamp
+        ]
+        
+        if not completed_events:
+            # No existing events to consider for reanalysis
+            return None
+            
+        # Sort events by start time (handle None values)
+        completed_events.sort(key=lambda e: e.start_timestamp or datetime.min.replace(tzinfo=timezone.utc))
+        
+        # Find the time range of new transcript groups
+        new_start = min(group["start_time"] for group in raw_event_groups)
+        new_end = max(group["end_time"] for group in raw_event_groups)
+        
+        logger.info(f"🔍 REANALYSIS_CHECK: New transcripts range {new_start} to {new_end}")
+        
+        # Find events that might be affected by the new transcripts
+        affected_events = []
+        
+        for event in completed_events:
+            event_start = event.start_timestamp
+            event_end = event.end_timestamp
+            
+            # Skip events with missing timestamps
+            if not event_start or not event_end:
+                continue
+            
+            # Ensure timezone-aware comparison
+            if event_start.tzinfo is None:
+                event_start = event_start.replace(tzinfo=timezone.utc)
+            if event_end.tzinfo is None:
+                event_end = event_end.replace(tzinfo=timezone.utc)
+            if new_start.tzinfo is None:
+                new_start = new_start.replace(tzinfo=timezone.utc)
+            if new_end.tzinfo is None:
+                new_end = new_end.replace(tzinfo=timezone.utc)
+            
+            # Check if new transcripts fall within the gap threshold of existing events
+            gap_before = (new_start - event_end).total_seconds()
+            gap_after = (event_start - new_end).total_seconds()
+            
+            # Event is affected if:
+            # 1. New transcripts start close to when this event ended (potential continuation)
+            # 2. New transcripts end close to when this event started (potential prefix)
+            # 3. New transcripts overlap with the event time range
+            if (
+                (0 <= gap_before <= self.raw_event_gap_seconds) or  # New starts after event ends (within gap)
+                (0 <= gap_after <= self.raw_event_gap_seconds) or   # New ends before event starts (within gap)
+                (new_start <= event_end and new_end >= event_start)  # Overlap
+            ):
+                affected_events.append(event)
+                logger.info(f"🎯 AFFECTED_EVENT: {event.event_id} ({event_start} to {event_end}) affected by new transcripts")
+        
+        if not affected_events:
+            logger.info("✅ NO_REANALYSIS: No existing events affected by new transcripts")
+            return None
+            
+        # Determine the reanalysis range
+        # Include all events that might be connected by the new transcripts
+        range_start = min(
+            min(event.start_timestamp for event in affected_events),
+            new_start
+        )
+        range_end = max(
+            max(event.end_timestamp for event in affected_events),
+            new_end
+        )
+        
+        # Extend range to include any events that fall within the expanded time window
+        extended_affected = []
+        for event in completed_events:
+            event_start = event.start_timestamp
+            event_end = event.end_timestamp
+            
+            # Skip events with missing timestamps
+            if not event_start or not event_end:
+                continue
+                
+            if event_start.tzinfo is None:
+                event_start = event_start.replace(tzinfo=timezone.utc)
+            if event_end.tzinfo is None:
+                event_end = event_end.replace(tzinfo=timezone.utc)
+                
+            # Include event if it overlaps with the reanalysis range
+            if event_start <= range_end and event_end >= range_start:
+                extended_affected.append(event)
+        
+        logger.info(f"🔄 REANALYSIS_RANGE: {range_start} to {range_end} with {len(extended_affected)} affected events")
+        
+        return {
+            "start_time": range_start,
+            "end_time": range_end,
+            "affected_events": extended_affected,
+            "new_groups": raw_event_groups
+        }
+
+    async def _reprocess_time_range(
+        self, username: str, reanalysis_range: Dict[str, Any]
+    ) -> IncrementalAnalyzeResponse:
+        """
+        Re-process a time range by collecting all transcriptions and re-analyzing as a batch.
+        
+        Args:
+            username: Username
+            reanalysis_range: Dictionary containing affected events and new groups
+            
+        Returns:
+            IncrementalAnalyzeResponse: Processing results
+        """
+        start_time = reanalysis_range["start_time"]
+        end_time = reanalysis_range["end_time"]
+        affected_events = reanalysis_range["affected_events"]
+        new_groups = reanalysis_range["new_groups"]
+        
+        logger.info(f"🔄 REPROCESSING: Time range {start_time} to {end_time} with {len(affected_events)} existing events")
+        
+        # Step 1: Collect all transcriptions for this time range
+        all_transcriptions = await self._collect_transcriptions_for_range(username, start_time, end_time)
+        
+        # Step 2: Combine existing transcriptions with new transcript groups
+        combined_transcript_parts = []
+        
+        # Add existing transcriptions from the database
+        for trans in all_transcriptions:
+            if trans.transcription_text.strip():
+                start_str = trans.start_time.isoformat()
+                end_str = trans.end_time.isoformat()
+                combined_transcript_parts.append(f"[{start_str}|{end_str}] {trans.transcription_text.strip()}")
+        
+        # Add new transcript groups (they're already parsed)
+        for group in new_groups:
+            if group.get("text", "").strip():
+                start_str = group["start_time"].isoformat()
+                end_str = group["end_time"].isoformat()
+                combined_transcript_parts.append(f"[{start_str}|{end_str}] {group['text'].strip()}")
+        
+        if not combined_transcript_parts:
+            logger.warning("No transcriptions found for reanalysis range")
+            return IncrementalAnalyzeResponse(
+                updated_events_count=0,
+                new_events_count=0,
+                total_events_count=await self._get_total_event_count(username),
+                message="No transcriptions found for reanalysis"
+            )
+        
+        # Sort by timestamp to maintain chronological order
+        combined_transcript_parts.sort(key=lambda x: self._extract_start_time_from_transcript_line(x))
+        combined_transcript = " ".join(combined_transcript_parts)
+        
+        logger.info(f"📋 REANALYSIS_INPUT: {len(combined_transcript_parts)} transcript segments for range {start_time} to {end_time}")
+        
+        # Step 3: Delete affected events (they will be replaced)
+        logger.info(f"🗑️ DELETING: {len(affected_events)} existing events for re-analysis")
+        await self._delete_events(username, [event.event_id for event in affected_events])
+        
+        # Step 4: Re-process the combined transcripts using completion analysis
+        # Use the date from the start of the range
+        date_str = start_time.strftime("%Y-%m-%d")
+        
+        # Parse and group the combined transcripts
+        transcript_chunks = self._parse_transcript_with_times(combined_transcript)
+        raw_event_groups_combined = self._group_into_raw_events(transcript_chunks, username)
+        
+        logger.info(f"📊 REANALYSIS_GROUPS: {len(transcript_chunks)} transcript chunks → {len(raw_event_groups_combined)} groups")
+        
+        # Step 5: Process all groups as completed events (no ongoing since this is historical)
+        new_events = []
+        for group in raw_event_groups_combined:
+            event = await self._create_completed_event(group, username)
+            if event:
+                new_events.append(event)
+        
+        # Step 6: Save the new events
+        await self._save_events(username, new_events)
+        
+        # Step 7: Get updated total count
+        total_events = await self._get_total_event_count(username)
+        
+        logger.info(f"✅ REANALYSIS_COMPLETE: Created {len(new_events)} new events from reanalysis")
+        
+        return IncrementalAnalyzeResponse(
+            updated_events_count=0,  # We deleted and recreated, so no "updates"
+            new_events_count=len(new_events),
+            total_events_count=total_events,
+            message=f"Re-analyzed range {start_time.strftime('%H:%M')} to {end_time.strftime('%H:%M')}: {len(affected_events)} events deleted, {len(new_events)} events created"
+        )
+
+    async def _collect_transcriptions_for_range(
+        self, username: str, start_time: datetime, end_time: datetime
+    ) -> List[TranscriptionResultDB]:
+        """
+        Collect all transcriptions from the database for a given time range.
+        
+        Args:
+            username: Username to filter transcriptions
+            start_time: Start of the time range
+            end_time: End of the time range
+            
+        Returns:
+            List of transcription results ordered by start time
+        """
+        db = SessionLocal()
+        try:
+            # Query transcriptions that overlap with the time range
+            transcriptions = db.query(TranscriptionResultDB).filter(
+                and_(
+                    TranscriptionResultDB.username == username,
+                    TranscriptionResultDB.start_time <= end_time,
+                    TranscriptionResultDB.end_time >= start_time
+                )
+            ).order_by(TranscriptionResultDB.start_time).all()
+            
+            logger.info(f"📊 COLLECTED: {len(transcriptions)} transcriptions for range {start_time} to {end_time}")
+            return transcriptions
+            
+        finally:
+            db.close()
+
+    def _extract_start_time_from_transcript_line(self, transcript_line: str) -> datetime:
+        """
+        Extract start time from a transcript line in format '[START_ISO|END_ISO] text'.
+        
+        Args:
+            transcript_line: Line with timestamp prefix
+            
+        Returns:
+            Parsed start time as datetime
+        """
+        import re
+        
+        try:
+            # Extract timestamp from [START|END] format
+            match = re.match(r'\[([^|]+)\|[^\]]+\]', transcript_line)
+            if match:
+                time_str = match.group(1)
+                return self._parse_time_string(time_str)
+            else:
+                # Fallback: try to extract any timestamp
+                match = re.match(r'\[([^\]]+)\]', transcript_line)
+                if match:
+                    time_str = match.group(1)
+                    return self._parse_time_string(time_str)
+        except Exception as e:
+            logger.warning(f"Failed to extract time from transcript line '{transcript_line[:50]}...': {e}")
+        
+        # Fallback to current time if parsing fails
+        return datetime.now(timezone.utc)
+
+    async def _delete_events(self, username: str, event_ids: List[str]) -> None:
+        """
+        Delete events by their IDs from the events table.
+        
+        Args:
+            username: Username (for verification)
+            event_ids: List of event IDs to delete
+        """
+        if not event_ids:
+            return
+            
+        db = SessionLocal()
+        try:
+            from ...db.pgsql_object import EventDB
+            
+            # Delete events with matching IDs and username (for security)
+            deleted_count = db.query(EventDB).filter(
+                and_(
+                    EventDB.event_id.in_(event_ids),
+                    EventDB.username == username
+                )
+            ).delete(synchronize_session=False)
+            
+            db.commit()
+            logger.info(f"🗑️ DELETED: {deleted_count} events for user {username}")
+            
+        except Exception as e:
+            logger.error(f"Failed to delete events: {e}")
+            db.rollback()
+            raise
+        finally:
+            db.close()
