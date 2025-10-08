@@ -7,7 +7,7 @@ import os
 import tempfile
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import json
 
 from fastapi import FastAPI, HTTPException
@@ -125,11 +125,16 @@ async def process_batch_transcription(batch_id: str) -> None:
             db.commit()
             return
         
-        # Calculate time range
+        # Calculate time range based on actual capture times
         first_segment = segments[0]
         last_segment = segments[-1]
-        start_time = first_segment.uploaded_at
-        end_time = last_segment.uploaded_at + timedelta(seconds=last_segment.duration_seconds or 30)
+        
+        # Use captured_at if available, fallback to uploaded_at for backward compatibility
+        start_time = first_segment.captured_at or first_segment.uploaded_at
+        end_time_base = last_segment.captured_at or last_segment.uploaded_at
+        end_time = end_time_base + timedelta(seconds=last_segment.duration_seconds or 30)
+        
+        logger.info(f"Transcription time range: {start_time} to {end_time} (using {'capture' if first_segment.captured_at else 'upload'} timestamps)")
         
         # Store transcription result with all new fields
         transcription = TranscriptionResultDB(
@@ -413,6 +418,25 @@ async def process_s3_event(message: dict, s3_client) -> None:
         file_size = head_response.get('ContentLength', 0)
         content_type = head_response.get('ContentType', '')
         
+        # Extract capture time from S3 metadata if available
+        metadata = head_response.get('Metadata', {})
+        capture_time = None
+        if 'capturedat' in metadata:  # S3 metadata keys are lowercase
+            try:
+                # Parse Unix timestamp in milliseconds from metadata
+                timestamp_ms = float(metadata['capturedat'])
+                capture_time = datetime.fromtimestamp(timestamp_ms / 1000, tz=timezone.utc)
+                logger.info(f"Found capture time in metadata: {capture_time}")
+            except Exception as e:
+                logger.warning(f"Failed to parse capture time from metadata '{metadata['capturedat']}': {e}")
+        elif 'capture-time' in metadata:
+            try:
+                # Fallback: Parse ISO format timestamp from metadata  
+                capture_time = datetime.fromisoformat(metadata['capture-time'].replace('Z', '+00:00'))
+                logger.info(f"Found capture time in ISO metadata: {capture_time}")
+            except Exception as e:
+                logger.warning(f"Failed to parse ISO capture time from metadata '{metadata['capture-time']}': {e}")
+        
         # Determine file format from content type or extension
         file_format = None
         if 'audio' in content_type:
@@ -420,12 +444,13 @@ async def process_s3_event(message: dict, s3_client) -> None:
         elif '.' in key:
             file_format = key.split('.')[-1].lower()
         
-        logger.info(f"File metadata - Size: {file_size}, Type: {content_type}, Format: {file_format}")
+        logger.info(f"File metadata - Size: {file_size}, Type: {content_type}, Format: {file_format}, Capture time: {capture_time}")
         
     except Exception as e:
         logger.error(f"Error getting S3 object metadata: {e}")
         file_size = message.get('size', 0)
         file_format = None
+        capture_time = None
     
     # Store in database
     db: Session = SessionLocal()
@@ -440,6 +465,7 @@ async def process_s3_event(message: dict, s3_client) -> None:
             logger.info(f"File already tracked in database: {existing_file.id}")
         else:
             # Create new audio file record
+            s3_upload_time = datetime.fromisoformat(message['event_time'].replace('Z', '+00:00'))
             audio_file = AudioFileDB(
                 user_id=None,  # User ID field not used (using username instead)
                 username=user_id,  # Using the hashed username from S3 path
@@ -448,7 +474,8 @@ async def process_s3_event(message: dict, s3_client) -> None:
                 file_size=file_size,
                 format=file_format,
                 status="uploaded",
-                uploaded_at=datetime.fromisoformat(message['event_time'].replace('Z', '+00:00'))
+                captured_at=capture_time,  # Use capture time from metadata if available
+                uploaded_at=s3_upload_time  # S3 upload time for tracking
             )
             
             db.add(audio_file)

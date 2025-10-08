@@ -272,9 +272,12 @@ class AudioFileDB(UUIDBase):
     )  # aws, deepgram, etc
     
     # Timestamps
+    captured_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )  # Actual time when audio was recorded/captured
     uploaded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+    )  # Time when audio was uploaded to S3
     vad_processed_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
