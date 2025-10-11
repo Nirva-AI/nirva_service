@@ -137,47 +137,47 @@ async def process_batch_transcription(batch_id: str) -> None:
             )
 
             logger.info(f"Uploaded VAD-processed audio to S3 for synchronized processing: {temp_s3_key}")
+
+            # Step 1: Get word-level transcription from Enhanced Deepgram (no diarization)
+            logger.info("Step 1: Getting word-level transcription from Deepgram (VAD-processed audio)")
+            deepgram_result = await enhanced_deepgram_service.transcribe_audio_with_words(speech_audio)
+
+            # Step 2: Get speaker diarization from Pyannote.ai (same VAD-processed audio)
+            logger.info("Step 2: Getting speaker diarization from Pyannote.ai (same VAD-processed audio)")
+            speaker_segments = await pyannote_service.diarize_audio_url(presigned_url)
+
+            # Step 3: Merge diarization with word timestamps to create sentence-level output
+            logger.info("Step 3: Merging diarization with word timestamps")
+            base_time = batch.first_segment_time or datetime.now()
+            merged_transcription = diarization_merger.merge_diarization_with_words(
+                speaker_segments,
+                deepgram_result.get('words', []),
+                base_time
+            )
+
+            # Create combined result
+            transcription_result = {
+                'transcription': merged_transcription,
+                'confidence': deepgram_result.get('confidence', 0.0),
+                'language': deepgram_result.get('language', 'en'),
+                'speaker_segments': speaker_segments,
+                'word_count': len(deepgram_result.get('words', [])),
+                'sentence_count': len([s for s in merged_transcription.split('[') if 'Speaker' in s]),
+                'sentiment_data': deepgram_result.get('sentiment_data'),
+                'topics_data': deepgram_result.get('topics_data'),
+                'intents_data': deepgram_result.get('intents_data'),
+                'raw_response': deepgram_result.get('raw_response')
+            }
+
+            logger.info(
+                f"Dual API processing complete: {len(speaker_segments)} speakers, "
+                f"{transcription_result['word_count']} words, "
+                f"{transcription_result['sentence_count']} sentences"
+            )
+
         except Exception as e:
-            logger.error(f"Failed to upload VAD-processed audio: {e}")
+            logger.error(f"Failed to process audio with dual API: {e}")
             raise
-
-        # Step 1: Get word-level transcription from Enhanced Deepgram (no diarization)
-        logger.info("Step 1: Getting word-level transcription from Deepgram (VAD-processed audio)")
-        deepgram_result = await enhanced_deepgram_service.transcribe_audio_with_words(speech_audio)
-
-        # Step 2: Get speaker diarization from Pyannote.ai (same VAD-processed audio)
-        logger.info("Step 2: Getting speaker diarization from Pyannote.ai (same VAD-processed audio)")
-        speaker_segments = await pyannote_service.diarize_audio_url(presigned_url)
-
-        # Step 3: Merge diarization with word timestamps to create sentence-level output
-        logger.info("Step 3: Merging diarization with word timestamps")
-        base_time = batch.first_segment_time or datetime.now()
-        merged_transcription = diarization_merger.merge_diarization_with_words(
-            speaker_segments,
-            deepgram_result.get('words', []),
-            base_time
-        )
-
-        # Create combined result
-        transcription_result = {
-            'transcription': merged_transcription,
-            'confidence': deepgram_result.get('confidence', 0.0),
-            'language': deepgram_result.get('language', 'en'),
-            'speaker_segments': speaker_segments,
-            'word_count': len(deepgram_result.get('words', [])),
-            'sentence_count': len([s for s in merged_transcription.split('[') if 'Speaker' in s]),
-            'sentiment_data': deepgram_result.get('sentiment_data'),
-            'topics_data': deepgram_result.get('topics_data'),
-            'intents_data': deepgram_result.get('intents_data'),
-            'raw_response': deepgram_result.get('raw_response')
-        }
-
-        logger.info(
-            f"Dual API processing complete: {len(speaker_segments)} speakers, "
-            f"{transcription_result['word_count']} words, "
-            f"{transcription_result['sentence_count']} sentences"
-        )
-
         finally:
             # Clean up temporary files
             if temp_audio_file and os.path.exists(temp_audio_file):
