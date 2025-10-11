@@ -29,7 +29,7 @@ class EnhancedDeepgramService:
         self,
         audio_bytes: bytes,
         sample_rate: int = 16000,
-        language: str = 'en',  # Fixed language to avoid Portuguese misidentification
+        language: str = 'auto',  # Changed to auto-detect by default
         model: str = 'nova-3'
     ) -> Dict[str, Any]:
         """
@@ -47,18 +47,17 @@ class EnhancedDeepgramService:
         if not self.api_key:
             raise ValueError("DEEPGRAM_API_KEY not configured")
 
-        # Build query parameters - OPTIMIZED FOR WORD-LEVEL TIMESTAMPS
         params = {
             'model': model,  # nova-3
-            'language': language,  # Fixed language to avoid Portuguese misidentification
-            'diarize': 'false',  # DISABLED - we use pyannote.ai for diarization
+            'detect_language': 'true',  # ALWAYS enable language detection for multilingual support
+            'diarize': 'false',
             'punctuate': 'true',  # Enable punctuation
-            'utterances': 'true',  # Enable utterances for better segmentation
+            'utterances': 'true',  # Enable utterances
             'paragraphs': 'true',  # Group transcript into readable paragraphs
-            'words': 'true',  # CRITICAL - Enable word-level data for timestamps
-            'sentiment': 'true',  # Keep sentiment analysis
-            'topics': 'true',  # Keep topic detection
-            'intents': 'true',  # Keep intent recognition
+            'words': 'true',  # Enable word-level data for better timing and punctuation
+            'sentiment': 'true',  # Enable sentiment analysis (matches client)
+            'topics': 'true',  # Enable topic detection (matches client)
+            'intents': 'true',  # Enable intent recognition (matches client)
         }
 
         # Remove None values
