@@ -150,10 +150,30 @@ async def process_batch_transcription(batch_id: str) -> None:
             # Step 3: Merge diarization with word timestamps to create sentence-level output
             logger.info("Step 3: Merging diarization with word timestamps")
             base_time = batch.first_segment_time or datetime.now()
+
+            # Get timezone offset from first audio file's S3 metadata
+            timezone_offset_seconds = None
+            if batch.audio_files:
+                first_file = batch.audio_files[0]
+                try:
+                    # Get S3 metadata to extract timezone offset
+                    s3_client = boto3.client('s3')
+                    head_response = s3_client.head_object(
+                        Bucket=first_file.s3_bucket,
+                        Key=first_file.s3_key
+                    )
+                    metadata = head_response.get('Metadata', {})
+                    if 'timezoneoffset' in metadata:
+                        timezone_offset_seconds = int(metadata['timezoneoffset'])
+                        logger.info(f"Using timezone offset from S3 metadata: {timezone_offset_seconds} seconds")
+                except Exception as e:
+                    logger.warning(f"Failed to get timezone from S3 metadata: {e}")
+
             merged_transcription = diarization_merger.merge_diarization_with_words(
                 speaker_segments,
                 deepgram_result.get('words', []),
-                base_time
+                base_time,
+                timezone_offset_seconds
             )
 
             # Create combined result

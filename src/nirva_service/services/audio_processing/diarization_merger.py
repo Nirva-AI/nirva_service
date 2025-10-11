@@ -25,7 +25,8 @@ class DiarizationMerger:
         self,
         speaker_segments: List[Dict[str, Any]],
         word_data: List[Dict[str, Any]],
-        base_datetime: Optional[datetime] = None
+        base_datetime: Optional[datetime] = None,
+        timezone_offset_seconds: Optional[int] = None
     ) -> str:
         """
         Merge speaker diarization with word-level timestamps to create sentence-level output.
@@ -47,7 +48,7 @@ class DiarizationMerger:
 
         if not speaker_segments:
             logger.warning("No speaker segments provided, creating single-speaker output")
-            return self._create_single_speaker_output(word_data, base_datetime)
+            return self._create_single_speaker_output(word_data, base_datetime, timezone_offset_seconds)
 
         # Step 1: Assign speakers to words
         speaker_words = self._assign_speakers_to_words(speaker_segments, word_data)
@@ -56,7 +57,7 @@ class DiarizationMerger:
         speaker_sentences = self._group_words_into_sentences(speaker_words)
 
         # Step 3: Format output with timestamps
-        return self._format_output_with_timestamps(speaker_sentences, base_datetime)
+        return self._format_output_with_timestamps(speaker_sentences, base_datetime, timezone_offset_seconds)
 
     def _assign_speakers_to_words(
         self,
@@ -215,7 +216,8 @@ class DiarizationMerger:
     def _format_output_with_timestamps(
         self,
         sentences: List[Dict[str, Any]],
-        base_datetime: Optional[datetime] = None
+        base_datetime: Optional[datetime] = None,
+        timezone_offset_seconds: Optional[int] = None
     ) -> str:
         """
         Format sentences into the required output format with HH:MM:SS timestamps.
@@ -223,9 +225,10 @@ class DiarizationMerger:
         Args:
             sentences: List of sentence objects
             base_datetime: Base datetime for timestamp calculation
+            timezone_offset_seconds: Timezone offset in seconds from UTC
 
         Returns:
-            Formatted string: "[HH:MM:SS-HH:MM:SS] Speaker 0: Hello. [HH:MM:SS-HH:MM:SS] Speaker 1: Hi."
+            Formatted string: "[HH:MM:SS-HH:MM:SS] 0: Hello. [HH:MM:SS-HH:MM:SS] 1: Hi."
         """
         if not sentences:
             return ""
@@ -233,18 +236,29 @@ class DiarizationMerger:
         if base_datetime is None:
             base_datetime = datetime.now()
 
+        # Apply timezone offset from metadata (if available)
+        if timezone_offset_seconds is not None:
+            timezone_offset = timedelta(seconds=timezone_offset_seconds)
+        else:
+            # Default to UTC if no offset provided
+            timezone_offset = timedelta(0)
+            logger.warning("No timezone offset provided, using UTC")
+
         formatted_parts = []
 
         for sentence in sentences:
-            # Convert seconds to HH:MM:SS format
-            start_time = base_datetime + timedelta(seconds=sentence['start'])
-            end_time = base_datetime + timedelta(seconds=sentence['end'])
+            # Convert seconds to HH:MM:SS format with timezone adjustment
+            start_time = base_datetime + timedelta(seconds=sentence['start']) + timezone_offset
+            end_time = base_datetime + timedelta(seconds=sentence['end']) + timezone_offset
 
             start_str = start_time.strftime("%H:%M:%S")
             end_str = end_time.strftime("%H:%M:%S")
 
-            # Format: [HH:MM:SS-HH:MM:SS] Speaker X: sentence text
-            formatted_part = f"[{start_str}-{end_str}] Speaker {sentence['speaker']}: {sentence['sentence']}"
+            # Use speaker ID exactly as provided by the API
+            speaker_id = sentence['speaker']
+
+            # Format: [HH:MM:SS-HH:MM:SS] speaker_id: sentence text
+            formatted_part = f"[{start_str}-{end_str}] {speaker_id}: {sentence['sentence']}"
             formatted_parts.append(formatted_part)
 
         result = " ".join(formatted_parts)
@@ -254,7 +268,8 @@ class DiarizationMerger:
     def _create_single_speaker_output(
         self,
         word_data: List[Dict[str, Any]],
-        base_datetime: Optional[datetime] = None
+        base_datetime: Optional[datetime] = None,
+        timezone_offset_seconds: Optional[int] = None
     ) -> str:
         """
         Create output for single speaker (no diarization data).
@@ -319,7 +334,7 @@ class DiarizationMerger:
                     'end': end_time
                 })
 
-        # Format with Speaker 0
+        # Format with default speaker "0"
         formatted_parts = []
         for sentence in sentences:
             start_time = base_datetime + timedelta(seconds=sentence['start'])
@@ -328,7 +343,20 @@ class DiarizationMerger:
             start_str = start_time.strftime("%H:%M:%S")
             end_str = end_time.strftime("%H:%M:%S")
 
-            formatted_part = f"[{start_str}-{end_str}] Speaker 0: {sentence['sentence']}"
+            # Apply timezone offset from metadata (if available)
+            if timezone_offset_seconds is not None:
+                timezone_offset = timedelta(seconds=timezone_offset_seconds)
+            else:
+                timezone_offset = timedelta(0)
+
+            start_time = start_time + timezone_offset
+            end_time = end_time + timezone_offset
+
+            start_str = start_time.strftime("%H:%M:%S")
+            end_str = end_time.strftime("%H:%M:%S")
+
+            # Use default speaker ID as provided by API (usually "0" for single speaker)
+            formatted_part = f"[{start_str}-{end_str}] 0: {sentence['sentence']}"
             formatted_parts.append(formatted_part)
 
         result = " ".join(formatted_parts)
