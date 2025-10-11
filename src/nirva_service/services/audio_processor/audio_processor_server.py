@@ -21,6 +21,7 @@ from nirva_service.services.audio_processing.enhanced_deepgram_service import ge
 from nirva_service.services.audio_processing.pyannote_service import get_pyannote_service
 from nirva_service.services.audio_processing.diarization_merger import get_diarization_merger
 from nirva_service.services.audio_processor.batch_manager import get_batch_manager
+from nirva_service.services.audio_processor.s3_reconciliation import reconciliation_task
 from nirva_service.db.pgsql_client import SessionLocal
 from nirva_service.db.pgsql_object import AudioFileDB, AudioBatchDB, TranscriptionResultDB
 from nirva_service.config.configuration import AudioProcessorServerConfig
@@ -316,39 +317,73 @@ async def process_sqs_messages():
     )
     
     logger.info("Starting SQS polling background task...")
-    
+
+    poll_count = 0
     while True:
+        poll_count += 1
         try:
+            logger.debug(f"[SQS_POLL_{poll_count}] Starting poll for up to {config.max_messages_per_poll} messages...")
+
             # Poll for messages
             messages = sqs_service.poll_messages(
                 max_messages=config.max_messages_per_poll,
                 wait_time_seconds=20,  # Long polling
                 visibility_timeout=config.visibility_timeout
             )
-            
+
             if messages:
-                logger.info(f"Processing {len(messages)} messages from SQS")
+                logger.info(f"[SQS_POLL_{poll_count}] Received {len(messages)} messages from SQS")
+                logger.info(f"[SQS_POLL_{poll_count}] Message keys: {[m.get('key', 'unknown') for m in messages]}")
                 
-                for message in messages:
+                # Process all messages concurrently to prevent blocking
+                async def process_single_message(idx: int, message: dict) -> tuple:
+                    """Process a single SQS message and return result."""
                     try:
                         # Process S3 event messages
                         if 'bucket' in message and 'key' in message:
-                            await process_s3_event(message, s3_client)
-                            
-                            # Delete message after successful processing
-                            sqs_service.delete_message(message['receipt_handle'])
+                            logger.info(f"[SQS_MSG_{idx}/{len(messages)}] Processing message for {message['key']}")
+
+                            # Process the event and check if database record was created
+                            success = await process_s3_event(message, s3_client)
+
+                            if success:
+                                # Only delete message after successful database record creation
+                                sqs_service.delete_message(message['receipt_handle'])
+                                logger.info(f"[SQS_MSG_{idx}/{len(messages)}] Successfully processed and deleted message for {message['key']}")
+                            else:
+                                logger.error(f"[SQS_MSG_{idx}/{len(messages)}] Failed to process S3 event for {message['key']}, keeping message in queue for retry")
+                                # Message will become visible again after visibility timeout
+
+                            return (message['key'], success)
                         else:
-                            logger.warning(f"Non-S3 message received: {message.get('message_id')}")
+                            logger.warning(f"[SQS_MSG_{idx}/{len(messages)}] Non-S3 message received: {message.get('message_id')}")
                             # Still delete non-S3 messages to prevent reprocessing
                             sqs_service.delete_message(message['receipt_handle'])
-                            
+                            return (message.get('message_id', 'unknown'), True)
+
                     except Exception as e:
-                        logger.error(f"Error processing message {message.get('message_id')}: {e}")
-                        # Message will become visible again after visibility timeout
+                        logger.error(f"[SQS_MSG_{idx}/{len(messages)}] Error processing message {message.get('message_id')}: {e}")
+                        logger.error(f"[SQS_MSG_{idx}/{len(messages)}] Failed to process {message.get('key', 'unknown')}, will retry after visibility timeout")
+                        return (message.get('key', 'unknown'), False)
+
+                # Process all messages concurrently
+                logger.info(f"[SQS_POLL_{poll_count}] Processing {len(messages)} messages concurrently...")
+                tasks = [process_single_message(idx, msg) for idx, msg in enumerate(messages, 1)]
+                processing_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+                # Log batch processing summary
+                successful = sum(1 for r in processing_results if isinstance(r, tuple) and r[1])
+                failed = len(processing_results) - successful
+                logger.info(f"[SQS_POLL_{poll_count}] Batch complete: {successful} successful, {failed} failed")
+                logger.info(f"[SQS_POLL_{poll_count}] Results: {processing_results}")
             
             # Small delay between polls if no messages
             if not messages:
+                logger.debug(f"[SQS_POLL_{poll_count}] No messages received, sleeping {config.poll_interval_seconds}s")
                 await asyncio.sleep(config.poll_interval_seconds)
+            else:
+                # Very short delay even after processing to allow new messages to arrive
+                await asyncio.sleep(0.1)
                 
         except Exception as e:
             logger.error(f"Error in SQS polling loop: {e}")
@@ -364,7 +399,7 @@ async def apply_vad_processing(audio_file_id: str, bucket: str, key: str) -> Non
         bucket: S3 bucket name
         key: S3 object key
     """
-    logger.info(f"Starting VAD processing for {audio_file_id}")
+    logger.info(f"[VAD] Starting VAD processing for audio_file_id: {audio_file_id}, s3://{bucket}/{key}")
     
     # Initialize services
     s3_client = boto3.client('s3')
@@ -404,7 +439,7 @@ async def apply_vad_processing(audio_file_id: str, bucket: str, key: str) -> Non
             
             # If there's speech, add to batch for transcription
             if vad_result['num_segments'] > 0:
-                logger.info(f"Audio file {audio_file_id} has speech, adding to batch")
+                logger.info(f"[VAD] Audio file {audio_file_id} has speech, adding to batch for transcription")
                 
                 # Get or create batch for this user session
                 batch = batch_manager.get_or_create_batch(
@@ -421,7 +456,7 @@ async def apply_vad_processing(audio_file_id: str, bucket: str, key: str) -> Non
                     db
                 )
             else:
-                logger.warning(f"No speech detected in {audio_file_id}, skipping transcription")
+                logger.warning(f"[VAD] No speech detected in {audio_file_id}, skipping transcription")
                 audio_file.status = 'no_speech'
                 db.commit()
             
@@ -434,7 +469,8 @@ async def apply_vad_processing(audio_file_id: str, bucket: str, key: str) -> Non
             )
         
     except Exception as e:
-        logger.error(f"Error in VAD processing for {audio_file_id}: {e}")
+        logger.error(f"[VAD] Error in VAD processing for {audio_file_id}: {e}")
+        logger.error(f"[VAD] Failed to process s3://{bucket}/{key}")
         # Update status to failed
         try:
             audio_file = db.query(AudioFileDB).filter_by(id=audio_file_id).first()
@@ -453,13 +489,16 @@ async def apply_vad_processing(audio_file_id: str, bucket: str, key: str) -> Non
             logger.debug(f"Cleaned up temp file: {temp_path}")
 
 
-async def process_s3_event(message: dict, s3_client) -> None:
+async def process_s3_event(message: dict, s3_client) -> bool:
     """
     Process an S3 event notification.
-    
+
     Args:
         message: Parsed SQS message containing S3 event information
         s3_client: Boto3 S3 client
+
+    Returns:
+        bool: True if processing succeeded, False otherwise
     """
     bucket = message['bucket']
     key = message['key']
@@ -470,29 +509,21 @@ async def process_s3_event(message: dict, s3_client) -> None:
     # Only process ObjectCreated events
     if not event_name.startswith('ObjectCreated'):
         logger.info(f"Ignoring event type: {event_name}")
-        return
+        return True  # Not an error, just not relevant
     
     # Extract user information from the S3 key
-    # Expected format: native-audio/{username_hash}/segment_*.wav
+    # Expected format: native-audio/{username}/segment_*.wav
+    # NOTE: Client uploads directly with username, NOT hash
     key_parts = key.split('/')
     if len(key_parts) < 3 or key_parts[0] != 'native-audio':
         logger.warning(f"Unexpected S3 key format: {key}")
-        return
-    
-    # The second part is the hashed username (16 char SHA-256 hash)
-    username_hash = key_parts[1]
+        return True  # Not an error, just unexpected format
+
+    # The second part is the actual username (e.g., "yytestbot", "weilyupku@gmail.com")
+    user_id = key_parts[1]
     filename = key_parts[2]
-    
-    # TEMPORARY: Map hash to actual username
-    # In production, we should store a proper mapping or use a different approach
-    if username_hash == "4f3dbd5df4b8c1f3":
-        user_id = "weilyupku@gmail.com"
-    else:
-        # For other users, we'd need their mapping
-        user_id = username_hash
-        logger.warning(f"Unknown username hash: {username_hash}, using hash as username")
-    
-    logger.info(f"Processing audio file: {filename} for user: {user_id} (hash: {username_hash})")
+
+    logger.info(f"[S3_EVENT] Processing audio file: {filename} for user: {user_id} from s3://{bucket}/{key}")
     
     # Get file metadata from S3
     try:
@@ -502,15 +533,16 @@ async def process_s3_event(message: dict, s3_client) -> None:
         
         # Extract capture time from S3 metadata if available
         metadata = head_response.get('Metadata', {})
+        logger.info(f"[S3_EVENT] S3 metadata for {key}: {metadata}")
         capture_time = None
         if 'capturedat' in metadata:  # S3 metadata keys are lowercase
             try:
                 # Parse Unix timestamp in milliseconds from metadata
                 timestamp_ms = float(metadata['capturedat'])
                 capture_time = datetime.fromtimestamp(timestamp_ms / 1000, tz=timezone.utc)
-                logger.info(f"Found capture time in metadata: {capture_time}")
+                logger.info(f"[S3_EVENT] Parsed capture time from metadata: {capture_time} (from timestamp: {timestamp_ms})")
             except Exception as e:
-                logger.warning(f"Failed to parse capture time from metadata '{metadata['capturedat']}': {e}")
+                logger.warning(f"[S3_EVENT] Failed to parse capture time from metadata '{metadata['capturedat']}': {e}")
         elif 'capture-time' in metadata:
             try:
                 # Fallback: Parse ISO format timestamp from metadata  
@@ -526,13 +558,14 @@ async def process_s3_event(message: dict, s3_client) -> None:
         elif '.' in key:
             file_format = key.split('.')[-1].lower()
         
-        logger.info(f"File metadata - Size: {file_size}, Type: {content_type}, Format: {file_format}, Capture time: {capture_time}")
+        logger.info(f"[S3_EVENT] File metadata - Size: {file_size}, Type: {content_type}, Format: {file_format}, Capture time: {capture_time}")
         
     except Exception as e:
-        logger.error(f"Error getting S3 object metadata: {e}")
+        logger.error(f"[S3_EVENT] Error getting S3 object metadata for {key}: {e}")
         file_size = message.get('size', 0)
         file_format = None
         capture_time = None
+        logger.warning(f"[S3_EVENT] Using fallback values for {key}: size={file_size}, format={file_format}, capture_time={capture_time}")
     
     # Store in database
     db: Session = SessionLocal()
@@ -544,10 +577,12 @@ async def process_s3_event(message: dict, s3_client) -> None:
         ).first()
         
         if existing_file:
-            logger.info(f"File already tracked in database: {existing_file.id}")
+            logger.info(f"[S3_EVENT] File already tracked in database: {existing_file.id}")
+            return True  # Already processed, consider it success
         else:
             # Create new audio file record
             s3_upload_time = datetime.fromisoformat(message['event_time'].replace('Z', '+00:00'))
+            logger.info(f"[S3_EVENT] Creating DB record - user: {user_id}, s3_upload_time: {s3_upload_time}, capture_time: {capture_time}")
             audio_file = AudioFileDB(
                 user_id=None,  # User ID field not used (using username instead)
                 username=user_id,  # Using the hashed username from S3 path
@@ -563,17 +598,26 @@ async def process_s3_event(message: dict, s3_client) -> None:
             db.add(audio_file)
             db.commit()
             db.refresh(audio_file)
+            logger.info(f"[S3_EVENT] Database commit successful for {audio_file.id}")
             
-            logger.info(f"Created audio file record: {audio_file.id} for s3://{bucket}/{key}")
-            
-            # Apply VAD processing
+            logger.info(f"[S3_EVENT] Successfully created audio file record: {audio_file.id} for s3://{bucket}/{key}, user: {user_id}")
+
+            # Apply VAD processing in background but don't block
+            # VAD failures should not prevent database record creation
             asyncio.create_task(apply_vad_processing(audio_file.id, bucket, key))
+
+            # Return success - database record was created successfully
+            return True
     
     except Exception as e:
-        logger.error(f"Database error: {e}")
+        logger.error(f"[S3_EVENT] Database error processing {key}: {e}")
+        logger.error(f"[S3_EVENT] Failed to create database record for s3://{bucket}/{key}, user: {user_id}")
         db.rollback()
+        return False  # Failed to create database record
     finally:
         db.close()
+
+    return False  # Should not reach here, but default to failure
 
 
 @asynccontextmanager
@@ -599,6 +643,25 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         batch_monitor = asyncio.create_task(batch_monitor_task())
         background_tasks.append(batch_monitor)
         logger.info("Started batch monitor background task")
+
+        # Start S3 reconciliation task to catch missing events
+        bucket_name = os.getenv('S3_BUCKET_NAME', 'nirva-audio-1756080156')
+        # Create S3 client for reconciliation
+        s3_client_reconcile = boto3.client(
+            's3',
+            region_name=os.getenv('AWS_REGION', 'us-east-1'),
+            aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+            aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY')
+        )
+        reconciliation = asyncio.create_task(
+            reconciliation_task(
+                bucket_name=bucket_name,
+                process_callback=lambda msg: process_s3_event(msg, s3_client_reconcile),
+                interval_seconds=60  # Check every 1 minute for testing
+            )
+        )
+        background_tasks.append(reconciliation)
+        logger.info("Started S3 reconciliation background task")
     
     yield
     

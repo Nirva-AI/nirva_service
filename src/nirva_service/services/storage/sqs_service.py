@@ -5,6 +5,7 @@ SQS Service for polling S3 event notifications.
 import json
 import os
 from typing import List, Dict, Any, Optional
+from urllib.parse import unquote_plus
 import boto3
 from botocore.exceptions import ClientError
 from loguru import logger
@@ -57,6 +58,8 @@ class SQSService:
             return []
         
         try:
+            logger.debug(f"[SQS_API] Requesting up to {min(max_messages, 10)} messages with {wait_time_seconds}s wait time")
+
             response = self.sqs_client.receive_message(
                 QueueUrl=self.queue_url,
                 MaxNumberOfMessages=min(max_messages, 10),
@@ -65,8 +68,9 @@ class SQSService:
                 MessageAttributeNames=['All'],
                 AttributeNames=['All']
             )
-            
+
             messages = response.get('Messages', [])
+            logger.debug(f"[SQS_API] AWS returned {len(messages)} messages")
             parsed_messages = []
             
             for message in messages:
@@ -79,13 +83,21 @@ class SQSService:
                         for record in body['Records']:
                             if record.get('eventSource') == 'aws:s3':
                                 s3_info = record['s3']
+                                # S3 URL-encodes the object key in event notifications
+                                # We need to decode it to get the actual key
+                                raw_key = s3_info['object']['key']
+                                decoded_key = unquote_plus(raw_key)
+
+                                if raw_key != decoded_key:
+                                    logger.info(f"Decoded S3 key from '{raw_key}' to '{decoded_key}'")
+
                                 parsed_message = {
                                     'message_id': message['MessageId'],
                                     'receipt_handle': message['ReceiptHandle'],
                                     'event_name': record['eventName'],
                                     'event_time': record['eventTime'],
                                     'bucket': s3_info['bucket']['name'],
-                                    'key': s3_info['object']['key'],
+                                    'key': decoded_key,  # Use the decoded key
                                     'size': s3_info['object'].get('size', 0),
                                     'etag': s3_info['object'].get('eTag', ''),
                                     'raw_message': message
@@ -109,7 +121,10 @@ class SQSService:
                     logger.error(f"Missing expected field in message: {e}")
             
             if parsed_messages:
-                logger.info(f"Polled {len(parsed_messages)} messages from SQS")
+                logger.info(f"[SQS_API] Parsed {len(parsed_messages)} S3 events from {len(messages)} SQS messages")
+                for msg in parsed_messages:
+                    if 'key' in msg:
+                        logger.debug(f"[SQS_API] Message contains S3 key: {msg['key']}")
             
             return parsed_messages
             
@@ -136,7 +151,7 @@ class SQSService:
                 QueueUrl=self.queue_url,
                 ReceiptHandle=receipt_handle
             )
-            logger.debug(f"Deleted message with receipt handle: {receipt_handle[:20]}...")
+            logger.info(f"[SQS_DELETE] Deleted message with receipt handle: {receipt_handle[:20]}...")
             return True
             
         except ClientError as e:
