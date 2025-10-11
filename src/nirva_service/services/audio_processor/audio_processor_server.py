@@ -17,6 +17,9 @@ from sqlalchemy.orm import Session
 
 from nirva_service.services.storage.sqs_service import get_sqs_service
 from nirva_service.services.audio_processing import get_vad_service, get_deepgram_service
+from nirva_service.services.audio_processing.enhanced_deepgram_service import get_enhanced_deepgram_service
+from nirva_service.services.audio_processing.pyannote_service import get_pyannote_service
+from nirva_service.services.audio_processing.diarization_merger import get_diarization_merger
 from nirva_service.services.audio_processor.batch_manager import get_batch_manager
 from nirva_service.db.pgsql_client import SessionLocal
 from nirva_service.db.pgsql_object import AudioFileDB, AudioBatchDB, TranscriptionResultDB
@@ -41,7 +44,9 @@ async def process_batch_transcription(batch_id: str) -> None:
     
     db: Session = SessionLocal()
     vad_service = get_vad_service()
-    deepgram_service = get_deepgram_service()
+    enhanced_deepgram_service = get_enhanced_deepgram_service()
+    pyannote_service = get_pyannote_service()
+    diarization_merger = get_diarization_merger()
     s3_client = boto3.client('s3')
     batch_manager = get_batch_manager()
     
@@ -104,9 +109,86 @@ async def process_batch_transcription(batch_id: str) -> None:
             batch_manager.mark_batch_completed(batch, db)
             return
         
-        # Transcribe with Deepgram
-        logger.info(f"Sending {len(speech_audio)} bytes to Deepgram for transcription")
-        transcription_result = await deepgram_service.transcribe_audio(speech_audio)
+        # Dual API Approach: Deepgram for word-level transcription + Pyannote for diarization
+        logger.info(f"Starting dual API processing for {len(speech_audio)} bytes")
+
+        # Determine S3 URL for pyannote.ai processing
+        temp_audio_file = None
+        temp_s3_key = None
+
+        # Ensure both services process the exact same audio
+        # Always upload the VAD-processed speech_audio for consistent processing
+        try:
+            # Save VAD-processed audio to temporary file
+            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_file:
+                temp_audio_file = temp_file.name
+                temp_file.write(speech_audio)
+
+            # Upload VAD-processed audio to S3 for pyannote.ai processing
+            temp_s3_key = f"temp-diarization/{batch_id}.wav"
+            s3_bucket = os.getenv('AWS_S3_BUCKET')
+            s3_client.upload_file(temp_audio_file, s3_bucket, temp_s3_key)
+
+            # Create presigned URL for pyannote.ai access (bucket is private)
+            presigned_url = s3_client.generate_presigned_url(
+                'get_object',
+                Params={'Bucket': s3_bucket, 'Key': temp_s3_key},
+                ExpiresIn=3600  # 1 hour
+            )
+
+            logger.info(f"Uploaded VAD-processed audio to S3 for synchronized processing: {temp_s3_key}")
+        except Exception as e:
+            logger.error(f"Failed to upload VAD-processed audio: {e}")
+            raise
+
+        # Step 1: Get word-level transcription from Enhanced Deepgram (no diarization)
+        logger.info("Step 1: Getting word-level transcription from Deepgram (VAD-processed audio)")
+        deepgram_result = await enhanced_deepgram_service.transcribe_audio_with_words(speech_audio)
+
+        # Step 2: Get speaker diarization from Pyannote.ai (same VAD-processed audio)
+        logger.info("Step 2: Getting speaker diarization from Pyannote.ai (same VAD-processed audio)")
+        speaker_segments = await pyannote_service.diarize_audio_url(presigned_url)
+
+        # Step 3: Merge diarization with word timestamps to create sentence-level output
+        logger.info("Step 3: Merging diarization with word timestamps")
+        base_time = batch.first_segment_time or datetime.now()
+        merged_transcription = diarization_merger.merge_diarization_with_words(
+            speaker_segments,
+            deepgram_result.get('words', []),
+            base_time
+        )
+
+        # Create combined result
+        transcription_result = {
+            'transcription': merged_transcription,
+            'confidence': deepgram_result.get('confidence', 0.0),
+            'language': deepgram_result.get('language', 'en'),
+            'speaker_segments': speaker_segments,
+            'word_count': len(deepgram_result.get('words', [])),
+            'sentence_count': len([s for s in merged_transcription.split('[') if 'Speaker' in s]),
+            'sentiment_data': deepgram_result.get('sentiment_data'),
+            'topics_data': deepgram_result.get('topics_data'),
+            'intents_data': deepgram_result.get('intents_data'),
+            'raw_response': deepgram_result.get('raw_response')
+        }
+
+        logger.info(
+            f"Dual API processing complete: {len(speaker_segments)} speakers, "
+            f"{transcription_result['word_count']} words, "
+            f"{transcription_result['sentence_count']} sentences"
+        )
+
+        finally:
+            # Clean up temporary files
+            if temp_audio_file and os.path.exists(temp_audio_file):
+                os.remove(temp_audio_file)
+            # Clean up temporary S3 object
+            if temp_s3_key:
+                try:
+                    s3_client.delete_object(Bucket=s3_bucket, Key=temp_s3_key)
+                    logger.debug(f"Cleaned up temporary S3 object: {temp_s3_key}")
+                except:
+                    pass
         
         # Check if transcription text is meaningful (not null, not empty, more than 1 character)
         transcription_text = transcription_result.get('transcription', '')
@@ -144,7 +226,7 @@ async def process_batch_transcription(batch_id: str) -> None:
             end_time=end_time,
             transcription_text=transcription_text,
             transcription_confidence=transcription_result['confidence'],
-            transcription_service='deepgram',
+            transcription_service='deepgram+pyannote',
             detected_language=transcription_result.get('language'),
             sentiment_data=transcription_result.get('sentiment_data'),
             topics_data=transcription_result.get('topics_data'),

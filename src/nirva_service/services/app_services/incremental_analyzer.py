@@ -192,9 +192,10 @@ class IncrementalAnalyzer:
         """
         Parse transcript with time markers to extract chunks with timestamps.
         Supports:
-        - [START_ISO|END_ISO] for full timestamp ranges
-        - [ISO_TIMESTAMP] for single timestamps
-        - [HH:MM] for simple times
+        - [HH:MM:SS-HH:MM:SS] for new format (e.g., [10:15:30-10:15:33])
+        - [START_ISO|END_ISO] for full timestamp ranges (legacy)
+        - [ISO_TIMESTAMP] for single timestamps (legacy)
+        - [HH:MM] for simple times (legacy)
 
         Returns:
             List of dicts with 'start_time', 'end_time', 'text' keys
@@ -207,7 +208,21 @@ class IncrementalAnalyzer:
         matches = re.findall(pattern, transcript)
 
         for time_str, text in matches:
-            # Check if this is a range format (start|end)
+            # Check if this is the new HH:MM:SS-HH:MM:SS format
+            if "-" in time_str and ":" in time_str:
+                # New format: [HH:MM:SS-HH:MM:SS]
+                if time_str.count("-") == 1:  # Only one dash for time range
+                    start_str, end_str = time_str.split("-", 1)
+                    chunks.append(
+                        {
+                            "start_time": start_str.strip(),
+                            "end_time": end_str.strip(),
+                            "text": text.strip(),
+                        }
+                    )
+                    continue
+
+            # Check if this is legacy ISO range format (start|end)
             if "|" in time_str:
                 start_str, end_str = time_str.split("|", 1)
                 chunks.append(
@@ -298,14 +313,41 @@ class IncrementalAnalyzer:
     ) -> datetime:
         """
         Parse time string to datetime. Always returns UTC datetime.
-        Handles ISO format timestamps directly.
+        Handles both HH:MM:SS format and ISO format timestamps.
         """
-        from datetime import datetime, timezone
-
+        from datetime import datetime, timezone, time
         from dateutil import parser
 
         try:
-            # Parse ISO format timestamp (this should be the primary format now)
+            # Check if this is HH:MM:SS format
+            if ":" in time_str and len(time_str.split(":")) == 3:
+                try:
+                    # Parse HH:MM:SS format
+                    time_parts = time_str.split(":")
+                    hours = int(time_parts[0])
+                    minutes = int(time_parts[1])
+                    seconds = int(time_parts[2])
+
+                    # Create time object
+                    time_obj = time(hours, minutes, seconds)
+
+                    # If we have a previous_time, use its date; otherwise use today
+                    if previous_time:
+                        base_date = previous_time.date()
+                    else:
+                        base_date = datetime.now(timezone.utc).date()
+
+                    # Combine date and time
+                    parsed = datetime.combine(base_date, time_obj)
+                    parsed = parsed.replace(tzinfo=timezone.utc)
+
+                    return parsed
+
+                except (ValueError, IndexError):
+                    # If HH:MM:SS parsing fails, fall through to ISO parsing
+                    pass
+
+            # Try ISO format timestamp parsing (legacy support)
             parsed = parser.isoparse(time_str)
 
             # Ensure it's timezone-aware (UTC if not specified)
